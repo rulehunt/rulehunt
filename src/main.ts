@@ -5,35 +5,62 @@ import {
   c4RulesetToHex,
   conwayRule,
   coords10x14,
+  coords32x16,
   expandC4Ruleset,
   makeC4Ruleset,
   outlierRule,
   randomC4RulesetByDensity,
 } from './utils.ts'
 
+// --- Display Mode -----------------------------------------------------------
+type DisplayMode = 'orbits' | 'full'
+
 // --- Renderer --------------------------------------------------------------
 function renderRule(
   ruleset: C4Ruleset,
+  orbitLookup: Uint8Array,
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   ruleLabelDisplay: HTMLElement,
   ruleIdDisplay: HTMLElement,
   ruleLabel: string,
+  displayMode: DisplayMode,
 ) {
-  const cols = 10
-  const rows = 14
-  const cellW = canvas.width / cols
-  const cellH = canvas.height / rows
+  if (displayMode === 'orbits') {
+    // Render 10×14 grid of C4 orbits
+    const cols = 10
+    const rows = 14
+    const cellW = canvas.width / cols
+    const cellH = canvas.height / rows
 
-  ctx.fillStyle = '#fff'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = 'purple'
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = 'purple'
 
-  // Render the 140 orbit representatives
-  for (let orbit = 0; orbit < 140; orbit++) {
-    if (ruleset[orbit]) {
-      const { x, y } = coords10x14(orbit)
-      ctx.fillRect(x * cellW, y * cellH, cellW, cellH)
+    for (let orbit = 0; orbit < 140; orbit++) {
+      if (ruleset[orbit]) {
+        const { x, y } = coords10x14(orbit)
+        ctx.fillRect(x * cellW, y * cellH, cellW, cellH)
+      }
+    }
+  } else {
+    // Render 32×16 grid of full 512 patterns
+    const cols = 32
+    const rows = 16
+    const cellW = canvas.width / cols
+    const cellH = canvas.height / rows
+
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = 'purple'
+
+    const expandedRuleset = expandC4Ruleset(ruleset, orbitLookup)
+
+    for (let pattern = 0; pattern < 512; pattern++) {
+      if (expandedRuleset[pattern]) {
+        const { x, y } = coords32x16(pattern)
+        ctx.fillRect(x * cellW, y * cellH, cellW, cellH)
+      }
     }
   }
 
@@ -48,47 +75,81 @@ function handleCanvasClick(
   canvas: HTMLCanvasElement,
   currentRuleset: C4Ruleset,
   orbitsData: C4OrbitsData,
+  orbitLookup: Uint8Array,
+  displayMode: DisplayMode,
 ) {
   const rect = canvas.getBoundingClientRect()
   const x = event.clientX - rect.left
   const y = event.clientY - rect.top
 
-  const cols = 10
-  const rows = 14
-  const cellW = canvas.width / cols
-  const cellH = canvas.height / rows
+  if (displayMode === 'orbits') {
+    // 10×14 orbit grid
+    const cols = 10
+    const rows = 14
+    const cellW = canvas.width / cols
+    const cellH = canvas.height / rows
 
-  const gridX = Math.floor(x / cellW)
-  const gridY = Math.floor(y / cellH)
+    const gridX = Math.floor(x / cellW)
+    const gridY = Math.floor(y / cellH)
+    const orbitIndex = gridY * cols + gridX
 
-  // Convert grid position to orbit index
-  const orbitIndex = gridY * cols + gridX
+    if (orbitIndex < 0 || orbitIndex >= 140) return
 
-  if (orbitIndex < 0 || orbitIndex >= 140) return
+    const orbit = orbitsData.orbits[orbitIndex]
+    const output = currentRuleset[orbitIndex]
+    const representative = orbit.representative
 
-  // Get the orbit data
-  const orbit = orbitsData.orbits[orbitIndex]
-  const output = currentRuleset[orbitIndex]
+    const bits = []
+    for (let i = 0; i < 9; i++) {
+      bits.push((representative >> i) & 1)
+    }
 
-  // Use the representative pattern from the orbit
-  const representative = orbit.representative
+    console.log(
+      `\nOrbit ${orbitIndex} (output: ${output})\nRepresentative pattern:\n${bits[0]} ${bits[1]} ${bits[2]}\n${bits[3]} ${bits[4]} ${bits[5]}     --->  ${output}\n${bits[6]} ${bits[7]} ${bits[8]}\n`,
+    )
+    console.log(`Stabilizer: ${orbit.stabilizer}, Size: ${orbit.size}`)
+  } else {
+    // 32×16 full pattern grid
+    const cols = 32
+    const rows = 16
+    const cellW = canvas.width / cols
+    const cellH = canvas.height / rows
 
-  // Extract the 3x3 pattern from the 9-bit index
-  const bits = []
-  for (let i = 0; i < 9; i++) {
-    bits.push((representative >> i) & 1)
+    const gridX = Math.floor(x / cellW)
+    const gridY = Math.floor(y / cellH)
+
+    // Find pattern index from coordinates using inverse of coords32x16
+    let patternIndex = -1
+    for (let p = 0; p < 512; p++) {
+      const coord = coords32x16(p)
+      if (coord.x === gridX && coord.y === gridY) {
+        patternIndex = p
+        break
+      }
+    }
+
+    if (patternIndex === -1) return
+
+    const expandedRuleset = expandC4Ruleset(currentRuleset, orbitLookup)
+    const output = expandedRuleset[patternIndex]
+    const orbitId = orbitLookup[patternIndex]
+
+    const bits = []
+    for (let i = 0; i < 9; i++) {
+      bits.push((patternIndex >> i) & 1)
+    }
+
+    console.log(
+      `\nPattern ${patternIndex} (orbit: ${orbitId}, output: ${output})\n${bits[0]} ${bits[1]} ${bits[2]}\n${bits[3]} ${bits[4]} ${bits[5]}     --->  ${output}\n${bits[6]} ${bits[7]} ${bits[8]}\n`,
+    )
   }
-
-  console.log(
-    `\nOrbit ${orbitIndex} (output: ${output})\nRepresentative pattern:\n${bits[0]} ${bits[1]} ${bits[2]}\n${bits[3]} ${bits[4]} ${bits[5]}     --->  ${output}\n${bits[6]} ${bits[7]} ${bits[8]}\n`,
-  )
-  console.log(`Stabilizer: ${orbit.stabilizer}, Size: ${orbit.size}`)
 }
 
 // --- Main ------------------------------------------------------------------
 window.addEventListener('DOMContentLoaded', async () => {
-  const ruleLabelDisplay = document.getElementById('rulename') as HTMLElement
-  const ruleIdDisplay = document.getElementById('ruleid') as HTMLElement
+  const ruleLabelDisplay = document.getElementById('rule-label') as HTMLElement
+  const ruleIdDisplay = document.getElementById('rule-id') as HTMLElement
+
   const canvas = document.getElementById('truth') as HTMLCanvasElement
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
 
@@ -109,21 +170,33 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Track current initial condition selection
   let initialConditionType: 'center' | 'random' | 'patch' = 'patch'
 
+  // Track current display mode
+  let displayMode: DisplayMode = 'orbits'
+
   // Default: Conway
   const conwayRuleset = makeC4Ruleset(conwayRule, orbitLookup)
   currentRuleset = conwayRuleset
   renderRule(
     conwayRuleset,
+    orbitLookup,
     ctx,
     canvas,
     ruleLabelDisplay,
     ruleIdDisplay,
     'Conway',
+    displayMode,
   )
 
   // Add click listener
   canvas.addEventListener('click', (e) => {
-    handleCanvasClick(e, canvas, currentRuleset, orbitsData)
+    handleCanvasClick(
+      e,
+      canvas,
+      currentRuleset,
+      orbitsData,
+      orbitLookup,
+      displayMode,
+    )
   })
   canvas.style.cursor = 'pointer'
 
@@ -143,7 +216,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   btnConway.addEventListener('click', () => {
     const ruleset = makeC4Ruleset(conwayRule, orbitLookup)
     currentRuleset = ruleset
-    renderRule(ruleset, ctx, canvas, ruleLabelDisplay, ruleIdDisplay, 'Conway')
+    renderRule(
+      ruleset,
+      orbitLookup,
+      ctx,
+      canvas,
+      ruleLabelDisplay,
+      ruleIdDisplay,
+      'Conway',
+      displayMode,
+    )
 
     // If playing, restart with new rules
     if (cellularAutomata.isCurrentlyPlaying()) {
@@ -157,7 +239,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   btnOutlier.addEventListener('click', () => {
     const ruleset = makeC4Ruleset(outlierRule, orbitLookup)
     currentRuleset = ruleset
-    renderRule(ruleset, ctx, canvas, ruleLabelDisplay, ruleIdDisplay, 'Outlier')
+    renderRule(
+      ruleset,
+      orbitLookup,
+      ctx,
+      canvas,
+      ruleLabelDisplay,
+      ruleIdDisplay,
+      'Outlier',
+      displayMode,
+    )
 
     // If playing, restart with new rules
     if (cellularAutomata.isCurrentlyPlaying()) {
@@ -186,11 +277,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     currentRuleset = ruleset
     renderRule(
       ruleset,
+      orbitLookup,
       ctx,
       canvas,
       ruleLabelDisplay,
       ruleIdDisplay,
       `Random Pattern (${percentage}% orbits)`,
+      displayMode,
     )
 
     // If playing, restart with new rules
@@ -200,6 +293,56 @@ window.addEventListener('DOMContentLoaded', async () => {
       const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
       cellularAutomata.play(stepsPerSecond, expanded)
     }
+  }
+
+  // Display mode radio buttons
+  const radioDisplayOrbits = document.getElementById(
+    'radio-display-orbits',
+  ) as HTMLInputElement
+  const radioDisplayFull = document.getElementById(
+    'radio-display-full',
+  ) as HTMLInputElement
+
+  radioDisplayOrbits.addEventListener('change', () => {
+    if (radioDisplayOrbits.checked) {
+      displayMode = 'orbits'
+      // Re-render current ruleset with new display mode
+      renderRule(
+        currentRuleset,
+        orbitLookup,
+        ctx,
+        canvas,
+        ruleLabelDisplay,
+        ruleIdDisplay,
+        getCurrentRuleLabel(),
+        displayMode,
+      )
+    }
+  })
+
+  radioDisplayFull.addEventListener('change', () => {
+    if (radioDisplayFull.checked) {
+      displayMode = 'full'
+      // Re-render current ruleset with new display mode
+      renderRule(
+        currentRuleset,
+        orbitLookup,
+        ctx,
+        canvas,
+        ruleLabelDisplay,
+        ruleIdDisplay,
+        getCurrentRuleLabel(),
+        displayMode,
+      )
+    }
+  })
+
+  // Helper to get current rule label for re-rendering
+  function getCurrentRuleLabel(): string {
+    // Extract label from current display text
+    const currentLabelText = ruleLabelDisplay.textContent || ''
+    const labelMatch = currentLabelText.match(/^(.+?)\s*—/)
+    return labelMatch ? labelMatch[1] : 'Rule'
   }
 
   // Initial condition radio buttons
