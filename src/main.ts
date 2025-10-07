@@ -6,6 +6,7 @@ import {
   makeRule140,
   outlierOutput,
   randomRule140,
+  randomRule140ByOrbits,
   Rule140,
   ruleToHex,
 } from "./utils.ts";
@@ -124,23 +125,14 @@ window.addEventListener("DOMContentLoaded", () => {
   canvas.style.cursor = "pointer";
 
   // Buttons
-  const btnRandom = document.getElementById("btn-random")!;
   const btnConway = document.getElementById("btn-conway")!;
   const btnOutlier = document.getElementById("btn-outlier")!;
-
-  btnRandom.addEventListener("click", () => {
-    const rule = randomRule140();
-    currentRule = rule;
-    currentTruth = expandRule(rule, orbitId);
-    renderRule(rule, orbitId, ctx, canvas, ruleDisplay, "Random");
-    
-    // If playing, restart with new rules
-    if (cellularAutomata.isCurrentlyPlaying()) {
-      cellularAutomata.pause();
-      const stepsPerSecond = parseInt(stepsPerSecondInput.value);
-      cellularAutomata.play(stepsPerSecond, currentRule, orbitId);
-    }
-  });
+  const btnRandomPattern = document.getElementById("btn-random-pattern")!;
+  
+  // Orbit slider elements
+  const orbitSliderContainer = document.getElementById("orbit-slider-container")!;
+  const orbitSlider = document.getElementById("orbit-slider") as HTMLInputElement;
+  const orbitValue = document.getElementById("orbit-value")!;
 
   btnConway.addEventListener("click", () => {
     const rule = makeRule140(conwayOutput, orbitId);
@@ -169,6 +161,32 @@ window.addEventListener("DOMContentLoaded", () => {
       cellularAutomata.play(stepsPerSecond, currentRule, orbitId);
     }
   });
+
+  // Random pattern button generates a new rule
+  btnRandomPattern.addEventListener("click", () => {
+    generateRandomPatternRule();
+  });
+
+  // Update orbit slider value display and regenerate rule
+  orbitSlider.addEventListener("input", () => {
+    orbitValue.textContent = `${orbitSlider.value}%`;
+    generateRandomPatternRule();
+  });
+
+  function generateRandomPatternRule() {
+    const percentage = parseInt(orbitSlider.value);
+    const rule = randomRule140ByOrbits(percentage);
+    currentRule = rule;
+    currentTruth = expandRule(rule, orbitId);
+    renderRule(rule, orbitId, ctx, canvas, ruleDisplay, `Random Pattern (${percentage}% orbits)`);
+    
+    // If playing, restart with new rules
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause();
+      const stepsPerSecond = parseInt(stepsPerSecondInput.value);
+      cellularAutomata.play(stepsPerSecond, currentRule, orbitId);
+    }
+  }
 
   // Simulation buttons
   const btnStep = document.getElementById("btn-step")!;

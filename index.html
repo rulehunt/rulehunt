@@ -110,9 +110,16 @@
       <h2 id="ruleid">loading rule...</h2>
       <canvas id="truth" width="512" height="256"></canvas>
       <div class="buttons">
-        <button id="btn-random">Random ruleset</button>
         <button id="btn-conway">Conway ruleset</button>
         <button id="btn-outlier">Outlier ruleset</button>
+      </div>
+      <div class="buttons" style="margin-top: 12px;">
+        <button id="btn-random-pattern">Random pattern</button>
+      </div>
+      <div class="slider-container" id="orbit-slider-container">
+        <label for="orbit-slider">Orbit %:</label>
+        <input type="range" id="orbit-slider" min="0" max="100" value="50" />
+        <span id="orbit-value">50%</span>
       </div>
     </div>
     <script type="module" src="./src/main.ts"></script>

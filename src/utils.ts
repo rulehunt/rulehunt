@@ -137,6 +137,31 @@ export function randomRule140(): Rule140 {
   return { lo, mid, hi };
 }
 
+/** Generate random 140-bit rule by randomly selecting orbits */
+export function randomRule140ByOrbits(orbitPercentage: number = 50): Rule140 {
+  let lo = 0n;
+  let mid = 0n;
+  let hi = 0n;
+  
+  const threshold = orbitPercentage / 100;
+  
+  // There are 140 orbits total (indices 0-139)
+  for (let orbit = 0; orbit < 140; orbit++) {
+    if (Math.random() < threshold) {
+      // Turn on this orbit
+      if (orbit < 64) {
+        lo |= 1n << BigInt(orbit);
+      } else if (orbit < 128) {
+        mid |= 1n << BigInt(orbit - 64);
+      } else {
+        hi |= 1n << BigInt(orbit - 128);
+      }
+    }
+  }
+  
+  return { lo, mid, hi };
+}
+
 // --- Canonical Rule Definitions ---------------------------------------------
 /** Conway's Game of Life (B3/S23) */
 export function conwayOutput(n: number): number {
