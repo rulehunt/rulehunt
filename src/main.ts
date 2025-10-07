@@ -1,3 +1,5 @@
+import type { CellState, Ruleset, CanonicalPatternIndex } from './schemas/cellular-automata';
+
 // --- constants ------------------------------------------------------------
 const ROT_MAP = [6, 3, 0, 7, 4, 1, 8, 5, 2]; // 90° CW rotation for bits 8..0
 
@@ -30,21 +32,19 @@ function buildC4Index() {
 }
 
 // --- rule generation / expansion -----------------------------------------
-type Rule128 = { lo: bigint; hi: bigint };
-function randomRule(): Rule128 {
-  const lo = (BigInt(Math.floor(Math.random() * 2 ** 32)) << 32n) |
-             BigInt(Math.floor(Math.random() * 2 ** 32));
-  const hi = (BigInt(Math.floor(Math.random() * 2 ** 32)) << 32n) |
-             BigInt(Math.floor(Math.random() * 2 ** 32));
-  return { lo, hi };
+function randomRule(): Ruleset {
+  const ruleset: Ruleset = {};
+  for (let i = 0; i < 128; i++) {
+    ruleset[i.toString()] = Math.random() < 0.5 ? 0 : 1;
+  }
+  return ruleset;
 }
 
-function ruleGet(R: Rule128, orbit: number): number {
-  if (orbit < 64) return Number((R.lo >> BigInt(orbit)) & 1n);
-  return Number((R.hi >> BigInt(orbit - 64)) & 1n);
+function ruleGet(R: Ruleset, orbit: number): CellState {
+  return R[orbit.toString()] as CellState;
 }
 
-function expandRule(R: Rule128, orbitId: Uint8Array): Uint8Array {
+function expandRule(R: Ruleset, orbitId: Uint8Array): Uint8Array {
   const T = new Uint8Array(512);
   for (let n = 0; n < 512; n++) T[n] = ruleGet(R, orbitId[n]);
   return T;
