@@ -6,8 +6,6 @@ export const CellState = z.union([
   z.literal(1),
 ]);
 
-export const ExtendedCellState = z.number().int().min(0).max(255);
-
 // Coordinates
 export const Coordinate = z.object({
   x: z.number().int(),
@@ -29,27 +27,26 @@ export const GridDimensions = z.object({
 // Grid/Board schemas
 export const Grid = z.array(z.array(CellState));
 
-export const ExtendedGrid = z.array(z.array(ExtendedCellState));
+// Canonical pattern index (0-127) representing a C4 symmetry equivalence class
+export const CanonicalPatternIndex = z.number().int().min(0).max(127);
 
-// Neighborhood types
-export const NeighborhoodType = z.enum([
-  'moore', // 8 neighbors
-  'vonNeumann', // 4 neighbors
-  'hexagonal', // 6 neighbors
-]);
-
-// Rule definitions
-export const ConwayRule = z.object({
-  birth: z.array(z.number().int().min(0).max(8)),
-  survival: z.array(z.number().int().min(0).max(8)),
+// Individual 3x3 convolution rule
+// Maps a canonical pattern to output state (alive/dead)
+export const Rule = z.object({
+  canonicalIndex: CanonicalPatternIndex,
+  pattern: z.array(z.array(CellState).length(3)).length(3), // The canonical representation
+  output: CellState,
 });
 
-export const ElementaryRule = z.number().int().min(0).max(255);
-
-export const TotalisticRule = z.object({
-  states: z.number().int().min(2),
-  transitions: z.record(z.string(), z.number().int()),
-});
+// Complete ruleset with C4 symmetry as a map from canonical index to output
+// Using a Record ensures each canonical pattern appears exactly once
+export const Ruleset = z.record(
+  z.string().regex(/^(12[0-7]|1[01][0-9]|[1-9]?[0-9])$/), // "0" to "127" as strings
+  CellState
+).refine(
+  (record) => Object.keys(record).length === 128,
+  { message: "Ruleset must define output for all 128 canonical patterns" }
+);
 
 // Pattern definitions
 export const Pattern = z.object({
@@ -67,27 +64,17 @@ export const SimulationConfig = z.object({
     Pattern,
     Grid,
   ]),
-  rule: z.union([
-    z.object({ type: z.literal('conway'), config: ConwayRule }),
-    z.object({ type: z.literal('elementary'), config: ElementaryRule }),
-    z.object({ type: z.literal('totalistic'), config: TotalisticRule }),
-  ]),
-  neighborhoodType: NeighborhoodType.default('moore'),
-  boundaryCondition: z.enum(['periodic', 'fixed', 'reflective']).default('periodic'),
-  speed: z.number().positive().default(1),
+  ruleset: Ruleset,
 });
 
 // Type exports
 export type CellState = z.infer<typeof CellState>;
-export type ExtendedCellState = z.infer<typeof ExtendedCellState>;
 export type Coordinate = z.infer<typeof Coordinate>;
 export type Cell = z.infer<typeof Cell>;
 export type GridDimensions = z.infer<typeof GridDimensions>;
 export type Grid = z.infer<typeof Grid>;
-export type ExtendedGrid = z.infer<typeof ExtendedGrid>;
-export type NeighborhoodType = z.infer<typeof NeighborhoodType>;
-export type ConwayRule = z.infer<typeof ConwayRule>;
-export type ElementaryRule = z.infer<typeof ElementaryRule>;
-export type TotalisticRule = z.infer<typeof TotalisticRule>;
+export type CanonicalPatternIndex = z.infer<typeof CanonicalPatternIndex>;
+export type Rule = z.infer<typeof Rule>;
+export type Ruleset = z.infer<typeof Ruleset>;
 export type Pattern = z.infer<typeof Pattern>;
 export type SimulationConfig = z.infer<typeof SimulationConfig>;
