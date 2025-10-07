@@ -110,6 +110,9 @@ window.addEventListener('DOMContentLoaded', () => {
   let currentTruth: Uint8Array
   let currentRule: Rule140
 
+  // Track current initial condition selection
+  let initialConditionType: 'center' | 'random' | 'patch' = 'patch'
+
   // Default: Conway
   const conwayRule = makeRule140(conwayOutput, orbitId)
   currentRule = conwayRule
@@ -196,14 +199,56 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Initial condition radio buttons
+  const radioCenterSeed = document.getElementById(
+    'radio-center-seed',
+  ) as HTMLInputElement
+  const radioRandomSeed = document.getElementById(
+    'radio-random-seed',
+  ) as HTMLInputElement
+  const radioPatchSeed = document.getElementById(
+    'radio-patch-seed',
+  ) as HTMLInputElement
+
+  // Listen for radio button changes
+  radioCenterSeed.addEventListener('change', () => {
+    if (radioCenterSeed.checked) {
+      initialConditionType = 'center'
+      applyInitialCondition()
+    }
+  })
+
+  radioRandomSeed.addEventListener('change', () => {
+    if (radioRandomSeed.checked) {
+      initialConditionType = 'random'
+      applyInitialCondition()
+    }
+  })
+
+  radioPatchSeed.addEventListener('change', () => {
+    if (radioPatchSeed.checked) {
+      initialConditionType = 'patch'
+      applyInitialCondition()
+    }
+  })
+
+  // Function to apply the selected initial condition
+  function applyInitialCondition() {
+    if (initialConditionType === 'center') {
+      cellularAutomata.centerSeed()
+    } else if (initialConditionType === 'patch') {
+      const percentage = Number.parseInt(aliveSlider.value)
+      cellularAutomata.patchSeed(percentage)
+    } else {
+      const percentage = Number.parseInt(aliveSlider.value)
+      cellularAutomata.randomSeed(percentage)
+    }
+    cellularAutomata.render()
+  }
+
   // Simulation buttons
   const btnStep = document.getElementById('btn-step') as HTMLButtonElement
-  const btnRandomSeed = document.getElementById(
-    'btn-random-seed',
-  ) as HTMLButtonElement
-  const btnCenterSeed = document.getElementById(
-    'btn-center-seed',
-  ) as HTMLButtonElement
+  const btnRestart = document.getElementById('btn-restart') as HTMLButtonElement
 
   const btnPlay = document.getElementById('btn-play') as HTMLButtonElement
   const aliveSlider = document.getElementById(
@@ -217,21 +262,18 @@ window.addEventListener('DOMContentLoaded', () => {
   // Update slider value display
   aliveSlider.addEventListener('input', () => {
     aliveValue.textContent = `${aliveSlider.value}%`
+    // If random seed or patch seed is selected, update the grid
+    if (initialConditionType === 'random' || initialConditionType === 'patch') {
+      applyInitialCondition()
+    }
   })
 
   btnStep.addEventListener('click', () => {
     cellularAutomata.step(currentRule, orbitId)
   })
 
-  btnCenterSeed.addEventListener('click', () => {
-    cellularAutomata.centerSeed()
-    cellularAutomata.render()
-  })
-
-  btnRandomSeed.addEventListener('click', () => {
-    const percentage = Number.parseInt(aliveSlider.value)
-    cellularAutomata.randomSeed(percentage)
-    cellularAutomata.render()
+  btnRestart.addEventListener('click', () => {
+    applyInitialCondition()
   })
 
   btnPlay.addEventListener('click', () => {

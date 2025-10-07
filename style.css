@@ -1,0 +1,18 @@
+/* Custom styles for RuleHunt - Tailwind handles most styling */
+
+/* Ensure canvas cursors work properly */
+#truth {
+  cursor: pointer;
+}
+
+/* Optional: Custom focus ring color for consistency */
+:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Smooth font rendering */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

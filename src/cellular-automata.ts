@@ -42,6 +42,31 @@ export class CellularAutomata {
     }
   }
 
+  patchSeed(alivePercentage = 50) {
+    // Clear the grid first
+    for (let i = 0; i < this.grid.length; i++) {
+      this.grid[i] = 0
+    }
+
+    // Fill a 10x10 patch in the center with random noise
+    const threshold = alivePercentage / 100
+    const centerX = Math.floor(GRID_SIZE / 2)
+    const centerY = Math.floor(GRID_SIZE / 2)
+    const patchSize = 10
+    const startX = centerX - Math.floor(patchSize / 2)
+    const startY = centerY - Math.floor(patchSize / 2)
+
+    for (let dy = 0; dy < patchSize; dy++) {
+      for (let dx = 0; dx < patchSize; dx++) {
+        const x = startX + dx
+        const y = startY + dy
+        if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+          this.grid[y * GRID_SIZE + x] = Math.random() < threshold ? 1 : 0
+        }
+      }
+    }
+  }
+
   step(rule: Rule140, orbitId: Uint8Array) {
     const truth = expandRule(rule, orbitId)
 
