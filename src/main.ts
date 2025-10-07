@@ -9,6 +9,7 @@ import {
   Rule140,
   ruleToHex,
 } from "./utils.ts";
+import { CellularAutomata } from "./cellular-automata.ts";
 
 // --- Renderer --------------------------------------------------------------
 function renderRule(
@@ -102,11 +103,17 @@ window.addEventListener("DOMContentLoaded", () => {
   const ctx = canvas.getContext("2d")!;
   const { orbitId } = buildC4Index();
 
-  // Track current truth table for click handler
+  // Initialize cellular automata simulation
+  const simCanvas = document.getElementById("simulation") as HTMLCanvasElement;
+  const cellularAutomata = new CellularAutomata(simCanvas);
+
+  // Track current truth table and rule for click handler
   let currentTruth: Uint8Array;
+  let currentRule: Rule140;
 
   // Default: Conway
   const conwayRule = makeRule140(conwayOutput, orbitId);
+  currentRule = conwayRule;
   currentTruth = expandRule(conwayRule, orbitId);
   renderRule(conwayRule, orbitId, ctx, canvas, ruleDisplay, "Conway");
   
@@ -123,19 +130,86 @@ window.addEventListener("DOMContentLoaded", () => {
 
   btnRandom.addEventListener("click", () => {
     const rule = randomRule140();
+    currentRule = rule;
     currentTruth = expandRule(rule, orbitId);
     renderRule(rule, orbitId, ctx, canvas, ruleDisplay, "Random");
+    
+    // If playing, restart with new rules
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause();
+      const stepsPerSecond = parseInt(stepsPerSecondInput.value);
+      cellularAutomata.play(stepsPerSecond, currentRule, orbitId);
+    }
   });
 
   btnConway.addEventListener("click", () => {
     const rule = makeRule140(conwayOutput, orbitId);
+    currentRule = rule;
     currentTruth = expandRule(rule, orbitId);
     renderRule(rule, orbitId, ctx, canvas, ruleDisplay, "Conway");
+    
+    // If playing, restart with new rules
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause();
+      const stepsPerSecond = parseInt(stepsPerSecondInput.value);
+      cellularAutomata.play(stepsPerSecond, currentRule, orbitId);
+    }
   });
 
   btnOutlier.addEventListener("click", () => {
     const rule = makeRule140(outlierOutput, orbitId);
+    currentRule = rule;
     currentTruth = expandRule(rule, orbitId);
     renderRule(rule, orbitId, ctx, canvas, ruleDisplay, "Outlier");
+    
+    // If playing, restart with new rules
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause();
+      const stepsPerSecond = parseInt(stepsPerSecondInput.value);
+      cellularAutomata.play(stepsPerSecond, currentRule, orbitId);
+    }
+  });
+
+  // Simulation buttons
+  const btnStep = document.getElementById("btn-step")!;
+  const btnRandomize = document.getElementById("btn-randomize")!;
+  const btnPlay = document.getElementById("btn-play")!;
+  const aliveSlider = document.getElementById("alive-slider") as HTMLInputElement;
+  const aliveValue = document.getElementById("alive-value")!;
+  const stepsPerSecondInput = document.getElementById("steps-per-second") as HTMLInputElement;
+
+  // Update slider value display
+  aliveSlider.addEventListener("input", () => {
+    aliveValue.textContent = `${aliveSlider.value}%`;
+  });
+
+  btnStep.addEventListener("click", () => {
+    cellularAutomata.step(currentRule, orbitId);
+  });
+
+  btnRandomize.addEventListener("click", () => {
+    const percentage = parseInt(aliveSlider.value);
+    cellularAutomata.randomize(percentage);
+    cellularAutomata.render();
+  });
+
+  btnPlay.addEventListener("click", () => {
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause();
+      btnPlay.textContent = "Play";
+    } else {
+      const stepsPerSecond = parseInt(stepsPerSecondInput.value);
+      cellularAutomata.play(stepsPerSecond, currentRule, orbitId);
+      btnPlay.textContent = "Pause";
+    }
+  });
+
+  // Update play speed when input changes
+  stepsPerSecondInput.addEventListener("change", () => {
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause();
+      const stepsPerSecond = parseInt(stepsPerSecondInput.value);
+      cellularAutomata.play(stepsPerSecond, currentRule, orbitId);
+    }
   });
 });

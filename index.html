@@ -8,9 +8,10 @@
       body {
         background: #fff;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
         justify-content: center;
+        gap: 48px;
         height: 100vh;
         margin: 0;
         font-family: system-ui, sans-serif;
@@ -42,15 +43,77 @@
       button:hover {
         background: #eee;
       }
+      .simulation-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .rule-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      #simulation {
+        border: 1px solid #ccc;
+        width: 400px;
+        height: 400px;
+      }
+      .sim-buttons {
+        margin-top: 12px;
+        display: flex;
+        gap: 12px;
+      }
+      .slider-container {
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 14px;
+      }
+      #alive-slider {
+        width: 200px;
+      }
+      .play-controls {
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 14px;
+      }
+      #steps-per-second {
+        width: 60px;
+        padding: 4px 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
     </style>
   </head>
   <body>
-    <h2 id="ruleid">loading rule...</h2>
-    <canvas id="truth" width="512" height="256"></canvas>
-    <div class="buttons">
-      <button id="btn-random">Random ruleset</button>
-      <button id="btn-conway">Conway ruleset</button>
-      <button id="btn-outlier">Outlier ruleset</button>
+    <div class="simulation-container">
+      <canvas id="simulation" width="400" height="400"></canvas>
+      <div class="sim-buttons">
+        <button id="btn-randomize">Random</button>
+      </div>
+      <div class="slider-container">
+        <label for="alive-slider">Alive %:</label>
+        <input type="range" id="alive-slider" min="0" max="100" value="50" />
+        <span id="alive-value">50%</span>
+      </div>
+      <div class="play-controls">
+        <button id="btn-step">Step</button>
+        <button id="btn-play">Play</button>
+        <label for="steps-per-second">Steps/sec:</label>
+        <input type="number" id="steps-per-second" min="1" max="60" value="10" />
+      </div>
+    </div>
+    <div class="rule-container">
+      <h2 id="ruleid">loading rule...</h2>
+      <canvas id="truth" width="512" height="256"></canvas>
+      <div class="buttons">
+        <button id="btn-random">Random ruleset</button>
+        <button id="btn-conway">Conway ruleset</button>
+        <button id="btn-outlier">Outlier ruleset</button>
+      </div>
     </div>
     <script type="module" src="./src/main.ts"></script>
   </body>
