@@ -1,24 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>RuleHunt – Truth Table</title>
-  <style>
-    body {
-      background: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
-    canvas {
-      border: 1px solid #ccc;
-    }
-  </style>
-</head>
-<body>
-  <canvas id="truth" width="512" height="512"></canvas>
-  <script type="module" src="./src/main.ts"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RuleHunt</title>
+    <style>
+      body {
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        font-family: system-ui, sans-serif;
+      }
+      h2 {
+        font-family: monospace;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        margin-bottom: 12px;
+      }
+      canvas {
+        border: 1px solid #ccc;
+        width: 256px;
+        height: 512px;
+      }
+      .buttons {
+        margin-top: 12px;
+        display: flex;
+        gap: 12px;
+      }
+      button {
+        padding: 6px 14px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        background: #f8f8f8;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #eee;
+      }
+    </style>
+  </head>
+  <body>
+    <h2 id="ruleid">loading rule...</h2>
+    <canvas id="truth" width="512" height="256"></canvas>
+    <div class="buttons">
+      <button id="btn-random">Random ruleset</button>
+      <button id="btn-conway">Conway ruleset</button>
+      <button id="btn-outlier">Outlier ruleset</button>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
 </html>
