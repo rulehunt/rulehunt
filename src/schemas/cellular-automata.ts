@@ -64,7 +64,6 @@ export type Coordinate = z.infer<typeof Coordinate>;
 export type Cell = z.infer<typeof Cell>;
 export type GridDimensions = z.infer<typeof GridDimensions>;
 export type Grid = z.infer<typeof Grid>;
-export type CanonicalPatternIndex = z.infer<typeof CanonicalPatternIndex>;
 export type Rule = z.infer<typeof Rule>;
 export type Ruleset = z.infer<typeof Ruleset>;
 export type Pattern = z.infer<typeof Pattern>;
