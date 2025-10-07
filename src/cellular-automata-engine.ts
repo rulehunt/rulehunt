@@ -128,5 +128,40 @@ export function coords16x32(n: number): { x: number; y: number } {
     ((n >> 2) & 1);
   const y = by ^ (by >> 1);
 
+// --- ruleset serialization utilities -------------------------------------
+export function rulesetToBinary(ruleset: Ruleset): bigint {
+  let result = 0n;
+  for (let i = 0; i < 512; i++) {
+    if (ruleset[i] === 1) {
+      result |= 1n << BigInt(i);
+    }
+  }
+  return result;
+}
+
+export function rulesetToString(ruleset: Ruleset): string {
+  const binary = rulesetToBinary(ruleset);
+  return binary.toString(16).padStart(128, '0');
+}
+
+export function rulesetFromBinary(binary: bigint): Ruleset {
+  const ruleset: CellState[] = new Array(512);
+  for (let i = 0; i < 512; i++) {
+    ruleset[i] = (binary >> BigInt(i)) & 1n ? 1 : 0;
+  }
+  return ruleset as Ruleset;
+}
+
+export function rulesetFromString(hex: string): Ruleset {
+  const binary = BigInt('0x' + hex);
+  return rulesetFromBinary(binary);
+}
+
+// --- visualization mapping (16×32 grid) ----------------------------------
+export function coords16x32(n: number) {
+  const bx = ((n >> 7) & 1) << 3 | ((n >> 3) & 1) << 2 | ((n >> 1) & 1) << 1 | ((n >> 5) & 1);
+  const x = bx ^ (bx >> 1); // 4-bit Gray
+  const by = ((n >> 4) & 1) << 4 | ((n >> 8) & 1) << 3 | ((n >> 6) & 1) << 2 | ((n >> 0) & 1) << 1 | ((n >> 2) & 1);
+  const y = by ^ (by >> 1); // 5-bit Gray
   return { x, y };
 }
