@@ -8,7 +8,7 @@ import {
   randomRule140,
   Rule140,
   ruleToHex,
-} from "./cellular-automata-engine.ts";
+} from "./utils.ts";
 
 // --- Renderer --------------------------------------------------------------
 function renderRule(
