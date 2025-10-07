@@ -27,10 +27,12 @@ export const GridDimensions = z.object({
 // Grid/Board schemas
 export const Grid = z.array(z.array(CellState));
 
+export const Pattern = z.array(z.array(CellState).length(3)).length(3);
+
 // Individual 3x3 convolution rule
 // Maps a canonical pattern to output state (alive/dead)
 export const Rule = z.object({
-  pattern: z.array(z.array(CellState).length(3)).length(3),
+  pattern: Pattern,
   output: CellState,
 });
 
@@ -40,7 +42,7 @@ export const Ruleset = z.array(CellState).refine(
 );
 
 // Pattern definitions
-export const Pattern = z.object({
+export const GridPattern = z.object({
   name: z.string(),
   description: z.string().optional(),
   cells: z.array(Coordinate),
@@ -52,7 +54,7 @@ export const SimulationConfig = z.object({
   initialState: z.union([
     z.literal('random'),
     z.literal('empty'),
-    Pattern,
+    GridPattern,
     Grid,
   ]),
   ruleset: Ruleset,
