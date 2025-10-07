@@ -41,6 +41,11 @@ export const Ruleset = z.array(CellState).refine(
   { message: "Ruleset must define output for all 512 canonical patterns" }
 );
 
+export const C4Ruleset = z.array(CellState).refine(
+  (array) => array.length === 140,
+  { message: "Ruleset must define output for all 512 canonical patterns" }
+);
+
 // Pattern definitions
 export const GridPattern = z.object({
   name: z.string(),
