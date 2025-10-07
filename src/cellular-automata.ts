@@ -120,10 +120,15 @@ export class CellularAutomata {
   }
 
   render() {
-    this.ctx.fillStyle = '#fff'
+    // Get colors from CSS variables
+    const styles = getComputedStyle(document.documentElement)
+    const bgColor = styles.getPropertyValue('--canvas-bg').trim()
+    const fgColor = styles.getPropertyValue('--canvas-fg').trim()
+
+    this.ctx.fillStyle = bgColor
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
 
-    this.ctx.fillStyle = 'purple'
+    this.ctx.fillStyle = fgColor
 
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {

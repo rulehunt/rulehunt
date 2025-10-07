@@ -33,9 +33,14 @@ function renderRule(
     const cellW = canvas.width / cols
     const cellH = canvas.height / rows
 
-    ctx.fillStyle = '#fff'
+    // Get colors from CSS variables
+    const styles = getComputedStyle(document.documentElement)
+    const bgColor = styles.getPropertyValue('--canvas-bg').trim()
+    const fgColor = styles.getPropertyValue('--canvas-fg').trim()
+
+    ctx.fillStyle = bgColor
     ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = 'purple'
+    ctx.fillStyle = fgColor
 
     for (let orbit = 0; orbit < 140; orbit++) {
       if (ruleset[orbit]) {
@@ -147,6 +152,76 @@ function handleCanvasClick(
 
 // --- Main ------------------------------------------------------------------
 window.addEventListener('DOMContentLoaded', async () => {
+  // Theme Management
+  const themeLight = document.getElementById('theme-light') as HTMLButtonElement
+  const themeDark = document.getElementById('theme-dark') as HTMLButtonElement
+  const themeSystem = document.getElementById(
+    'theme-system',
+  ) as HTMLButtonElement
+
+  function setTheme(theme: 'light' | 'dark' | 'system') {
+    localStorage.setItem('theme', theme)
+
+    // Update button styles
+    const baseClasses = 'px-3 py-1 rounded text-sm transition-colors'
+    const activeClasses = baseClasses + ' bg-blue-500 text-white'
+    const inactiveClasses =
+      baseClasses + ' hover:bg-gray-200 dark:hover:bg-gray-700'
+
+    themeLight.className = theme === 'light' ? activeClasses : inactiveClasses
+    themeDark.className = theme === 'dark' ? activeClasses : inactiveClasses
+    themeSystem.className = theme === 'system' ? activeClasses : inactiveClasses
+
+    if (theme === 'system') {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      document.documentElement.classList.toggle('dark', isDark)
+    } else {
+      document.documentElement.classList.toggle('dark', theme === 'dark')
+    }
+
+    // Re-render canvases with new colors (only if they exist)
+    try {
+      if (typeof cellularAutomata !== 'undefined' && cellularAutomata) {
+        cellularAutomata.render()
+      }
+      if (typeof currentRuleset !== 'undefined' && currentRuleset) {
+        renderRule(
+          currentRuleset,
+          orbitLookup,
+          ctx,
+          canvas,
+          ruleLabelDisplay,
+          ruleIdDisplay,
+          ruleLabelDisplay.textContent || 'Loading...',
+          displayMode,
+        )
+      }
+    } catch (e) {
+      // Variables not initialized yet - will use correct theme when first rendered
+    }
+  }
+
+  themeLight.addEventListener('click', () => setTheme('light'))
+  themeDark.addEventListener('click', () => setTheme('dark'))
+  themeSystem.addEventListener('click', () => setTheme('system'))
+
+  // Initialize theme
+  const savedTheme = localStorage.getItem('theme') as
+    | 'light'
+    | 'dark'
+    | 'system'
+    | null
+  setTheme(savedTheme || 'system')
+
+  // Listen for system theme changes
+  window
+    .matchMedia('(prefers-color-scheme: dark)')
+    .addEventListener('change', () => {
+      if (localStorage.getItem('theme') === 'system') {
+        setTheme('system')
+      }
+    })
+
   const ruleLabelDisplay = document.getElementById('rule-label') as HTMLElement
   const ruleIdDisplay = document.getElementById('rule-id') as HTMLElement
 
@@ -174,7 +249,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   let displayMode: DisplayMode = 'orbits'
 
   // Get slider early so we can use it in applyInitialCondition
-  const aliveSlider = document.getElementById('alive-slider') as HTMLInputElement
+  const aliveSlider = document.getElementById(
+    'alive-slider',
+  ) as HTMLInputElement
 
   // Function to apply the selected initial condition
   function applyInitialCondition() {
