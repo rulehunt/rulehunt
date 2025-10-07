@@ -1,0 +1,60 @@
+import type { CellState, Ruleset } from './schemas/cellular-automata';
+
+// --- constants ------------------------------------------------------------
+const ROT_MAP = [6, 3, 0, 7, 4, 1, 8, 5, 2]; // 90° CW rotation for bits 8..0
+
+// --- rotation/orbit utilities --------------------------------------------
+function rot90(n: number): number {
+  let r = 0;
+  for (let i = 0; i < 9; i++) {
+    const src = ROT_MAP[i];
+    if ((n >> src) & 1) r |= 1 << i;
+  }
+  return r;
+}
+
+function canonicalC4(n: number): number {
+  const r1 = rot90(n);
+  const r2 = rot90(r1);
+  const r3 = rot90(r2);
+  return Math.min(n, r1, r2, r3);
+}
+
+export function buildC4Index() {
+  const canon = new Uint16Array(512);
+  for (let n = 0; n < 512; n++) canon[n] = canonicalC4(n);
+  const reps = Array.from(new Set(Array.from(canon))).sort((a, b) => a - b);
+  const idMap = new Map<number, number>();
+  reps.forEach((v, i) => idMap.set(v, i));
+  const orbitId = new Uint8Array(512);
+  for (let n = 0; n < 512; n++) orbitId[n] = idMap.get(canon[n])!;
+  return { orbitId };
+}
+
+// --- rule generation / expansion -----------------------------------------
+export function randomRule(): Ruleset {
+  const ruleset: Ruleset = {};
+  for (let i = 0; i < 128; i++) {
+    ruleset[i.toString()] = Math.random() < 0.5 ? 0 : 1;
+  }
+  return ruleset;
+}
+
+function ruleGet(R: Ruleset, orbit: number): CellState {
+  return R[orbit.toString()] as CellState;
+}
+
+export function expandRule(R: Ruleset, orbitId: Uint8Array): Uint8Array {
+  const T = new Uint8Array(512);
+  for (let n = 0; n < 512; n++) T[n] = ruleGet(R, orbitId[n]);
+  return T;
+}
+
+// --- visualization mapping (16×32 grid) ----------------------------------
+export function coords16x32(n: number) {
+  const bx = ((n >> 7) & 1) << 3 | ((n >> 3) & 1) << 2 | ((n >> 1) & 1) << 1 | ((n >> 5) & 1);
+  const x = bx ^ (bx >> 1); // 4-bit Gray
+  const by = ((n >> 4) & 1) << 4 | ((n >> 8) & 1) << 3 | ((n >> 6) & 1) << 2 | ((n >> 0) & 1) << 1 | ((n >> 2) & 1);
+  const y = by ^ (by >> 1); // 5-bit Gray
+  return { x, y };
+}
