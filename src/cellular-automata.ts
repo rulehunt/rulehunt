@@ -1,4 +1,4 @@
-import { type Rule140, expandRule } from './utils.ts'
+import type { Ruleset } from './schema.ts'
 
 const GRID_SIZE = 100
 
@@ -67,14 +67,12 @@ export class CellularAutomata {
     }
   }
 
-  step(rule: Rule140, orbitId: Uint8Array) {
-    const truth = expandRule(rule, orbitId)
-
+  step(ruleset: Ruleset) {
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {
         const pattern = this.get3x3Pattern(x, y)
         const index = this.patternToIndex(pattern)
-        this.nextGrid[y * GRID_SIZE + x] = truth[index]
+        this.nextGrid[y * GRID_SIZE + x] = ruleset[index]
       }
     }
 
@@ -141,14 +139,14 @@ export class CellularAutomata {
     }
   }
 
-  play(stepsPerSecond: number, rule: Rule140, orbitId: Uint8Array) {
+  play(stepsPerSecond: number, ruleset: Ruleset) {
     if (this.isPlaying) return
 
     this.isPlaying = true
     const intervalMs = 1000 / stepsPerSecond
 
     this.playInterval = window.setInterval(() => {
-      this.step(rule, orbitId)
+      this.step(ruleset)
     }, intervalMs)
   }
 

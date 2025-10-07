@@ -1,26 +1,12 @@
 import { writeFileSync } from 'node:fs'
-import type {
-  C4Orbit,
-  C4OrbitsFile,
-  C4Pattern,
-} from '../src/schemas/c4-orbits.js'
+import type { C4Orbit, C4OrbitsData } from '../src/schema.ts'
+import { canonicalC4, rot90 } from '../src/utils.ts'
 
-// 90° clockwise rotation mapping for 3x3 grid positions
-const ROT_MAP = [6, 3, 0, 7, 4, 1, 8, 5, 2]
+// ============================================================================
+// Orbit Building
+// ============================================================================
 
-// Rotate a 3x3 bit pattern by 90° clockwise
-function rot90(n: number): number {
-  let result = 0
-  for (let i = 0; i < 9; i++) {
-    const sourceBit = ROT_MAP[i]
-    if ((n >> sourceBit) & 1) {
-      result |= 1 << i
-    }
-  }
-  return result
-}
-
-// Get all rotations of a pattern
+/** Get all 4 rotations of a pattern (may contain duplicates if symmetric) */
 function getAllRotations(n: number): number[] {
   const rotations = [n]
   let current = n
@@ -31,88 +17,118 @@ function getAllRotations(n: number): number[] {
   return rotations
 }
 
-// Convert pattern number to 3x3 grid
-function patternToGrid(n: number): number[][] {
-  const grid: number[][] = []
-  for (let row = 0; row < 3; row++) {
-    grid[row] = []
-    for (let col = 0; col < 3; col++) {
-      const bitIndex = row * 3 + col
-      grid[row][col] = (n >> bitIndex) & 1
-    }
+/** Get stabilizer subgroup based on orbit size */
+function getStabilizer(size: number): 'I' | 'C2' | 'C4' {
+  switch (size) {
+    case 1:
+      return 'C4' // 4-fold rotational symmetry
+    case 2:
+      return 'C2' // 180° rotational symmetry
+    case 4:
+      return 'I' // No rotational symmetry (identity only)
+    default:
+      throw new Error(`Invalid orbit size: ${size}`)
   }
-  return grid
 }
 
-// Format grid as string
-function gridToString(grid: number[][]): string {
-  return grid.map((row) => row.join('')).join('\n')
-}
-
-// Build all C4 orbits
-function buildC4Orbits() {
+/** Build all 140 C4 orbits from the 512 possible 3×3 patterns */
+function buildC4Orbits(): Map<number, number[]> {
   const orbits: Map<number, number[]> = new Map()
 
-  // Process all 512 patterns
   for (let n = 0; n < 512; n++) {
-    const rotations = getAllRotations(n)
-    const canonical = Math.min(...rotations)
+    const canonical = canonicalC4(n)
 
-    // Only process if this is a new canonical representative
     if (!orbits.has(canonical)) {
-      const uniqueRotations = [...new Set(rotations)].sort((a, b) => a - b)
-      orbits.set(canonical, uniqueRotations)
+      const rotations = getAllRotations(canonical)
+      // Get unique patterns in this orbit, sorted
+      const uniquePatterns = [...new Set(rotations)].sort((a, b) => a - b)
+      orbits.set(canonical, uniquePatterns)
     }
   }
 
   return orbits
 }
 
-// Main execution
-const orbits = buildC4Orbits()
+// ============================================================================
+// Main Execution
+// ============================================================================
 
-// Convert to array format with all orbits together
-const allOrbits: C4Orbit[] = []
+console.log('Computing C4 orbits...')
+const orbitsMap = buildC4Orbits()
 
+// Convert to array format
+const orbits: C4Orbit[] = []
 let orbitId = 0
-for (const [representative, patterns] of orbits) {
-  const orbitData: C4Orbit = {
+
+for (const [representative, patternValues] of orbitsMap) {
+  const size = patternValues.length
+  orbits.push({
     id: orbitId++,
     representative,
-    size: patterns.length,
-    patterns: patterns.map((pattern) => ({
-      value: pattern,
-      binary: pattern.toString(2).padStart(9, '0'),
-      grid: patternToGrid(pattern),
-      gridString: gridToString(patternToGrid(pattern)),
-    })),
-  }
-  allOrbits.push(orbitData)
+    size,
+    stabilizer: getStabilizer(size),
+    patterns: patternValues, // Patterns are just numbers now
+  })
   process.stdout.write('.')
 }
-console.log() // New line after dots
+console.log() // New line after progress dots
 
-// Create the final JSON structure
-const result: C4OrbitsFile = {
-  summary: {
-    totalOrbits: orbits.size,
-    orbitSizeDistribution: allOrbits.reduce(
-      (acc, orbit) => {
-        acc[orbit.size] = (acc[orbit.size] || 0) + 1
-        return acc
-      },
-      {} as Record<string, number>,
-    ),
-    totalPatterns: allOrbits.reduce((sum, orbit) => sum + orbit.size, 0),
+// Create orbit size distribution
+const orbitSizeDistribution = orbits.reduce(
+  (acc, orbit) => {
+    const key = orbit.size.toString()
+    acc[key] = (acc[key] || 0) + 1
+    return acc
   },
-  orbits: allOrbits,
+  {} as Record<string, number>,
+)
+
+// Create stabilizer distribution
+const stabilizerDistribution = orbits.reduce(
+  (acc, orbit) => {
+    acc[orbit.stabilizer] = (acc[orbit.stabilizer] || 0) + 1
+    return acc
+  },
+  {} as Record<string, number>,
+)
+
+// Create the final data structure
+const result: C4OrbitsData = {
+  summary: {
+    totalOrbits: 140,
+    orbitSizeDistribution,
+    stabilizerDistribution,
+    totalPatterns: 512,
+  },
+  orbits,
 }
 
 // Write to file
-writeFileSync('./resources/c4-orbits.json', JSON.stringify(result, null, 2))
+const outputPath = './resources/c4-orbits.json'
+writeFileSync(outputPath, JSON.stringify(result, null, 2))
 
-console.log('C4 orbit analysis written to resources/c4-orbits.json')
-console.log('Summary:')
+// Print summary
+console.log(`✓ C4 orbit analysis written to ${outputPath}`)
+console.log('\nSummary:')
 console.log(`  Total orbits: ${result.summary.totalOrbits}`)
-console.log('  Orbit distribution:', result.summary.orbitSizeDistribution)
+console.log('  Orbit size distribution:')
+for (const [size, count] of Object.entries(orbitSizeDistribution).sort()) {
+  console.log(`    Size ${size}: ${count} orbits`)
+}
+console.log('  Stabilizer distribution:')
+for (const [stabilizer, count] of Object.entries(
+  stabilizerDistribution,
+).sort()) {
+  console.log(`    ${stabilizer}: ${count} orbits`)
+}
 console.log(`  Total patterns: ${result.summary.totalPatterns}`)
+
+// Validation
+console.log('\nValidation:')
+const totalPatternsCheck = orbits.reduce((sum, orbit) => sum + orbit.size, 0)
+console.log(
+  `  Pattern count check: ${totalPatternsCheck === 512 ? '✓' : '✗'} (${totalPatternsCheck}/512)`,
+)
+console.log(
+  `  Orbit count check: ${orbits.length === 140 ? '✓' : '✗'} (${orbits.length}/140)`,
+)

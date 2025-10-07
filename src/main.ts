@@ -1,28 +1,27 @@
 import { CellularAutomata } from './cellular-automata.ts'
+import type { C4OrbitsData, C4Ruleset } from './schema.ts'
 import {
-  type Rule140,
-  buildC4Index,
-  conwayOutput,
-  coords16x32,
-  expandRule,
-  makeRule140,
-  outlierOutput,
-  randomRule140ByOrbits,
-  ruleToHex,
+  buildOrbitLookup,
+  c4RulesetToHex,
+  conwayRule,
+  coords10x14,
+  expandC4Ruleset,
+  makeC4Ruleset,
+  outlierRule,
+  randomC4RulesetByDensity,
 } from './utils.ts'
 
 // --- Renderer --------------------------------------------------------------
 function renderRule(
-  rule: Rule140,
-  orbitId: Uint8Array,
+  ruleset: C4Ruleset,
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
-  ruleDisplay: HTMLElement,
-  label: string,
+  ruleLabelDisplay: HTMLElement,
+  ruleIdDisplay: HTMLElement,
+  ruleLabel: string,
 ) {
-  const truth = expandRule(rule, orbitId)
-  const cols = 16
-  const rows = 32
+  const cols = 10
+  const rows = 14
   const cellW = canvas.width / cols
   const cellH = canvas.height / rows
 
@@ -30,98 +29,101 @@ function renderRule(
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   ctx.fillStyle = 'purple'
 
-  for (let n = 0; n < 512; n++) {
-    if (truth[n]) {
-      const { x, y } = coords16x32(n)
+  // Render the 140 orbit representatives
+  for (let orbit = 0; orbit < 140; orbit++) {
+    if (ruleset[orbit]) {
+      const { x, y } = coords10x14(orbit)
       ctx.fillRect(x * cellW, y * cellH, cellW, cellH)
     }
   }
 
-  const hex35 = ruleToHex(rule)
-  ruleDisplay.textContent = `${label} — ${hex35}`
-
-  console.log(`${label} rule140 (${hex35.length} hex chars):`)
-  console.log('lo  =', `0x${rule.lo.toString(16).padStart(16, '0')}`)
-  console.log('mid =', `0x${rule.mid.toString(16).padStart(16, '0')}`)
-  console.log('hi  =', `0x${rule.hi.toString(16).padStart(3, '0')}`)
-  console.log('hex =', hex35)
+  const hex35 = c4RulesetToHex(ruleset)
+  ruleLabelDisplay.textContent = `${ruleLabel}`
+  ruleIdDisplay.textContent = `${hex35}`
 }
 
 // --- Canvas Click Handler --------------------------------------------------
 function handleCanvasClick(
   event: MouseEvent,
   canvas: HTMLCanvasElement,
-  currentTruth: Uint8Array,
+  currentRuleset: C4Ruleset,
+  orbitsData: C4OrbitsData,
 ) {
   const rect = canvas.getBoundingClientRect()
   const x = event.clientX - rect.left
   const y = event.clientY - rect.top
 
-  const cols = 16
-  const rows = 32
+  const cols = 10
+  const rows = 14
   const cellW = canvas.width / cols
   const cellH = canvas.height / rows
 
   const gridX = Math.floor(x / cellW)
   const gridY = Math.floor(y / cellH)
 
-  // Find which patch index maps to this grid position
-  let patchIndex = -1
-  for (let n = 0; n < 512; n++) {
-    const coord = coords16x32(n)
-    if (coord.x === gridX && coord.y === gridY) {
-      patchIndex = n
-      break
-    }
-  }
+  // Convert grid position to orbit index
+  const orbitIndex = gridY * cols + gridX
 
-  if (patchIndex === -1) return
+  if (orbitIndex < 0 || orbitIndex >= 140) return
+
+  // Get the orbit data
+  const orbit = orbitsData.orbits[orbitIndex]
+  const output = currentRuleset[orbitIndex]
+
+  // Use the representative pattern from the orbit
+  const representative = orbit.representative
 
   // Extract the 3x3 pattern from the 9-bit index
   const bits = []
   for (let i = 0; i < 9; i++) {
-    bits.push((patchIndex >> i) & 1)
+    bits.push((representative >> i) & 1)
   }
 
-  // Format as 3x3 grid (bits are in this order: 0,1,2,3,4,5,6,7,8)
-  // Position layout: 0 1 2
-  //                  3 4 5
-  //                  6 7 8
-  const output = currentTruth[patchIndex]
-
   console.log(
-    `\n${bits[0]} ${bits[1]} ${bits[2]}\n${bits[3]} ${bits[4]} ${bits[5]}     --->  ${output}\n${bits[6]} ${bits[7]} ${bits[8]}\n`,
+    `\nOrbit ${orbitIndex} (output: ${output})\nRepresentative pattern:\n${bits[0]} ${bits[1]} ${bits[2]}\n${bits[3]} ${bits[4]} ${bits[5]}     --->  ${output}\n${bits[6]} ${bits[7]} ${bits[8]}\n`,
   )
-  console.log(`Patch index: ${patchIndex}`)
+  console.log(`Stabilizer: ${orbit.stabilizer}, Size: ${orbit.size}`)
 }
 
 // --- Main ------------------------------------------------------------------
-window.addEventListener('DOMContentLoaded', () => {
-  const ruleDisplay = document.getElementById('ruleid') as HTMLElement
+window.addEventListener('DOMContentLoaded', async () => {
+  const ruleLabelDisplay = document.getElementById('rulename') as HTMLElement
+  const ruleIdDisplay = document.getElementById('ruleid') as HTMLElement
   const canvas = document.getElementById('truth') as HTMLCanvasElement
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
-  const { orbitId } = buildC4Index()
+
+  // Load orbit data
+  const response = await fetch('./resources/c4-orbits.json')
+  const orbitsData: C4OrbitsData = await response.json()
+  const orbitLookup = buildOrbitLookup(orbitsData)
+
+  console.log(`Loaded ${orbitsData.orbits.length} C4 orbits`)
 
   // Initialize cellular automata simulation
   const simCanvas = document.getElementById('simulation') as HTMLCanvasElement
   const cellularAutomata = new CellularAutomata(simCanvas)
 
-  // Track current truth table and rule for click handler
-  let currentTruth: Uint8Array
-  let currentRule: Rule140
+  // Track current ruleset for click handler
+  let currentRuleset: C4Ruleset
 
   // Track current initial condition selection
   let initialConditionType: 'center' | 'random' | 'patch' = 'patch'
 
   // Default: Conway
-  const conwayRule = makeRule140(conwayOutput, orbitId)
-  currentRule = conwayRule
-  currentTruth = expandRule(conwayRule, orbitId)
-  renderRule(conwayRule, orbitId, ctx, canvas, ruleDisplay, 'Conway')
+  const conwayRuleset = makeC4Ruleset(conwayRule, orbitLookup)
+  currentRuleset = conwayRuleset
+  renderRule(
+    conwayRuleset,
+    ctx,
+    canvas,
+    ruleLabelDisplay,
+    ruleIdDisplay,
+    'Conway',
+  )
 
   // Add click listener
   canvas.addEventListener('click', (e) => {
-    handleCanvasClick(e, canvas, currentTruth)
+    handleCanvasClick(e, canvas, currentRuleset, orbitsData)
   })
   canvas.style.cursor = 'pointer'
 
@@ -139,30 +141,30 @@ window.addEventListener('DOMContentLoaded', () => {
   const orbitValue = document.getElementById('orbit-value') as HTMLButtonElement
 
   btnConway.addEventListener('click', () => {
-    const rule = makeRule140(conwayOutput, orbitId)
-    currentRule = rule
-    currentTruth = expandRule(rule, orbitId)
-    renderRule(rule, orbitId, ctx, canvas, ruleDisplay, 'Conway')
+    const ruleset = makeC4Ruleset(conwayRule, orbitLookup)
+    currentRuleset = ruleset
+    renderRule(ruleset, ctx, canvas, ruleLabelDisplay, ruleIdDisplay, 'Conway')
 
     // If playing, restart with new rules
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
       const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
-      cellularAutomata.play(stepsPerSecond, currentRule, orbitId)
+      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, expanded)
     }
   })
 
   btnOutlier.addEventListener('click', () => {
-    const rule = makeRule140(outlierOutput, orbitId)
-    currentRule = rule
-    currentTruth = expandRule(rule, orbitId)
-    renderRule(rule, orbitId, ctx, canvas, ruleDisplay, 'Outlier')
+    const ruleset = makeC4Ruleset(outlierRule, orbitLookup)
+    currentRuleset = ruleset
+    renderRule(ruleset, ctx, canvas, ruleLabelDisplay, ruleIdDisplay, 'Outlier')
 
     // If playing, restart with new rules
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
       const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
-      cellularAutomata.play(stepsPerSecond, currentRule, orbitId)
+      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, expanded)
     }
   })
 
@@ -179,15 +181,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function generateRandomPatternRule() {
     const percentage = Number.parseInt(orbitSlider.value)
-    const rule = randomRule140ByOrbits(percentage)
-    currentRule = rule
-    currentTruth = expandRule(rule, orbitId)
+    const density = percentage / 100
+    const ruleset = randomC4RulesetByDensity(density)
+    currentRuleset = ruleset
     renderRule(
-      rule,
-      orbitId,
+      ruleset,
       ctx,
       canvas,
-      ruleDisplay,
+      ruleLabelDisplay,
+      ruleIdDisplay,
       `Random Pattern (${percentage}% orbits)`,
     )
 
@@ -195,7 +197,8 @@ window.addEventListener('DOMContentLoaded', () => {
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
       const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
-      cellularAutomata.play(stepsPerSecond, currentRule, orbitId)
+      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, expanded)
     }
   }
 
@@ -269,7 +272,8 @@ window.addEventListener('DOMContentLoaded', () => {
   })
 
   btnStep.addEventListener('click', () => {
-    cellularAutomata.step(currentRule, orbitId)
+    const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+    cellularAutomata.step(expanded)
   })
 
   btnRestart.addEventListener('click', () => {
@@ -282,7 +286,8 @@ window.addEventListener('DOMContentLoaded', () => {
       btnPlay.textContent = 'Play'
     } else {
       const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
-      cellularAutomata.play(stepsPerSecond, currentRule, orbitId)
+      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, expanded)
       btnPlay.textContent = 'Pause'
     }
   })
@@ -292,7 +297,8 @@ window.addEventListener('DOMContentLoaded', () => {
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
       const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
-      cellularAutomata.play(stepsPerSecond, currentRule, orbitId)
+      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, expanded)
     }
   })
 })
