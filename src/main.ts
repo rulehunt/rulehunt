@@ -74,6 +74,42 @@ function renderRule(
   ruleIdDisplay.textContent = `${hex35}`
 }
 
+// --- Statistics Display ----------------------------------------------------
+function updateStatisticsDisplay(cellularAutomata: CellularAutomata) {
+  const stats = cellularAutomata.getStatistics()
+  const recentStats = stats.getRecentStats(1)
+
+  if (recentStats.length === 0) return
+
+  const current = recentStats[0]
+  const interestScore = stats.calculateInterestScore()
+
+  // Update text displays
+  const populationEl = document.getElementById('stat-population')
+  const activityEl = document.getElementById('stat-activity')
+  const entropy2x2El = document.getElementById('stat-entropy-2x2')
+  const entropy4x4El = document.getElementById('stat-entropy-4x4')
+  const entropy8x8El = document.getElementById('stat-entropy-8x8')
+  const interestEl = document.getElementById('stat-interest')
+
+  if (populationEl) populationEl.textContent = current.population.toFixed(0)
+  if (activityEl) activityEl.textContent = current.activity.toFixed(0)
+  if (entropy2x2El) entropy2x2El.textContent = current.entropy2x2.toFixed(2)
+  if (entropy4x4El) entropy4x4El.textContent = current.entropy4x4.toFixed(2)
+  if (entropy8x8El) entropy8x8El.textContent = current.entropy8x8.toFixed(2)
+  if (interestEl) {
+    interestEl.textContent = (interestScore * 100).toFixed(1) + '%'
+    // Color code the interest score
+    if (interestScore > 0.7) {
+      interestEl.className = 'font-mono text-green-600 dark:text-green-400'
+    } else if (interestScore > 0.4) {
+      interestEl.className = 'font-mono text-yellow-600 dark:text-yellow-400'
+    } else {
+      interestEl.className = 'font-mono text-red-600 dark:text-red-400'
+    }
+  }
+}
+
 // --- Canvas Click Handler --------------------------------------------------
 function handleCanvasClick(
   event: MouseEvent,
@@ -164,9 +200,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // Update button styles
     const baseClasses = 'px-3 py-1 rounded text-sm transition-colors'
-    const activeClasses = baseClasses + ' bg-blue-500 text-white'
-    const inactiveClasses =
-      baseClasses + ' hover:bg-gray-200 dark:hover:bg-gray-700'
+    const activeClasses = `${baseClasses} bg-blue-500 text-white`
+    const inactiveClasses = `${baseClasses} hover:bg-gray-200 dark:hover:bg-gray-700`
 
     themeLight.className = theme === 'light' ? activeClasses : inactiveClasses
     themeDark.className = theme === 'dark' ? activeClasses : inactiveClasses
@@ -183,6 +218,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
       if (typeof cellularAutomata !== 'undefined' && cellularAutomata) {
         cellularAutomata.render()
+        updateStatisticsDisplay(cellularAutomata)
       }
       if (typeof currentRuleset !== 'undefined' && currentRuleset) {
         renderRule(
@@ -239,6 +275,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   const simCanvas = document.getElementById('simulation') as HTMLCanvasElement
   const cellularAutomata = new CellularAutomata(simCanvas)
 
+  // Initialize statistics display
+  updateStatisticsDisplay(cellularAutomata)
+
   // Track current ruleset for click handler
   let currentRuleset: C4Ruleset
 
@@ -265,12 +304,11 @@ window.addEventListener('DOMContentLoaded', async () => {
       cellularAutomata.randomSeed(percentage)
     }
     cellularAutomata.render()
+    updateStatisticsDisplay(cellularAutomata)
   }
 
   // Apply the initial patch seed
   applyInitialCondition()
-
-  // Default: Conway
 
   // Default: Conway
   const conwayRuleset = makeC4Ruleset(conwayRule, orbitLookup)
@@ -326,6 +364,8 @@ window.addEventListener('DOMContentLoaded', async () => {
       displayMode,
     )
 
+    applyInitialCondition()
+
     // If playing, restart with new rules
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
@@ -348,6 +388,8 @@ window.addEventListener('DOMContentLoaded', async () => {
       'Outlier',
       displayMode,
     )
+
+    applyInitialCondition()
 
     // If playing, restart with new rules
     if (cellularAutomata.isCurrentlyPlaying()) {
@@ -384,6 +426,8 @@ window.addEventListener('DOMContentLoaded', async () => {
       `Random Pattern (${percentage}% orbits)`,
       displayMode,
     )
+
+    applyInitialCondition()
 
     // If playing, restart with new rules
     if (cellularAutomata.isCurrentlyPlaying()) {
@@ -473,7 +517,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Simulation buttons
   const btnStep = document.getElementById('btn-step') as HTMLButtonElement
-  const btnRestart = document.getElementById('btn-restart') as HTMLButtonElement
+  const btnRestart = document.getElementById('btn-reset') as HTMLButtonElement
 
   const btnPlay = document.getElementById('btn-play') as HTMLButtonElement
 
@@ -494,21 +538,34 @@ window.addEventListener('DOMContentLoaded', async () => {
   btnStep.addEventListener('click', () => {
     const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
     cellularAutomata.step(expanded)
+    updateStatisticsDisplay(cellularAutomata)
   })
 
   btnRestart.addEventListener('click', () => {
     applyInitialCondition()
   })
 
+  // Update statistics periodically when playing
+  let statsUpdateInterval: number | null = null
+
   btnPlay.addEventListener('click', () => {
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
       btnPlay.textContent = 'Play'
+      if (statsUpdateInterval !== null) {
+        clearInterval(statsUpdateInterval)
+        statsUpdateInterval = null
+      }
     } else {
       const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
       const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
       cellularAutomata.play(stepsPerSecond, expanded)
       btnPlay.textContent = 'Pause'
+
+      // Update statistics display periodically
+      statsUpdateInterval = window.setInterval(() => {
+        updateStatisticsDisplay(cellularAutomata)
+      }, 100)
     }
   })
 
@@ -516,9 +573,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   stepsPerSecondInput.addEventListener('change', () => {
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
+      if (statsUpdateInterval !== null) {
+        clearInterval(statsUpdateInterval)
+      }
       const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
       const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
       cellularAutomata.play(stepsPerSecond, expanded)
+
+      statsUpdateInterval = window.setInterval(() => {
+        updateStatisticsDisplay(cellularAutomata)
+      }, 100)
     }
   })
 })

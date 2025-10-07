@@ -1,4 +1,5 @@
 import type { Ruleset } from './schema.ts'
+import { StatisticsTracker } from './statistics.ts'
 
 const GRID_SIZE = 100
 
@@ -10,6 +11,7 @@ export class CellularAutomata {
   private cellSize: number
   private isPlaying = false
   private playInterval: number | null = null
+  private statistics: StatisticsTracker
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -18,9 +20,11 @@ export class CellularAutomata {
 
     this.grid = new Uint8Array(GRID_SIZE * GRID_SIZE)
     this.nextGrid = new Uint8Array(GRID_SIZE * GRID_SIZE)
+    this.statistics = new StatisticsTracker(GRID_SIZE)
 
     this.randomSeed()
     this.render()
+    this.statistics.recordStep(this.grid)
   }
 
   centerSeed() {
@@ -33,6 +37,9 @@ export class CellularAutomata {
     const centerX = Math.floor(GRID_SIZE / 2)
     const centerY = Math.floor(GRID_SIZE / 2)
     this.grid[centerY * GRID_SIZE + centerX] = 1
+
+    this.statistics.reset()
+    this.statistics.recordStep(this.grid)
   }
 
   randomSeed(alivePercentage = 50) {
@@ -40,6 +47,9 @@ export class CellularAutomata {
     for (let i = 0; i < this.grid.length; i++) {
       this.grid[i] = Math.random() < threshold ? 1 : 0
     }
+
+    this.statistics.reset()
+    this.statistics.recordStep(this.grid)
   }
 
   patchSeed(alivePercentage = 50) {
@@ -65,6 +75,9 @@ export class CellularAutomata {
         }
       }
     }
+
+    this.statistics.reset()
+    this.statistics.recordStep(this.grid)
   }
 
   step(ruleset: Ruleset) {
@@ -81,6 +94,7 @@ export class CellularAutomata {
     this.grid = this.nextGrid
     this.nextGrid = temp
 
+    this.statistics.recordStep(this.grid)
     this.render()
   }
 
@@ -167,5 +181,9 @@ export class CellularAutomata {
 
   isCurrentlyPlaying(): boolean {
     return this.isPlaying
+  }
+
+  getStatistics(): StatisticsTracker {
+    return this.statistics
   }
 }
