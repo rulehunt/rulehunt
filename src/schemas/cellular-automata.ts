@@ -27,25 +27,16 @@ export const GridDimensions = z.object({
 // Grid/Board schemas
 export const Grid = z.array(z.array(CellState));
 
-// Canonical pattern index (0-127) representing a C4 symmetry equivalence class
-export const CanonicalPatternIndex = z.number().int().min(0).max(127);
-
 // Individual 3x3 convolution rule
 // Maps a canonical pattern to output state (alive/dead)
 export const Rule = z.object({
-  canonicalIndex: CanonicalPatternIndex,
-  pattern: z.array(z.array(CellState).length(3)).length(3), // The canonical representation
+  pattern: z.array(z.array(CellState).length(3)).length(3),
   output: CellState,
 });
 
-// Complete ruleset with C4 symmetry as a map from canonical index to output
-// Using a Record ensures each canonical pattern appears exactly once
-export const Ruleset = z.record(
-  z.string().regex(/^(12[0-7]|1[01][0-9]|[1-9]?[0-9])$/), // "0" to "127" as strings
-  CellState
-).refine(
-  (record) => Object.keys(record).length === 128,
-  { message: "Ruleset must define output for all 128 canonical patterns" }
+export const Ruleset = z.array(CellState).refine(
+  (array) => array.length === 512,
+  { message: "Ruleset must define output for all 512 canonical patterns" }
 );
 
 // Pattern definitions

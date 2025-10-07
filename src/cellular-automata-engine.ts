@@ -33,15 +33,15 @@ export function buildC4Index() {
 
 // --- rule generation / expansion -----------------------------------------
 export function randomRule(): Ruleset {
-  const ruleset: Ruleset = {};
-  for (let i = 0; i < 128; i++) {
-    ruleset[i.toString()] = Math.random() < 0.5 ? 0 : 1;
+  const ruleset: CellState[] = new Array(512);
+  for (let i = 0; i < 512; i++) {
+    ruleset[i] = Math.random() < 0.5 ? 0 : 1;
   }
-  return ruleset;
+  return ruleset as Ruleset;
 }
 
 function ruleGet(R: Ruleset, orbit: number): CellState {
-  return R[orbit.toString()] as CellState;
+  return R[orbit];
 }
 
 export function expandRule(R: Ruleset, orbitId: Uint8Array): Uint8Array {
