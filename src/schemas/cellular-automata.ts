@@ -36,14 +36,16 @@ export const Rule = z.object({
   output: CellState,
 });
 
+// Full 512-entry truth table (expanded form)
 export const Ruleset = z.array(CellState).refine(
   (array) => array.length === 512,
-  { message: "Ruleset must define output for all 512 canonical patterns" }
+  { message: "Ruleset must define output for all 512 possible 3×3 patterns" }
 );
 
+// C4-symmetric compressed ruleset (140 orbits)
 export const C4Ruleset = z.array(CellState).refine(
   (array) => array.length === 140,
-  { message: "Ruleset must define output for all 512 canonical patterns" }
+  { message: "C4Ruleset must define output for all 140 C4-symmetric orbits" }
 );
 
 // Pattern definitions
@@ -73,5 +75,6 @@ export type GridDimensions = z.infer<typeof GridDimensions>;
 export type Grid = z.infer<typeof Grid>;
 export type Rule = z.infer<typeof Rule>;
 export type Ruleset = z.infer<typeof Ruleset>;
+export type C4Ruleset = z.infer<typeof C4Ruleset>;
 export type Pattern = z.infer<typeof Pattern>;
 export type SimulationConfig = z.infer<typeof SimulationConfig>;

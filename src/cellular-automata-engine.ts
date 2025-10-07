@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Cellular Automata Engine — C4 Symmetric 3×3 Binary Rules
+// Cellular Automata Engine — C4 Symmetric 3×3 Binary Rules (140 bits)
 // ---------------------------------------------------------------------------
 
 // --- Constants --------------------------------------------------------------
@@ -7,9 +7,10 @@
 const ROT_MAP = [6, 3, 0, 7, 4, 1, 8, 5, 2];
 
 // --- Types ------------------------------------------------------------------
-export interface Rule128 {
-  lo: bigint;
-  hi: bigint;
+export interface Rule140 {
+  lo: bigint;   // bits 0-63
+  mid: bigint;  // bits 64-127
+  hi: bigint;   // bits 128-139 (only 12 bits used)
 }
 
 export interface C4Index {
@@ -46,19 +47,21 @@ export function buildC4Index(): C4Index {
 
   const orbitId = new Uint8Array(512);
   for (let n = 0; n < 512; n++) orbitId[n] = idMap.get(canon[n])!;
+  
+  console.log(`C4 orbits: ${reps.length} (should be 140)`);
   return { orbitId };
 }
 
 // --- Rule Construction ------------------------------------------------------
 /**
- * Build a 128-bit rule (C4 compressed) by evaluating a local rule function
+ * Build a 140-bit rule (C4 compressed) by evaluating a local rule function
  * over all 512 possible neighborhoods.
  */
-export function makeRule128(
+export function makeRule140(
   fn: (n: number) => number,
   orbitId: Uint8Array
-): Rule128 {
-  const bits = new Array(128).fill(0);
+): Rule140 {
+  const bits = new Array(140).fill(0);
   for (let n = 0; n < 512; n++) {
     const out = fn(n);
     const oid = orbitId[n];
@@ -66,28 +69,76 @@ export function makeRule128(
   }
 
   let lo = 0n;
+  let mid = 0n;
   let hi = 0n;
+  
   for (let i = 0; i < 64; i++) if (bits[i]) lo |= 1n << BigInt(i);
-  for (let i = 64; i < 128; i++) if (bits[i]) hi |= 1n << BigInt(i - 64);
-  return { lo, hi };
+  for (let i = 64; i < 128; i++) if (bits[i]) mid |= 1n << BigInt(i - 64);
+  for (let i = 128; i < 140; i++) if (bits[i]) hi |= 1n << BigInt(i - 128);
+  
+  return { lo, mid, hi };
 }
 
-/** Expand a 128-bit rule to its 512-entry truth table */
-export function expandRule(R: Rule128, orbitId: Uint8Array): Uint8Array {
+/** Expand a 140-bit rule to its 512-entry truth table */
+export function expandRule(R: Rule140, orbitId: Uint8Array): Uint8Array {
   const T = new Uint8Array(512);
   for (let n = 0; n < 512; n++) {
     const orbit = orbitId[n];
-    const bit =
-      orbit < 64
-        ? Number((R.lo >> BigInt(orbit)) & 1n)
-        : Number((R.hi >> BigInt(orbit - 64)) & 1n);
+    let bit: number;
+    
+    if (orbit < 64) {
+      bit = Number((R.lo >> BigInt(orbit)) & 1n);
+    } else if (orbit < 128) {
+      bit = Number((R.mid >> BigInt(orbit - 64)) & 1n);
+    } else {
+      bit = Number((R.hi >> BigInt(orbit - 128)) & 1n);
+    }
+    
     T[n] = bit;
   }
   return T;
 }
 
+// --- Serialization ----------------------------------------------------------
+/** Convert Rule140 to 35-character hex string */
+export function ruleToHex(rule: Rule140): string {
+  // Pack: hi (12 bits) | mid (64 bits) | lo (64 bits) = 140 bits = 35 hex chars
+  const hiHex = rule.hi.toString(16).padStart(3, '0');      // 12 bits = 3 hex
+  const midHex = rule.mid.toString(16).padStart(16, '0');   // 64 bits = 16 hex
+  const loHex = rule.lo.toString(16).padStart(16, '0');     // 64 bits = 16 hex
+  return hiHex + midHex + loHex;  // 35 chars total
+}
+
+/** Parse 35-character hex string to Rule140 */
+export function hexToRule(hex: string): Rule140 {
+  if (hex.length !== 35) {
+    throw new Error(`Expected 35 hex characters, got ${hex.length}`);
+  }
+  
+  const hiHex = hex.slice(0, 3);
+  const midHex = hex.slice(3, 19);
+  const loHex = hex.slice(19, 35);
+  
+  return {
+    hi: BigInt('0x' + hiHex),
+    mid: BigInt('0x' + midHex),
+    lo: BigInt('0x' + loHex),
+  };
+}
+
+/** Generate random 140-bit rule */
+export function randomRule140(): Rule140 {
+  const lo = (BigInt(Math.floor(Math.random() * 2 ** 32)) << 32n) |
+             BigInt(Math.floor(Math.random() * 2 ** 32));
+  const mid = (BigInt(Math.floor(Math.random() * 2 ** 32)) << 32n) |
+              BigInt(Math.floor(Math.random() * 2 ** 32));
+  const hi = BigInt(Math.floor(Math.random() * 4096));  // 12 bits = 0-4095
+  
+  return { lo, mid, hi };
+}
+
 // --- Canonical Rule Definitions ---------------------------------------------
-/** Conway’s Game of Life (B3/S23) */
+/** Conway's Game of Life (B3/S23) */
 export function conwayOutput(n: number): number {
   const center = (n >> 4) & 1;
   let count = 0;
@@ -107,61 +158,17 @@ export function outlierOutput(n: number): number {
   return Number([1, 3, 5].includes(neighbors));
 }
 
-// --- Visualization Utilities -----------------------------------------------
+// --- Visualization Utilities ------------------------------------------------
 /**
  * Map 9-bit neighborhood index → (x,y) in a 16×32 Gray-coded grid.
  * Produces a smooth, structured imagemap layout for truth tables.
  */
 export function coords16x32(n: number): { x: number; y: number } {
-  const bx =
-    ((n >> 7) & 1) << 3 |
-    ((n >> 3) & 1) << 2 |
-    ((n >> 1) & 1) << 1 |
-    ((n >> 5) & 1);
-  const x = bx ^ (bx >> 1);
-
-  const by =
-    ((n >> 4) & 1) << 4 |
-    ((n >> 8) & 1) << 3 |
-    ((n >> 6) & 1) << 2 |
-    ((n >> 0) & 1) << 1 |
-    ((n >> 2) & 1);
-  const y = by ^ (by >> 1);
-
-// --- ruleset serialization utilities -------------------------------------
-export function rulesetToBinary(ruleset: Ruleset): bigint {
-  let result = 0n;
-  for (let i = 0; i < 512; i++) {
-    if (ruleset[i] === 1) {
-      result |= 1n << BigInt(i);
-    }
-  }
-  return result;
-}
-
-export function rulesetToString(ruleset: Ruleset): string {
-  const binary = rulesetToBinary(ruleset);
-  return binary.toString(16).padStart(128, '0');
-}
-
-export function rulesetFromBinary(binary: bigint): Ruleset {
-  const ruleset: CellState[] = new Array(512);
-  for (let i = 0; i < 512; i++) {
-    ruleset[i] = (binary >> BigInt(i)) & 1n ? 1 : 0;
-  }
-  return ruleset as Ruleset;
-}
-
-export function rulesetFromString(hex: string): Ruleset {
-  const binary = BigInt('0x' + hex);
-  return rulesetFromBinary(binary);
-}
-
-// --- visualization mapping (16×32 grid) ----------------------------------
-export function coords16x32(n: number) {
   const bx = ((n >> 7) & 1) << 3 | ((n >> 3) & 1) << 2 | ((n >> 1) & 1) << 1 | ((n >> 5) & 1);
   const x = bx ^ (bx >> 1); // 4-bit Gray
+  
   const by = ((n >> 4) & 1) << 4 | ((n >> 8) & 1) << 3 | ((n >> 6) & 1) << 2 | ((n >> 0) & 1) << 1 | ((n >> 2) & 1);
   const y = by ^ (by >> 1); // 5-bit Gray
+  
   return { x, y };
 }

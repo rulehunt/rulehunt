@@ -3,25 +3,16 @@ import {
   conwayOutput,
   coords16x32,
   expandRule,
-  makeRule128,
+  makeRule140,
   outlierOutput,
-  Rule128,
+  randomRule140,
+  Rule140,
+  ruleToHex,
 } from "./cellular-automata-engine.ts";
-
-// --- Helper: generate random 128-bit rule ---------------------------------
-function randomRule128(): Rule128 {
-  const lo =
-    (BigInt(Math.floor(Math.random() * 2 ** 32)) << 32n) |
-    BigInt(Math.floor(Math.random() * 2 ** 32));
-  const hi =
-    (BigInt(Math.floor(Math.random() * 2 ** 32)) << 32n) |
-    BigInt(Math.floor(Math.random() * 2 ** 32));
-  return { lo, hi };
-}
 
 // --- Renderer --------------------------------------------------------------
 function renderRule(
-  rule: Rule128,
+  rule: Rule140,
   orbitId: Uint8Array,
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
@@ -45,14 +36,14 @@ function renderRule(
     }
   }
 
-  const hex32 =
-    rule.hi.toString(16).padStart(16, "0") +
-    rule.lo.toString(16).padStart(16, "0");
-
-  ruleDisplay.textContent = `${label} — ${hex32}`;
-  console.log(`${label} rule128:`);
-  console.log("lo =", "0x" + rule.lo.toString(16).padStart(16, "0"));
-  console.log("hi =", "0x" + rule.hi.toString(16).padStart(16, "0"));
+  const hex35 = ruleToHex(rule);
+  ruleDisplay.textContent = `${label} — ${hex35}`;
+  
+  console.log(`${label} rule140 (${hex35.length} hex chars):`);
+  console.log("lo  =", "0x" + rule.lo.toString(16).padStart(16, "0"));
+  console.log("mid =", "0x" + rule.mid.toString(16).padStart(16, "0"));
+  console.log("hi  =", "0x" + rule.hi.toString(16).padStart(3, "0"));
+  console.log("hex =", hex35);
 }
 
 // --- Main ------------------------------------------------------------------
@@ -63,7 +54,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const { orbitId } = buildC4Index();
 
   // Default: Conway
-  const conwayRule = makeRule128(conwayOutput, orbitId);
+  const conwayRule = makeRule140(conwayOutput, orbitId);
   renderRule(conwayRule, orbitId, ctx, canvas, ruleDisplay, "Conway");
 
   // Buttons
@@ -72,17 +63,17 @@ window.addEventListener("DOMContentLoaded", () => {
   const btnOutlier = document.getElementById("btn-outlier")!;
 
   btnRandom.addEventListener("click", () => {
-    const rule = randomRule128();
+    const rule = randomRule140();
     renderRule(rule, orbitId, ctx, canvas, ruleDisplay, "Random");
   });
 
   btnConway.addEventListener("click", () => {
-    const rule = makeRule128(conwayOutput, orbitId);
+    const rule = makeRule140(conwayOutput, orbitId);
     renderRule(rule, orbitId, ctx, canvas, ruleDisplay, "Conway");
   });
 
   btnOutlier.addEventListener("click", () => {
-    const rule = makeRule128(outlierOutput, orbitId);
+    const rule = makeRule140(outlierOutput, orbitId);
     renderRule(rule, orbitId, ctx, canvas, ruleDisplay, "Outlier");
   });
 });
