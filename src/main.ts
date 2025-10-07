@@ -173,6 +173,28 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Track current display mode
   let displayMode: DisplayMode = 'orbits'
 
+  // Get slider early so we can use it in applyInitialCondition
+  const aliveSlider = document.getElementById('alive-slider') as HTMLInputElement
+
+  // Function to apply the selected initial condition
+  function applyInitialCondition() {
+    if (initialConditionType === 'center') {
+      cellularAutomata.centerSeed()
+    } else if (initialConditionType === 'patch') {
+      const percentage = Number.parseInt(aliveSlider.value)
+      cellularAutomata.patchSeed(percentage)
+    } else {
+      const percentage = Number.parseInt(aliveSlider.value)
+      cellularAutomata.randomSeed(percentage)
+    }
+    cellularAutomata.render()
+  }
+
+  // Apply the initial patch seed
+  applyInitialCondition()
+
+  // Default: Conway
+
   // Default: Conway
   const conwayRuleset = makeC4Ruleset(conwayRule, orbitLookup)
   currentRuleset = conwayRuleset
@@ -303,6 +325,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     'radio-display-full',
   ) as HTMLInputElement
 
+  radioDisplayOrbits.checked = true
+
   radioDisplayOrbits.addEventListener('change', () => {
     if (radioDisplayOrbits.checked) {
       displayMode = 'orbits'
@@ -314,7 +338,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         canvas,
         ruleLabelDisplay,
         ruleIdDisplay,
-        getCurrentRuleLabel(),
+        ruleLabelDisplay.textContent || 'Loading...',
         displayMode,
       )
     }
@@ -331,19 +355,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         canvas,
         ruleLabelDisplay,
         ruleIdDisplay,
-        getCurrentRuleLabel(),
+        ruleLabelDisplay.textContent || 'Loading...',
         displayMode,
       )
     }
   })
-
-  // Helper to get current rule label for re-rendering
-  function getCurrentRuleLabel(): string {
-    // Extract label from current display text
-    const currentLabelText = ruleLabelDisplay.textContent || ''
-    const labelMatch = currentLabelText.match(/^(.+?)\s*—/)
-    return labelMatch ? labelMatch[1] : 'Rule'
-  }
 
   // Initial condition radio buttons
   const radioCenterSeed = document.getElementById(
@@ -378,28 +394,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   })
 
-  // Function to apply the selected initial condition
-  function applyInitialCondition() {
-    if (initialConditionType === 'center') {
-      cellularAutomata.centerSeed()
-    } else if (initialConditionType === 'patch') {
-      const percentage = Number.parseInt(aliveSlider.value)
-      cellularAutomata.patchSeed(percentage)
-    } else {
-      const percentage = Number.parseInt(aliveSlider.value)
-      cellularAutomata.randomSeed(percentage)
-    }
-    cellularAutomata.render()
-  }
-
   // Simulation buttons
   const btnStep = document.getElementById('btn-step') as HTMLButtonElement
   const btnRestart = document.getElementById('btn-restart') as HTMLButtonElement
 
   const btnPlay = document.getElementById('btn-play') as HTMLButtonElement
-  const aliveSlider = document.getElementById(
-    'alive-slider',
-  ) as HTMLInputElement
+
   const aliveValue = document.getElementById('alive-value') as HTMLButtonElement
   const stepsPerSecondInput = document.getElementById(
     'steps-per-second',
