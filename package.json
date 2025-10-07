@@ -1,23 +1,26 @@
 {
-  "name": "biome-vite-typescript",
-  "private": true,
-  "version": "0.0.0",
+  "name": "rulehunt",
   "type": "module",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
     "dev": "vite",
+    "dev:worker": "wrangler dev",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "deploy": "wrangler publish",
+    "check": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write ."
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@cloudflare/workers-types": "^4.20241022.0",
     "@types/node": "^22.8.7",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
-  },
-  "dependencies": {
+    "vite": "^5.4.11",
+    "wrangler": "^3.75.0",
     "zod": "^4.1.12"
   }
 }
