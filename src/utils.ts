@@ -160,16 +160,6 @@ export function conwayRule(pattern: Pattern): 0 | 1 {
   return neighbors === 3 ? 1 : 0
 }
 
-/** Outlier rule (B135/S234) */
-export function outlierRule(pattern: Pattern): 0 | 1 {
-  const center = (pattern >> 4) & 1
-  let count = 0
-  for (let i = 0; i < 9; i++) count += (pattern >> i) & 1
-  const neighbors = count - center
-  if (center === 1) return [2, 3, 4].includes(neighbors) ? 1 : 0
-  return [1, 3, 5].includes(neighbors) ? 1 : 0
-}
-
 // --- Visualization Utilities ------------------------------------------------
 /**
  * Map orbit index (0-139) to (x,y) in a 10×14 grid.

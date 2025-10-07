@@ -1,7 +1,7 @@
 import type { Ruleset } from './schema.ts'
 import { StatisticsTracker } from './statistics.ts'
 
-const GRID_SIZE = 100
+const GRID_SIZE = 300
 
 export class CellularAutomata {
   private grid: Uint8Array

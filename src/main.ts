@@ -1,4 +1,5 @@
 import { CellularAutomata } from './cellular-automata.ts'
+import { outlierRule } from './outlier-rule.ts'
 import type { C4OrbitsData, C4Ruleset } from './schema.ts'
 import {
   buildOrbitLookup,
@@ -8,7 +9,6 @@ import {
   coords32x16,
   expandC4Ruleset,
   makeC4Ruleset,
-  outlierRule,
   randomC4RulesetByDensity,
 } from './utils.ts'
 
@@ -55,9 +55,14 @@ function renderRule(
     const cellW = canvas.width / cols
     const cellH = canvas.height / rows
 
-    ctx.fillStyle = '#fff'
+    // Get colors from CSS variables
+    const styles = getComputedStyle(document.documentElement)
+    const bgColor = styles.getPropertyValue('--canvas-bg').trim()
+    const fgColor = styles.getPropertyValue('--canvas-fg').trim()
+
+    ctx.fillStyle = bgColor
     ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = 'purple'
+    ctx.fillStyle = fgColor
 
     const expandedRuleset = expandC4Ruleset(ruleset, orbitLookup)
 
