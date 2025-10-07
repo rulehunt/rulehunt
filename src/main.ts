@@ -1,29 +1,3 @@
-import './style.css'
-
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <div>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite logo to learn more
-    </p>
-  </div>
-`
-
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
-
-function setupCounter(element: HTMLButtonElement) {
-  let counter = 0
-  const setCounter = (count: number) => {
-    counter = count
-    element.innerHTML = `count is ${counter}`
-  }
-  element.addEventListener('click', () => setCounter(counter + 1))
-  setCounter(0)
-}
-
 // --- constants ------------------------------------------------------------
 const ROT_MAP = [6, 3, 0, 7, 4, 1, 8, 5, 2]; // 90° CW rotation for bits 8..0
 
@@ -86,22 +60,29 @@ function coords16x32(n: number) {
 }
 
 // --- main ----------------------------------------------------------------
-const canvas = document.getElementById("truth") as HTMLCanvasElement;
-const ctx = canvas.getContext("2d")!;
-const { orbitId } = buildC4Index();
-const rule = randomRule();
-const truth = expandRule(rule, orbitId);
-
-const cellSize = 16; // 16×32 grid -> 512px canvas
-ctx.fillStyle = "#fff";
-ctx.fillRect(0, 0, canvas.width, canvas.height);
-ctx.fillStyle = "purple";
-
-for (let n = 0; n < 512; n++) {
-  if (truth[n]) {
-    const { x, y } = coords16x32(n);
-    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+window.addEventListener("DOMContentLoaded", () => {
+  const canvas = document.getElementById("truth") as HTMLCanvasElement | null;
+  if (!canvas) {
+    console.error("No canvas with id='truth' found.");
+    return;
   }
-}
 
-console.log("Random 128-bit rule:", rule);
+  const ctx = canvas.getContext("2d")!;
+  const { orbitId } = buildC4Index();
+  const rule = randomRule();
+  const truth = expandRule(rule, orbitId);
+
+  const cellSize = 16; // 16×32 grid -> 512px canvas
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "purple";
+
+  for (let n = 0; n < 512; n++) {
+    if (truth[n]) {
+      const { x, y } = coords16x32(n);
+      ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+    }
+  }
+
+  console.log("Random 128-bit rule:", rule);
+});
