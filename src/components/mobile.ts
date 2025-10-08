@@ -101,6 +101,8 @@ function computeAdaptiveGrid(maxCells = 100_000) {
 }
 
 // --- Dual-Canvas Swipe Handler with Direction Lock & Momentum Window -------
+let isTransitioning = false
+
 function setupDualCanvasSwipe(
   wrapper: HTMLElement,
   canvasA: HTMLCanvasElement,
@@ -263,19 +265,30 @@ function setupDualCanvasSwipe(
       `opacity ${transitionDuration} ease`
     canvasA.style.transition = transition
     canvasB.style.transition = transition
+    void canvasA.offsetWidth // 👈 force layout flush before applying transform
 
     if (shouldCommit) {
+      isTransitioning = true
+
       canvasA.style.transform = `translateY(-${height}px)`
       canvasB.style.transform = 'translateY(0)'
       canvasA.style.opacity = '0'
       canvasB.style.opacity = '1'
-      setTimeout(onCommit, Number.parseFloat(transitionDuration) * 1000)
+      const ms = Number.parseFloat(transitionDuration) * 1000
+      setTimeout(onCommit, ms)
+      setTimeout(() => {
+        isTransitioning = false
+      }, ms + 50)
     } else {
       canvasA.style.transform = 'translateY(0)'
       canvasB.style.transform = `translateY(${height}px)`
       canvasA.style.opacity = '1'
       canvasB.style.opacity = '1'
-      setTimeout(onCancel, Number.parseFloat(transitionDuration) * 1000)
+      const ms = Number.parseFloat(transitionDuration) * 1000
+      setTimeout(onCancel, ms)
+      setTimeout(() => {
+        isTransitioning = false
+      }, ms + 50)
     }
   }
 
@@ -495,6 +508,7 @@ export async function setupMobileLayout(
     // Set CSS dimensions to match buffer size
     c.style.width = `${size}px`
     c.style.height = `${size}px`
+    c.style.willChange = 'transform, opacity'
   }
   canvasA.style.zIndex = '2'
   canvasB.style.zIndex = '1'
@@ -676,6 +690,8 @@ locked:${info.directionLocked} dragging:${info.dragging} anim:${info.animationEx
   }
 
   const handleResize = () => {
+    if (isTransitioning) return
+
     const { gridCols, gridRows, cellSize, screenWidth, screenHeight } =
       computeAdaptiveGrid()
 
@@ -692,14 +708,26 @@ locked:${info.directionLocked} dragging:${info.dragging} anim:${info.animationEx
     currentCA.resize(gridRows, gridCols)
     nextCA.resize(gridRows, gridCols)
 
-    if (canvasB.style.transform.includes('translateY')) {
-      canvasB.style.transform = `translateY(${screenHeight}px)`
+    const frontIsA = canvasA.style.zIndex === '2'
+    const h = wrapper.clientHeight
+
+    if (frontIsA) {
+      canvasA.style.transform = 'translateY(0)'
+      canvasB.style.transform = `translateY(${h}px)`
+    } else {
+      canvasB.style.transform = 'translateY(0)'
+      canvasA.style.transform = `translateY(-${h}px)`
     }
 
     console.log(`[resize] ${gridCols}×${gridRows} @ cellSize=${cellSize}px`)
   }
 
-  window.addEventListener('resize', handleResize)
+  let resizeTimer: number | null = null
+  window.addEventListener('resize', () => {
+    if (isTransitioning) return
+    if (resizeTimer) clearTimeout(resizeTimer)
+    resizeTimer = window.setTimeout(handleResize, 120)
+  })
 
   return () => {
     currentCA.pause()
