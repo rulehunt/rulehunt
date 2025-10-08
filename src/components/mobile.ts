@@ -16,10 +16,12 @@ import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 10
-const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.2 // %
-const SWIPE_COMMIT_MIN_DISTANCE = 60 // px
-const SWIPE_VELOCITY_THRESHOLD = -0.3 // px/ms
-const SWIPE_FAST_THROW_THRESHOLD = -0.5 // px/ms
+
+const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.15
+const SWIPE_COMMIT_MIN_DISTANCE = 40
+const SWIPE_VELOCITY_THRESHOLD = -0.25
+const SWIPE_FAST_THROW_THRESHOLD = -0.4
+
 
 const LIGHT_FG_COLORS = [
   '#2563eb', // blue-600
@@ -82,6 +84,7 @@ function computeAdaptiveGrid(maxCells = 100_000) {
 }
 
 // --- Dual-Canvas Swipe Handler ----------------------------------------------
+
 function setupDualCanvasSwipe(
   wrapper: HTMLElement,
   canvasA: HTMLCanvasElement,
@@ -94,10 +97,8 @@ function setupDualCanvasSwipe(
   let currentY = 0
   let startT = 0
   let dragging = false
-
-  // Track recent positions for instantaneous velocity
-  let lastY = 0
-  let lastT = 0
+  let directionLocked: 'up' | 'down' | null = null
+  const samples: { t: number; y: number }[] = []
 
   const getHeight = () => wrapper.clientHeight
 
@@ -105,10 +106,11 @@ function setupDualCanvasSwipe(
     if (e.touches.length !== 1) return
     startY = e.touches[0].clientY
     currentY = startY
-    lastY = startY
     startT = e.timeStamp
-    lastT = e.timeStamp
+    directionLocked = null
     dragging = true
+    samples.length = 0
+    samples.push({ t: startT, y: startY })
 
     wrapper.style.transition = 'none'
     canvasA.style.transition = 'none'
@@ -119,49 +121,68 @@ function setupDualCanvasSwipe(
   const handleTouchMove = (e: TouchEvent) => {
     if (!dragging || e.touches.length !== 1) return
     const y = e.touches[0].clientY
+    const dy = y - startY
+    const absDy = Math.abs(dy)
 
-    // Store previous position before updating
-    lastY = currentY
-    lastT = e.timeStamp
+    // Direction lock (after 8px movement)
+    if (!directionLocked && absDy > 8) {
+      directionLocked = dy < 0 ? 'up' : 'down'
+    }
+
+    // Ignore downward motion
+    if (directionLocked === 'down') {
+      dragging = false
+      canvasA.style.transform = 'translateY(0)'
+      canvasB.style.transform = `translateY(${getHeight()}px)`
+      canvasA.style.opacity = '1'
+      canvasB.style.opacity = '1'
+      return
+    }
 
     currentY = y
-    const delta = Math.min(0, y - startY)
+    samples.push({ t: e.timeStamp, y })
+    const cutoff = e.timeStamp - 100 // 100 ms momentum window
+    while (samples.length > 2 && samples[0].t < cutoff) samples.shift()
+
+    const delta = Math.min(0, dy)
     const height = getHeight()
     const progress = Math.abs(delta) / height
 
     canvasA.style.transform = `translateY(${delta}px)`
     canvasB.style.transform = `translateY(${height + delta}px)`
-
-    const opacityA = Math.max(0.3, 1 - progress * 0.7)
-    const opacityB = Math.min(1, 0.3 + progress * 0.7)
-    canvasA.style.opacity = `${opacityA}`
-    canvasB.style.opacity = `${opacityB}`
+    canvasA.style.opacity = `${Math.max(0.3, 1 - progress * 0.7)}`
+    canvasB.style.opacity = `${Math.min(1, 0.3 + progress * 0.7)}`
   }
 
   const handleTouchEnd = (e: TouchEvent) => {
     if (!dragging) return
     dragging = false
 
-    const delta = currentY - startY
     const height = getHeight()
+    const delta = currentY - startY
     const dragDistance = Math.abs(delta)
-    const dt = Math.max(1, e.timeStamp - startT)
-    const vy = delta / dt // average velocity (px/ms)
 
-    // Calculate instantaneous velocity from recent motion
-    const recentDt = Math.max(1, e.timeStamp - lastT)
-    const recentVy = (currentY - lastY) / recentDt // px/ms, negative = upward
+    // Compute recent (100 ms) velocity
+    let vy = 0
+    if (samples.length >= 2) {
+      const a = samples[0]
+      const b = samples[samples.length - 1]
+      const dt = Math.max(1, b.t - a.t)
+      vy = (b.y - a.y) / dt // px/ms; negative = upward
+    }
 
-    // More lenient commit conditions using instantaneous velocity
-    const shouldCommit =
+    const fastFlick = vy < SWIPE_FAST_THROW_THRESHOLD
+    const normalFlick =
       dragDistance > height * SWIPE_COMMIT_THRESHOLD_PERCENT ||
       (dragDistance > SWIPE_COMMIT_MIN_DISTANCE &&
-        (vy < SWIPE_VELOCITY_THRESHOLD ||
-          recentVy < SWIPE_VELOCITY_THRESHOLD)) ||
-      recentVy < SWIPE_FAST_THROW_THRESHOLD // Fast throw based on recent velocity
+        vy < SWIPE_VELOCITY_THRESHOLD)
 
-    const transitionDuration = shouldCommit ? '0.4s' : '0.3s'
-    const transition = `transform ${transitionDuration} cubic-bezier(0.4,0,0.2,1), opacity ${transitionDuration} ease`
+    const shouldCommit = fastFlick || normalFlick
+
+    const transitionDuration = shouldCommit ? '0.35s' : '0.25s'
+    const transition =
+      `transform ${transitionDuration} cubic-bezier(0.4,0,0.2,1), ` +
+      `opacity ${transitionDuration} ease`
     canvasA.style.transition = transition
     canvasB.style.transition = transition
 
