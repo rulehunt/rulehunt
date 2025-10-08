@@ -11,21 +11,16 @@ import {
   makeC4Ruleset,
   randomC4RulesetByDensity,
 } from '../utils.ts'
-import {
-  createDebugFooter,
-  debugFooterClear,
-  debugFooterLog,
-} from './debugFooter.ts'
+
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
 // --- Feature Flags ----------------------------------------------------------
 const ENABLE_ZOOM_AND_PAN = false
-const ENABLE_DEBUG = true
 
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 100
-const TARGET_GRID_SIZE = 150_000
+const TARGET_GRID_SIZE = 500_000
 
 const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1
 const SWIPE_COMMIT_MIN_DISTANCE = 50
@@ -113,7 +108,6 @@ function waitForTransitionEnd(el: HTMLElement): Promise<void> {
 
 // --- Dual-Canvas Swipe Handler ----------------------------------------------
 let isTransitioning = false
-
 function setupDualCanvasSwipe(
   wrapper: HTMLElement,
   canvasA: HTMLCanvasElement,
@@ -122,6 +116,7 @@ function setupDualCanvasSwipe(
   onCancel: () => void,
   onDragStart?: () => void,
   debugCallback?: (info: SwipeDebugInfo) => void,
+  onPrepareNextCanvas?: () => void,
 ): CleanupFunction {
   let startY = 0
   let currentY = 0
@@ -149,8 +144,6 @@ function setupDualCanvasSwipe(
     canvasA.style.transition = 'none'
     canvasB.style.transition = 'none'
     onDragStart?.()
-    debugFooterClear()
-    debugFooterLog('DRAG_START', { startY, isTransitioning })
   }
 
   const handleTouchMove = (e: TouchEvent) => {
@@ -225,45 +218,23 @@ function setupDualCanvasSwipe(
     const shouldCommit =
       !tinyAccidentalMove && !slowPullback && (fastFlick || normalFlick)
 
-    debugFooterLog('DRAG_END', {
-      delta,
-      vy: Math.round(vy * 1000),
-      dragDistance,
-    })
-    debugCallback?.({
-      dragDistance: Math.round(dragDistance),
-      velocity: Math.round(vy * 1000),
-      direction: delta < 0 ? 'up' : 'down',
-      committed: shouldCommit,
-      reason: shouldCommit
-        ? fastFlick
-          ? 'fast flick'
-          : 'normal flick'
-        : tinyAccidentalMove
-          ? 'too small'
-          : slowPullback
-            ? 'pulled back'
-            : 'threshold not met',
-      timestamp: new Date().toLocaleTimeString(),
-      dragging: wasDragging,
-      directionLocked: lockedDirection || 'none',
-      animationExecuted: true,
-    })
-
     const duration = shouldCommit ? 0.35 : 0.25
     const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1), opacity ${duration}s ease`
     canvasA.style.transition = transition
     canvasB.style.transition = transition
     void canvasA.offsetWidth
 
-    // mark before starting transforms
     isTransitioning = true
 
     if (shouldCommit) {
+      // 👇 PRE-RESET the next canvas before showing it
+      onPrepareNextCanvas?.()
+
       canvasA.style.transform = `translateY(-${height}px)`
       canvasB.style.transform = 'translateY(0)'
       canvasA.style.opacity = '0'
       canvasB.style.opacity = '1'
+
       await Promise.all([
         waitForTransitionEnd(canvasA),
         waitForTransitionEnd(canvasB),
@@ -285,7 +256,6 @@ function setupDualCanvasSwipe(
       onCancel()
     }
 
-    debugFooterLog('FINISHING', { isTransitioning })
     isTransitioning = false
   }
 
@@ -381,11 +351,20 @@ function loadRule(
   rule: RuleData,
   orbitLookup: Uint8Array,
   seedPercentage = 50,
+  startPlaying = true,
 ): void {
+  // always stop before reseeding
   cellularAutomata.pause()
+
+  // reseed and render immediately so the new state is visible
   cellularAutomata.patchSeed(seedPercentage)
   const expanded = expandC4Ruleset(rule.ruleset, orbitLookup)
-  cellularAutomata.play(STEPS_PER_SECOND, expanded)
+  cellularAutomata.render()
+
+  // only start running if requested
+  if (startPlaying) {
+    cellularAutomata.play(STEPS_PER_SECOND, expanded)
+  }
 }
 
 // --- Save run ---------------------------------------------------------------
@@ -477,13 +456,6 @@ export async function setupMobileLayout(
   const { root: headerRoot, elements: headerElements } = createMobileHeader()
   const cleanupHeader = setupMobileHeader(headerElements)
   container.appendChild(headerRoot)
-
-  // Debug footer
-  let debugFooter: ReturnType<typeof createDebugFooter> | null = null
-  if (ENABLE_DEBUG) {
-    debugFooter = createDebugFooter()
-    container.appendChild(debugFooter.container)
-  }
 
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   const palette = isDark ? DARK_FG_COLORS : LIGHT_FG_COLORS
@@ -603,6 +575,7 @@ export async function setupMobileLayout(
     wrapper,
     canvasA,
     canvasB,
+    // --- onCommit -------------------------------------------------------------
     () => {
       if (!hasSwipedOnce) {
         hasSwipedOnce = true
@@ -611,7 +584,7 @@ export async function setupMobileLayout(
       }
       saveRunStatistics(currentCA, currentRule.name, currentRule.hex)
 
-      // swap
+      // swap canvases
       ;[canvasA, canvasB] = [canvasB, canvasA]
       ;[currentCA, nextCA] = [nextCA, currentCA]
       ;[currentRule, nextRule] = [nextRule, currentRule]
@@ -633,26 +606,9 @@ export async function setupMobileLayout(
       colorIndex = (colorIndex + 1) % palette.length
       const col = palette[colorIndex]
       const nextCol = palette[(colorIndex + 1) % palette.length]
-
-      // Update colors for both canvases
       currentCA.setColors(col, bgColor)
       nextCA.setColors(nextCol, bgColor)
-
       currentCA.resetZoom()
-
-      nextRule = generateRandomRule()
-      loadRule(nextCA, nextRule, lookup)
-      nextCA.pause()
-
-      currentCA.getStatistics().initializeSimulation({
-        name: `Mobile - ${currentRule.name}`,
-        seedType: 'patch',
-        seedPercentage: 50,
-        rulesetName: currentRule.name,
-        rulesetHex: currentRule.hex,
-        startTime: Date.now(),
-        requestedStepsPerSecond: STEPS_PER_SECOND,
-      })
 
       reload.remove()
       reload = createReloadButton(wrapper, () => {
@@ -666,9 +622,18 @@ export async function setupMobileLayout(
 
       console.log(`Switched to: ${currentRule.name}`)
     },
+    // --- onCancel -------------------------------------------------------------
     () => currentCA.play(STEPS_PER_SECOND, currentRule.ruleset),
+    // --- onDragStart ----------------------------------------------------------
     () => currentCA.pause(),
-    () => {}, // debugCallback
+
+    // --- onPrepareNextCanvas --------------------------------------------------
+    () => {
+      nextCA.pause()
+      nextCA.resetZoom()
+      nextRule = generateRandomRule()
+      loadRule(nextCA, nextRule, lookup, 50, false)
+    },
   )
 
   // Conditionally setup zoom and pan based on feature flag
@@ -685,12 +650,6 @@ export async function setupMobileLayout(
 
     const { gridCols, gridRows, cellSize, screenWidth, screenHeight } =
       computeAdaptiveGrid()
-
-    debugFooterLog('RESIZE', {
-      isTransitioning,
-      width: screenWidth,
-      height: screenHeight,
-    })
 
     wrapper.style.width = `${screenWidth}px`
     wrapper.style.height = `${screenHeight}px`
