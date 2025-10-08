@@ -406,6 +406,8 @@ function prepareRule(
 ): void {
   cellularAutomata.pause()
   cellularAutomata.clearGrid()
+  cellularAutomata.render()
+
   cellularAutomata.patchSeed(seedPercentage)
 
   if (!rule.expanded && (rule.ruleset as number[]).length === 140) {
