@@ -11,7 +11,7 @@ import {
   makeC4Ruleset,
   randomC4RulesetByDensity,
 } from '../utils.ts'
-import { appendDebugLine, createDebugFooter } from './debugFooter.ts'
+import { createDebugFooter, updateDebugText } from './debugFooter.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
 // --- Feature Flags ----------------------------------------------------------
@@ -565,7 +565,7 @@ export async function setupMobileLayout(
       ? (info: SwipeDebugInfo) => {
           const debugText = `${info.timestamp} | ${info.direction.toUpperCase()} | dist:${info.dragDistance}px vel:${info.velocity}px/s
 → ${info.committed ? '✅ COMMIT' : '❌ CANCEL'} (${info.reason})`
-          appendDebugLine(debugFooter, debugText)
+          updateDebugText(debugFooter, debugText)
         }
       : undefined
 
