@@ -235,7 +235,7 @@ function setupDualCanvasSwipe(
     const delta = currentY - startY
     const dragDistance = Math.abs(delta)
 
-    // velocity
+    // compute velocity
     let vy = 0
     if (samples.length >= 2) {
       const a = samples[0]
@@ -263,7 +263,13 @@ function setupDualCanvasSwipe(
     isTransitioning = true
 
     if (shouldCommit) {
-      // IMPORTANT: Defer any next-canvas reseed until AFTER the animation + swap.
+      // Pause the outgoing automaton right away
+      onCancel()
+
+      // Prepare the *incoming* canvas BEFORE animation so it shows a new rule
+      onPrepareNextCanvas?.()
+
+      // Run the transition
       canvasA.style.transform = `translateY(-${height}px)`
       canvasB.style.transform = 'translateY(0)'
       canvasA.style.opacity = '0'
@@ -273,15 +279,12 @@ function setupDualCanvasSwipe(
         waitForTransitionEnd(canvasA),
         waitForTransitionEnd(canvasB),
       ])
+
       canvasA.style.transition = 'none'
       canvasB.style.transition = 'none'
 
-      // Swap ownership/content first…
+      // Swap ownership/content after animation
       onCommit()
-
-      // …then quietly prep the *new background* canvas for the next swipe
-      // (user won’t see it change now).
-      onPrepareNextCanvas?.()
     } else {
       await doCancel()
     }
