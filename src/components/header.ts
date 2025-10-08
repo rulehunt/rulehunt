@@ -11,6 +11,9 @@ export interface HeaderElements {
   githubLink: HTMLAnchorElement
 }
 
+export type Theme = 'light' | 'dark' | 'system'
+export type CleanupFunction = () => void
+
 export function createHeader(): {
   root: HTMLElement
   elements: HeaderElements
@@ -70,53 +73,92 @@ export function createHeader(): {
   return { root, elements }
 }
 
-export type Theme = 'light' | 'dark' | 'system'
-
 export function setupTheme(
-  elements: ThemeToggleElements,
+  themeButtons: ThemeToggleElements,
   onThemeChange?: () => void,
-) {
-  const baseClasses = 'px-3 py-1 rounded text-sm transition-colors'
-  const activeClasses = `${baseClasses} bg-blue-500 text-white`
-  const inactiveClasses = `${baseClasses} hover:bg-gray-200 dark:hover:bg-gray-700`
+): CleanupFunction {
+  // Load saved theme
+  const savedTheme = (localStorage.getItem('theme') as Theme) || 'system'
+  let currentTheme: Theme = savedTheme
 
-  function setTheme(theme: Theme) {
-    localStorage.setItem('theme', theme)
+  // Apply initial theme
+  applyTheme(currentTheme)
+  updateActiveButton(themeButtons, currentTheme)
 
-    // Update button styles
-    elements.light.className =
-      theme === 'light' ? activeClasses : inactiveClasses
-    elements.dark.className = theme === 'dark' ? activeClasses : inactiveClasses
-    elements.system.className =
-      theme === 'system' ? activeClasses : inactiveClasses
-
-    if (theme === 'system') {
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      document.documentElement.classList.toggle('dark', isDark)
-    } else {
-      document.documentElement.classList.toggle('dark', theme === 'dark')
-    }
-
-    // Notify listeners that theme changed
-    onThemeChange?.()
+  // Create event handlers
+  const lightHandler = () => {
+    currentTheme = 'light'
+    localStorage.setItem('theme', currentTheme)
+    applyTheme(currentTheme)
+    updateActiveButton(themeButtons, currentTheme)
+    if (onThemeChange) onThemeChange()
   }
 
-  elements.light.addEventListener('click', () => setTheme('light'))
-  elements.dark.addEventListener('click', () => setTheme('dark'))
-  elements.system.addEventListener('click', () => setTheme('system'))
+  const darkHandler = () => {
+    currentTheme = 'dark'
+    localStorage.setItem('theme', currentTheme)
+    applyTheme(currentTheme)
+    updateActiveButton(themeButtons, currentTheme)
+    if (onThemeChange) onThemeChange()
+  }
 
-  // Initialize theme
-  const savedTheme = localStorage.getItem('theme') as Theme | null
-  setTheme(savedTheme || 'system')
+  const systemHandler = () => {
+    currentTheme = 'system'
+    localStorage.setItem('theme', currentTheme)
+    applyTheme(currentTheme)
+    updateActiveButton(themeButtons, currentTheme)
+    if (onThemeChange) onThemeChange()
+  }
 
-  // Listen for system theme changes
-  window
-    .matchMedia('(prefers-color-scheme: dark)')
-    .addEventListener('change', () => {
-      if (localStorage.getItem('theme') === 'system') {
-        setTheme('system')
-      }
-    })
+  // Add event listeners
+  themeButtons.light.addEventListener('click', lightHandler)
+  themeButtons.dark.addEventListener('click', darkHandler)
+  themeButtons.system.addEventListener('click', systemHandler)
 
-  return { setTheme }
+  // Watch for system theme changes when in system mode
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  const mediaQueryHandler = (e: MediaQueryListEvent) => {
+    if (currentTheme === 'system') {
+      document.documentElement.classList.toggle('dark', e.matches)
+      if (onThemeChange) onThemeChange()
+    }
+  }
+
+  mediaQuery.addEventListener('change', mediaQueryHandler)
+
+  // Return cleanup function
+  return () => {
+    themeButtons.light.removeEventListener('click', lightHandler)
+    themeButtons.dark.removeEventListener('click', darkHandler)
+    themeButtons.system.removeEventListener('click', systemHandler)
+    mediaQuery.removeEventListener('change', mediaQueryHandler)
+  }
+}
+
+function applyTheme(theme: Theme) {
+  if (theme === 'system') {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    document.documentElement.classList.toggle('dark', isDark)
+  } else {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+  }
+}
+
+function updateActiveButton(buttons: ThemeToggleElements, theme: Theme) {
+  // Reset all buttons
+  const baseClass = 'px-3 py-1 rounded text-sm transition-colors'
+  const activeClass = 'bg-white dark:bg-gray-700'
+
+  buttons.light.className = baseClass
+  buttons.dark.className = baseClass
+  buttons.system.className = baseClass
+
+  // Highlight active button
+  if (theme === 'light') {
+    buttons.light.className = `${baseClass} ${activeClass}`
+  } else if (theme === 'dark') {
+    buttons.dark.className = `${baseClass} ${activeClass}`
+  } else {
+    buttons.system.className = `${baseClass} ${activeClass}`
+  }
 }

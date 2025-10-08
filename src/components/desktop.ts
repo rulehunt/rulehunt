@@ -1,0 +1,686 @@
+import { CellularAutomata } from '../cellular-automata.ts'
+import { outlierRule } from '../outlier-rule.ts'
+import type { C4OrbitsData, C4Ruleset } from '../schema.ts'
+import {
+  buildOrbitLookup,
+  c4RulesetToHex,
+  conwayRule,
+  coords10x14,
+  coords32x16,
+  expandC4Ruleset,
+  makeC4Ruleset,
+  randomC4RulesetByDensity,
+} from '../utils.ts'
+
+import { createHeader, setupTheme } from './header.ts'
+import { createProgressBar } from './progressBar.ts'
+import { createRulesetPanel } from './ruleset.ts'
+import { createSimulationPanel } from './simulation.ts'
+import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
+
+// --- Types -----------------------------------------------------------------
+export type CleanupFunction = () => void
+type DisplayMode = 'orbits' | 'full'
+
+// --- Helpers ----------------------------------------------------------------
+function renderRule(
+  ruleset: C4Ruleset,
+  orbitLookup: Uint8Array,
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  ruleLabelDisplay: HTMLElement,
+  ruleIdDisplay: HTMLElement,
+  ruleLabel: string,
+  displayMode: DisplayMode,
+) {
+  if (displayMode === 'orbits') {
+    const cols = 10
+    const rows = 14
+    const cellW = canvas.width / cols
+    const cellH = canvas.height / rows
+
+    const styles = getComputedStyle(document.documentElement)
+    const bgColor = styles.getPropertyValue('--canvas-bg').trim()
+    const fgColor = styles.getPropertyValue('--canvas-fg').trim()
+
+    ctx.fillStyle = bgColor
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = fgColor
+
+    for (let orbit = 0; orbit < 140; orbit++) {
+      if (ruleset[orbit]) {
+        const { x, y } = coords10x14(orbit)
+        ctx.fillRect(x * cellW, y * cellH, cellW, cellH)
+      }
+    }
+  } else {
+    const cols = 32
+    const rows = 16
+    const cellW = canvas.width / cols
+    const cellH = canvas.height / rows
+
+    const styles = getComputedStyle(document.documentElement)
+    const bgColor = styles.getPropertyValue('--canvas-bg').trim()
+    const fgColor = styles.getPropertyValue('--canvas-fg').trim()
+
+    ctx.fillStyle = bgColor
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = fgColor
+
+    const expandedRuleset = expandC4Ruleset(ruleset, orbitLookup)
+
+    for (let pattern = 0; pattern < 512; pattern++) {
+      if (expandedRuleset[pattern]) {
+        const { x, y } = coords32x16(pattern)
+        ctx.fillRect(x * cellW, y * cellH, cellW, cellH)
+      }
+    }
+  }
+
+  const hex35 = c4RulesetToHex(ruleset)
+  ruleLabelDisplay.textContent = `${ruleLabel}`
+  ruleIdDisplay.textContent = `${hex35}`
+}
+
+function updateStatisticsDisplay(
+  cellularAutomata: CellularAutomata,
+  elements: SummaryPanelElements,
+  progressBar: ReturnType<typeof createProgressBar>,
+) {
+  const stats = cellularAutomata.getStatistics()
+  const recentStats = stats.getRecentStats(1)
+  const metadata = stats.getMetadata()
+
+  if (recentStats.length === 0) return
+
+  const current = recentStats[0]
+  const interestScore = stats.calculateInterestScore()
+
+  if (metadata) {
+    const stepCount = metadata.stepCount
+    const progressPercent = Math.min((stepCount / 10000) * 100, 100)
+    progressBar.set(Math.round(progressPercent))
+  }
+
+  if (metadata) {
+    elements.simName.textContent = metadata.name
+    elements.simRule.textContent = `${metadata.rulesetName} (${metadata.rulesetHex})`
+    elements.simRule.title = `${metadata.rulesetName} (${metadata.rulesetHex})`
+
+    let seedText = metadata.seedType
+    if (metadata.seedPercentage !== undefined) {
+      seedText += ` (${metadata.seedPercentage}%)`
+    }
+    elements.simSeed.textContent = seedText
+    elements.simSteps.textContent = metadata.stepCount.toString()
+
+    const elapsed = stats.getElapsedTime()
+    const seconds = Math.floor(elapsed / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+
+    if (hours > 0) {
+      elements.simTime.textContent = `${hours}h ${minutes % 60}m ${seconds % 60}s`
+    } else if (minutes > 0) {
+      elements.simTime.textContent = `${minutes}m ${seconds % 60}s`
+    } else {
+      elements.simTime.textContent = `${seconds}s`
+    }
+
+    const actualSps = stats.getActualStepsPerSecond()
+    const requestedSps = metadata.requestedStepsPerSecond
+    if (actualSps > 0) {
+      let spsText = actualSps.toFixed(1)
+      if (requestedSps) {
+        spsText += ` / ${requestedSps}`
+      }
+      elements.simSps.textContent = spsText
+    } else {
+      elements.simSps.textContent = requestedSps
+        ? `${requestedSps} (target)`
+        : '—'
+    }
+  }
+
+  elements.statPopulation.textContent = current.population.toFixed(0)
+  elements.statActivity.textContent = current.activity.toFixed(0)
+  elements.statEntropy2x2.textContent = current.entropy2x2.toFixed(2)
+  elements.statEntropy4x4.textContent = current.entropy4x4.toFixed(2)
+  elements.statEntropy8x8.textContent = current.entropy8x8.toFixed(2)
+  elements.statInterest.textContent = `${(interestScore * 100).toFixed(1)}%`
+
+  if (interestScore > 0.7) {
+    elements.statInterest.className =
+      'font-mono text-lg font-bold text-green-600 dark:text-green-400'
+  } else if (interestScore > 0.4) {
+    elements.statInterest.className =
+      'font-mono text-lg font-bold text-yellow-600 dark:text-yellow-400'
+  } else {
+    elements.statInterest.className =
+      'font-mono text-lg font-bold text-red-600 dark:text-red-400'
+  }
+}
+
+function handleCanvasClick(
+  event: MouseEvent,
+  canvas: HTMLCanvasElement,
+  currentRuleset: C4Ruleset,
+  orbitsData: C4OrbitsData,
+  orbitLookup: Uint8Array,
+  displayMode: DisplayMode,
+) {
+  const rect = canvas.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const y = event.clientY - rect.top
+
+  if (displayMode === 'orbits') {
+    const cols = 10
+    const rows = 14
+    const cellW = canvas.width / cols
+    const cellH = canvas.height / rows
+
+    const gridX = Math.floor(x / cellW)
+    const gridY = Math.floor(y / cellH)
+    const orbitIndex = gridY * cols + gridX
+
+    if (orbitIndex < 0 || orbitIndex >= 140) return
+
+    const orbit = orbitsData.orbits[orbitIndex]
+    const output = currentRuleset[orbitIndex]
+    const representative = orbit.representative
+
+    const bits = []
+    for (let i = 0; i < 9; i++) {
+      bits.push((representative >> i) & 1)
+    }
+
+    console.log(
+      `\nOrbit ${orbitIndex} (output: ${output})\nRepresentative pattern:\n${bits[0]} ${bits[1]} ${bits[2]}\n${bits[3]} ${bits[4]} ${bits[5]}     --->  ${output}\n${bits[6]} ${bits[7]} ${bits[8]}\n`,
+    )
+    console.log(`Stabilizer: ${orbit.stabilizer}, Size: ${orbit.size}`)
+  } else {
+    const cols = 32
+    const rows = 16
+    const cellW = canvas.width / cols
+    const cellH = canvas.height / rows
+
+    const gridX = Math.floor(x / cellW)
+    const gridY = Math.floor(y / cellH)
+
+    let patternIndex = -1
+    for (let p = 0; p < 512; p++) {
+      const coord = coords32x16(p)
+      if (coord.x === gridX && coord.y === gridY) {
+        patternIndex = p
+        break
+      }
+    }
+
+    if (patternIndex === -1) return
+
+    const expandedRuleset = expandC4Ruleset(currentRuleset, orbitLookup)
+    const output = expandedRuleset[patternIndex]
+    const orbitId = orbitLookup[patternIndex]
+
+    const bits = []
+    for (let i = 0; i < 9; i++) {
+      bits.push((patternIndex >> i) & 1)
+    }
+
+    console.log(
+      `\nPattern ${patternIndex} (orbit: ${orbitId}, output: ${output})\n${bits[0]} ${bits[1]} ${bits[2]}\n${bits[3]} ${bits[4]} ${bits[5]}     --->  ${output}\n${bits[6]} ${bits[7]} ${bits[8]}\n`,
+    )
+  }
+}
+
+// --- Desktop Layout ---------------------------------------------------------
+export async function setupDesktopLayout(
+  appRoot: HTMLDivElement,
+): Promise<CleanupFunction> {
+  // Track all cleanup tasks
+  const eventListeners: Array<{
+    element: EventTarget
+    event: string
+    handler: EventListenerOrEventListenerObject
+  }> = []
+  const intervals: number[] = []
+
+  const addEventListener = <K extends keyof HTMLElementEventMap>(
+    element: EventTarget,
+    event: K | string,
+    handler:
+      | EventListenerOrEventListenerObject
+      | ((evt: HTMLElementEventMap[K]) => void),
+  ) => {
+    element.addEventListener(
+      event as string,
+      handler as EventListenerOrEventListenerObject,
+    )
+    eventListeners.push({
+      element,
+      event: event as string,
+      handler: handler as EventListenerOrEventListenerObject,
+    })
+  }
+
+  const setInterval = (handler: () => void, ms: number): number => {
+    const id = window.setInterval(handler, ms)
+    intervals.push(id)
+    return id
+  }
+
+  const clearInterval = (id: number) => {
+    window.clearInterval(id)
+    const index = intervals.indexOf(id)
+    if (index > -1) intervals.splice(index, 1)
+  }
+
+  // Create header
+  const header = createHeader()
+  appRoot.appendChild(header.root)
+
+  // Create progress bar
+  const progressBar = createProgressBar(0)
+  const progressContainer = document.createElement('div')
+  progressContainer.className =
+    'w-full px-6 py-4 border-b border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900'
+  const progressWrapper = document.createElement('div')
+  progressWrapper.className = 'max-w-7xl mx-auto'
+  progressWrapper.appendChild(progressBar.root)
+  progressContainer.appendChild(progressWrapper)
+  appRoot.appendChild(progressContainer)
+
+  // Create main content
+  const mainContent = document.createElement('main')
+  mainContent.className =
+    'flex-1 flex items-center justify-center gap-6 p-6 lg:p-12'
+
+  const mainContainer = document.createElement('div')
+  mainContainer.className =
+    'flex flex-col lg:flex-row items-start justify-center gap-12 w-full max-w-7xl'
+
+  const leftColumn = document.createElement('div')
+  leftColumn.className = 'flex flex-col items-center gap-3'
+
+  const simulationPanel = createSimulationPanel()
+  const summaryPanel = createSummaryPanel()
+  leftColumn.appendChild(simulationPanel.root)
+  leftColumn.appendChild(summaryPanel.root)
+
+  const rulesetPanel = createRulesetPanel()
+
+  mainContainer.appendChild(leftColumn)
+  mainContainer.appendChild(rulesetPanel.root)
+  mainContent.appendChild(mainContainer)
+  appRoot.appendChild(mainContent)
+
+  // Extract elements
+  const {
+    canvas: simCanvas,
+    btnStep,
+    btnReset,
+    btnPlay,
+    stepsPerSecondInput,
+    aliveSlider,
+    aliveValue,
+    radioCenterSeed,
+    radioRandomSeed,
+    radioPatchSeed,
+  } = simulationPanel.elements
+
+  const {
+    canvas: ruleCanvas,
+    ruleLabel: ruleLabelDisplay,
+    ruleId: ruleIdDisplay,
+    btnConway,
+    btnOutlier,
+    btnRandomC4Ruleset,
+    orbitSlider,
+    orbitValue,
+    radioDisplayOrbits,
+    radioDisplayFull,
+  } = rulesetPanel.elements
+
+  const ctx = ruleCanvas.getContext('2d') as CanvasRenderingContext2D
+
+  // Load orbit data
+  const response = await fetch('./resources/c4-orbits.json')
+  const orbitsData: C4OrbitsData = await response.json()
+  const orbitLookup = buildOrbitLookup(orbitsData)
+
+  console.log(`Loaded ${orbitsData.orbits.length} C4 orbits`)
+
+  // Initialize cellular automata
+  const cellularAutomata = new CellularAutomata(simCanvas)
+  updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
+
+  // State
+  let currentRuleset: C4Ruleset
+  let initialConditionType: 'center' | 'random' | 'patch' = 'patch'
+  let displayMode: DisplayMode = 'orbits'
+  let statsUpdateInterval: number | null = null
+
+  // Functions
+  function applyInitialCondition() {
+    if (initialConditionType === 'center') {
+      cellularAutomata.centerSeed()
+    } else if (initialConditionType === 'patch') {
+      const percentage = Number.parseInt(aliveSlider.value)
+      cellularAutomata.patchSeed(percentage)
+    } else {
+      const percentage = Number.parseInt(aliveSlider.value)
+      cellularAutomata.randomSeed(percentage)
+    }
+    cellularAutomata.render()
+    updateStatisticsDisplay(
+      cellularAutomata,
+      summaryPanel.elements,
+      progressBar,
+    )
+    initializeSimulationMetadata()
+  }
+
+  function initializeSimulationMetadata() {
+    const stats = cellularAutomata.getStatistics()
+    const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
+
+    let seedPercentage: number | undefined
+    if (initialConditionType === 'random' || initialConditionType === 'patch') {
+      seedPercentage = Number.parseInt(aliveSlider.value)
+    }
+
+    stats.initializeSimulation({
+      name: `Simulation ${new Date().toLocaleTimeString()}`,
+      seedType: initialConditionType,
+      seedPercentage,
+      rulesetName: ruleLabelDisplay.textContent || 'Unknown',
+      rulesetHex: ruleIdDisplay.textContent || 'Unknown',
+      startTime: Date.now(),
+      requestedStepsPerSecond: cellularAutomata.isCurrentlyPlaying()
+        ? stepsPerSecond
+        : undefined,
+    })
+  }
+
+  function generateRandomPatternRule() {
+    const percentage = Number.parseInt(orbitSlider.value)
+    const density = percentage / 100
+    const ruleset = randomC4RulesetByDensity(density)
+    currentRuleset = ruleset
+    renderRule(
+      ruleset,
+      orbitLookup,
+      ctx,
+      ruleCanvas,
+      ruleLabelDisplay,
+      ruleIdDisplay,
+      `Random Pattern (${percentage}% orbits)`,
+      displayMode,
+    )
+    applyInitialCondition()
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause()
+      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
+      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, expanded)
+    }
+  }
+
+  // Initialize with Conway
+  applyInitialCondition()
+  const conwayRuleset = makeC4Ruleset(conwayRule, orbitLookup)
+  currentRuleset = conwayRuleset
+  renderRule(
+    conwayRuleset,
+    orbitLookup,
+    ctx,
+    ruleCanvas,
+    ruleLabelDisplay,
+    ruleIdDisplay,
+    'Conway',
+    displayMode,
+  )
+
+  // Setup theme with re-render callback
+  const cleanupTheme = setupTheme(header.elements.themeToggle, () => {
+    cellularAutomata.render()
+    updateStatisticsDisplay(
+      cellularAutomata,
+      summaryPanel.elements,
+      progressBar,
+    )
+    renderRule(
+      currentRuleset,
+      orbitLookup,
+      ctx,
+      ruleCanvas,
+      ruleLabelDisplay,
+      ruleIdDisplay,
+      ruleLabelDisplay.textContent || 'Loading...',
+      displayMode,
+    )
+  })
+
+  // Canvas click handler
+  const canvasClickHandler = (e: MouseEvent) => {
+    handleCanvasClick(
+      e,
+      ruleCanvas,
+      currentRuleset,
+      orbitsData,
+      orbitLookup,
+      displayMode,
+    )
+  }
+  addEventListener(ruleCanvas, 'click', canvasClickHandler)
+  ruleCanvas.style.cursor = 'pointer'
+
+  // Event Listeners
+  addEventListener(btnConway, 'click', () => {
+    const ruleset = makeC4Ruleset(conwayRule, orbitLookup)
+    currentRuleset = ruleset
+    renderRule(
+      ruleset,
+      orbitLookup,
+      ctx,
+      ruleCanvas,
+      ruleLabelDisplay,
+      ruleIdDisplay,
+      'Conway',
+      displayMode,
+    )
+    applyInitialCondition()
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause()
+      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
+      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, expanded)
+    }
+  })
+
+  addEventListener(btnOutlier, 'click', () => {
+    const ruleset = makeC4Ruleset(outlierRule, orbitLookup)
+    currentRuleset = ruleset
+    renderRule(
+      ruleset,
+      orbitLookup,
+      ctx,
+      ruleCanvas,
+      ruleLabelDisplay,
+      ruleIdDisplay,
+      'Outlier',
+      displayMode,
+    )
+    applyInitialCondition()
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause()
+      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
+      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, expanded)
+    }
+  })
+
+  addEventListener(btnRandomC4Ruleset, 'click', () => {
+    generateRandomPatternRule()
+  })
+
+  addEventListener(orbitSlider, 'input', () => {
+    orbitValue.textContent = `${orbitSlider.value}%`
+    generateRandomPatternRule()
+  })
+
+  radioDisplayOrbits.checked = true
+  addEventListener(radioDisplayOrbits, 'change', () => {
+    if (radioDisplayOrbits.checked) {
+      displayMode = 'orbits'
+      renderRule(
+        currentRuleset,
+        orbitLookup,
+        ctx,
+        ruleCanvas,
+        ruleLabelDisplay,
+        ruleIdDisplay,
+        ruleLabelDisplay.textContent || 'Loading...',
+        displayMode,
+      )
+    }
+  })
+
+  addEventListener(radioDisplayFull, 'change', () => {
+    if (radioDisplayFull.checked) {
+      displayMode = 'full'
+      renderRule(
+        currentRuleset,
+        orbitLookup,
+        ctx,
+        ruleCanvas,
+        ruleLabelDisplay,
+        ruleIdDisplay,
+        ruleLabelDisplay.textContent || 'Loading...',
+        displayMode,
+      )
+    }
+  })
+
+  addEventListener(radioCenterSeed, 'change', () => {
+    if (radioCenterSeed.checked) {
+      initialConditionType = 'center'
+      applyInitialCondition()
+    }
+  })
+
+  addEventListener(radioRandomSeed, 'change', () => {
+    if (radioRandomSeed.checked) {
+      initialConditionType = 'random'
+      applyInitialCondition()
+    }
+  })
+
+  addEventListener(radioPatchSeed, 'change', () => {
+    if (radioPatchSeed.checked) {
+      initialConditionType = 'patch'
+      applyInitialCondition()
+    }
+  })
+
+  addEventListener(btnStep, 'click', () => {
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause()
+      btnPlay.textContent = 'Play'
+      if (statsUpdateInterval !== null) {
+        clearInterval(statsUpdateInterval)
+        statsUpdateInterval = null
+      }
+    }
+    const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+    cellularAutomata.step(expanded)
+    updateStatisticsDisplay(
+      cellularAutomata,
+      summaryPanel.elements,
+      progressBar,
+    )
+  })
+
+  addEventListener(btnReset, 'click', () => {
+    applyInitialCondition()
+  })
+
+  addEventListener(btnPlay, 'click', () => {
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause()
+      btnPlay.textContent = 'Play'
+      if (statsUpdateInterval !== null) {
+        clearInterval(statsUpdateInterval)
+        statsUpdateInterval = null
+      }
+    } else {
+      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
+      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, expanded)
+      btnPlay.textContent = 'Pause'
+
+      const stats = cellularAutomata.getStatistics()
+      const metadata = stats.getMetadata()
+      if (metadata) {
+        metadata.requestedStepsPerSecond = stepsPerSecond
+      }
+
+      statsUpdateInterval = setInterval(() => {
+        updateStatisticsDisplay(
+          cellularAutomata,
+          summaryPanel.elements,
+          progressBar,
+        )
+      }, 100)
+    }
+  })
+
+  addEventListener(stepsPerSecondInput, 'change', () => {
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause()
+      if (statsUpdateInterval !== null) {
+        clearInterval(statsUpdateInterval)
+      }
+      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
+      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, expanded)
+
+      const stats = cellularAutomata.getStatistics()
+      const metadata = stats.getMetadata()
+      if (metadata) {
+        metadata.requestedStepsPerSecond = stepsPerSecond
+      }
+
+      statsUpdateInterval = setInterval(() => {
+        updateStatisticsDisplay(
+          cellularAutomata,
+          summaryPanel.elements,
+          progressBar,
+        )
+      }, 100)
+    }
+  })
+
+  addEventListener(aliveSlider, 'input', () => {
+    aliveValue.textContent = `${aliveSlider.value}%`
+    if (initialConditionType === 'random' || initialConditionType === 'patch') {
+      applyInitialCondition()
+    }
+  })
+
+  // Return cleanup function
+  return () => {
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause()
+    }
+    if (statsUpdateInterval !== null) {
+      clearInterval(statsUpdateInterval)
+    }
+    intervals.forEach((id) => window.clearInterval(id))
+    eventListeners.forEach(({ element, event, handler }) => {
+      element.removeEventListener(event, handler)
+    })
+    cleanupTheme()
+    console.log('Desktop layout cleaned up')
+  }
+}

@@ -209,6 +209,28 @@ export const RunQuery = z.object({
 })
 
 // ============================================================================
+// Leaderboard types
+// ============================================================================
+
+export const LeaderboardEntry = z.object({
+  run_id: z.string(),
+  user_id: z.string(),
+  user_label: z.string().nullable().optional(),
+  ruleset_name: z.string(),
+  ruleset_hex: z.string().regex(/^[0-9a-f]{35}$/i),
+  watched_steps: z.number().int().nonnegative(),
+  watched_wall_ms: z.number().int().nonnegative(),
+  interest_score: z.number().nonnegative(),
+  entropy4x4: z.number().nonnegative(),
+  submitted_at: z.string().datetime(),
+})
+
+export const LeaderboardResponse = z.object({
+  ok: z.literal(true),
+  results: z.array(LeaderboardEntry),
+})
+
+// ============================================================================
 // Type exports
 // ============================================================================
 export type RunSubmission = z.infer<typeof RunSubmission>
@@ -230,3 +252,5 @@ export type C4Orbit = z.infer<typeof C4Orbit>
 export type C4OrbitsData = z.infer<typeof C4OrbitsData>
 export type Ruleset = z.infer<typeof Ruleset>
 export type C4Ruleset = z.infer<typeof C4Ruleset>
+export type LeaderboardEntry = z.infer<typeof LeaderboardEntry>
+export type LeaderboardResponse = z.infer<typeof LeaderboardResponse>
