@@ -95,6 +95,12 @@ function waitForTransitionEnd(el: HTMLElement): Promise<void> {
 }
 
 // --- Dual-Canvas Swipe Handler ----------------------------------------------
+// Swipe Flow:
+// 1. Touch start → pause onScreen CA (both canvases now static)
+// 2. Touch move → animate both static canvases (TikTok-style scroll)
+// 3. Commit decision → run transition animation (incoming canvas already has next rule)
+// 4. After animation → onCommit swaps references, starts playing new onScreen CA
+// 5. onCommit also prepares the now-offScreen canvas with a fresh rule for NEXT swap
 let isTransitioning = false
 function setupDualCanvasSwipe(
   wrapper: HTMLElement,
@@ -103,7 +109,6 @@ function setupDualCanvasSwipe(
   onCommit: () => void,
   onCancel: () => void,
   onDragStart?: () => void,
-  onPrepareNextCanvas?: () => void,
 ): CleanupFunction {
   let startY = 0
   let currentY = 0
@@ -247,13 +252,10 @@ function setupDualCanvasSwipe(
     isTransitioning = true
 
     if (shouldCommit) {
-      // Pause the outgoing automaton right away
+      // Ensure outgoing CA is paused
       onCancel()
 
-      // Prepare the incoming canvas BEFORE animation
-      onPrepareNextCanvas?.()
-
-      // Run the transition
+      // Animate both canvases (both already showing their correct content)
       outgoingCanvas.style.transform = `translateY(-${height}px)`
       incomingCanvas.style.transform = 'translateY(0)'
       outgoingCanvas.style.opacity = '0'
@@ -267,7 +269,7 @@ function setupDualCanvasSwipe(
       outgoingCanvas.style.transition = 'none'
       incomingCanvas.style.transition = 'none'
 
-      // Swap ownership/content after animation
+      // Swap references and prepare for next swap
       onCommit()
     } else {
       await doCancel()
@@ -615,7 +617,10 @@ export async function setupMobileLayout(
   }
   let offScreenRule = generateRandomRule()
 
+  // Load and start the onScreen CA
   loadRule(onScreenCA, onScreenRule, lookup)
+
+  // Pre-load the offScreen CA with the next rule (paused, ready for first swap)
   loadRule(offScreenCA, offScreenRule, lookup)
   offScreenCA.pause()
 
@@ -641,7 +646,7 @@ export async function setupMobileLayout(
     wrapper,
     onScreenCanvas,
     offScreenCanvas,
-    // --- onCommit -------------------------------------------------------------
+    // --- onCommit: Called AFTER animation, swaps and prepares for next -------
     () => {
       if (!hasSwipedOnce) {
         hasSwipedOnce = true
@@ -650,7 +655,7 @@ export async function setupMobileLayout(
       }
       saveRunStatistics(onScreenCA, onScreenRule.name, onScreenRule.hex)
 
-      // Swap on-screen/off-screen tracking
+      // Swap references: incoming becomes onScreen, outgoing becomes offScreen
       ;[onScreenCanvas, offScreenCanvas] = [offScreenCanvas, onScreenCanvas]
       ;[onScreenCA, offScreenCA] = [offScreenCA, onScreenCA]
       ;[onScreenRule, offScreenRule] = [offScreenRule, onScreenRule]
@@ -667,15 +672,22 @@ export async function setupMobileLayout(
       offScreenCanvas.style.transform = `translateY(${h}px)`
       offScreenCanvas.style.opacity = '1'
 
-      offScreenCA.pause()
+      // Start playing the new onScreen CA (it already has the next rule loaded from previous swap)
       onScreenCA.play(STEPS_PER_SECOND, onScreenRule.ruleset)
 
+      // NOW prepare the offScreen canvas for the NEXT swap
+      // This is the old onScreen canvas that just went offScreen
+      offScreenCA.pause()
+      offScreenCA.resetZoom()
+      offScreenRule = generateRandomRule()
+      loadRule(offScreenCA, offScreenRule, lookup, 50, false)
+
+      // Update colors
       colorIndex = (colorIndex + 1) % palette.length
       const col = palette[colorIndex]
       const nextCol = palette[(colorIndex + 1) % palette.length]
       onScreenCA.setColors(col, bgColor)
       offScreenCA.setColors(nextCol, bgColor)
-      onScreenCA.resetZoom()
 
       // Recreate reload button with updated canvas references
       reload.remove()
@@ -688,17 +700,10 @@ export async function setupMobileLayout(
 
       console.log(`Switched to: ${onScreenRule.name}`)
     },
-    // --- onCancel -------------------------------------------------------------
+    // --- onCancel: Resume playing onScreen CA if user cancels swipe ----------
     () => onScreenCA.play(STEPS_PER_SECOND, onScreenRule.ruleset),
-    // --- onDragStart ----------------------------------------------------------
+    // --- onDragStart: Pause onScreen CA so both canvases are static ----------
     () => onScreenCA.pause(),
-    // --- onPrepareNextCanvas --------------------------------------------------
-    () => {
-      offScreenCA.pause()
-      offScreenCA.resetZoom()
-      offScreenRule = generateRandomRule()
-      loadRule(offScreenCA, offScreenRule, lookup, 50, false)
-    },
   )
 
   // Conditionally setup zoom and pan based on feature flag
