@@ -202,15 +202,13 @@ function createReloadButton(
 ): HTMLButtonElement {
   const btn = document.createElement('button')
   btn.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
-         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-      <path stroke-linecap="round" stroke-linejoin="round"
-            d="M4 4v6h6M20 20v-6h-6M5.41 18.59A9 9 0 1018.59 5.41" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+      <path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z" />
     </svg>
   `
   btn.title = 'Reload simulation'
   btn.className =
-    'absolute top-2 right-2 bg-white/70 dark:bg-gray-800/70 rounded-full shadow-md hover:bg-white hover:dark:bg-gray-700 transition-all p-2 text-lg leading-none'
+    'fixed bottom-4 right-4 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition'
   btn.style.zIndex = '10'
   btn.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
 

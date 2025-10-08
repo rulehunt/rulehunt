@@ -141,11 +141,31 @@ export function randomC4Ruleset(): C4Ruleset {
 }
 
 /** Generate random C4Ruleset by setting each orbit with given probability */
-export function randomC4RulesetByDensity(density = 0.5): C4Ruleset {
+export function randomC4RulesetByDensity(
+  density = 0.5,
+  forceRuleZeroOff = false,
+): C4Ruleset {
   const ruleset = new Array(140) as (0 | 1)[]
-  for (let i = 0; i < 140; i++) {
-    ruleset[i] = Math.random() < density ? 1 : 0
+
+  while (true) {
+    for (let i = 0; i < 140; i++) {
+      ruleset[i] = Math.random() < density ? 1 : 0
+    }
+
+    if (forceRuleZeroOff) {
+      // pattern 0b000000000 → orbit index 0
+      // pattern 0b111111111 → orbit index 139
+      const allDead = 0
+
+      // Rule 0 must produce 0 to prevent screen-wide toggling
+      if (ruleset[allDead] !== 0) {
+        continue // regenerate
+      }
+    }
+
+    break
   }
+
   return ruleset as C4Ruleset
 }
 
