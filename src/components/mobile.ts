@@ -2,7 +2,12 @@
 import { saveRun } from '../api/save'
 import { CellularAutomata } from '../cellular-automata.ts'
 import { getUserIdentity } from '../identity.ts'
-import type { C4OrbitsData, Ruleset, RunSubmission } from '../schema.ts'
+import type {
+  C4OrbitsData,
+  C4Ruleset,
+  Ruleset,
+  RunSubmission,
+} from '../schema.ts'
 import {
   buildOrbitLookup,
   c4RulesetToHex,
@@ -56,10 +61,13 @@ const DARK_FG_COLORS = [
 // --- Types ------------------------------------------------------------------
 export type CleanupFunction = () => void
 
-interface RuleData {
+// Runtime rule container used only on mobile.ts.
+// Combines a C4 or expanded ruleset plus optional cached expansion.
+export type RuleData = {
   name: string
   hex: string
-  ruleset: Ruleset
+  ruleset: C4Ruleset | Ruleset
+  expanded?: Ruleset
 }
 
 // --- Helpers ----------------------------------------------------------------
@@ -383,21 +391,33 @@ function generateRandomRule(): RuleData {
   }
 }
 
-function loadRule(
+// --- Explicit rule setup and play functions ---------------------------------
+
+/**
+ * Prepare a CA with the given rule and seed, paused and rendered.
+ */
+function prepareRule(
   cellularAutomata: CellularAutomata,
   rule: RuleData,
   orbitLookup: Uint8Array,
   seedPercentage = 50,
-  startPlaying = true,
 ): void {
   cellularAutomata.pause()
   cellularAutomata.patchSeed(seedPercentage)
-  const expanded = expandC4Ruleset(rule.ruleset, orbitLookup)
-  cellularAutomata.render()
 
-  if (startPlaying) {
-    cellularAutomata.play(STEPS_PER_SECOND, expanded)
+  if (!rule.expanded && (rule.ruleset as number[]).length === 140) {
+    rule.expanded = expandC4Ruleset(rule.ruleset as C4Ruleset, orbitLookup)
   }
+
+  cellularAutomata.render()
+}
+
+/**
+ * Start or resume the CA with its expanded rule.
+ */
+function startRule(cellularAutomata: CellularAutomata, rule: RuleData): void {
+  const expanded = rule.expanded ?? rule.ruleset
+  cellularAutomata.play(STEPS_PER_SECOND, expanded)
 }
 
 // --- Save run ---------------------------------------------------------------
@@ -631,12 +651,10 @@ export async function setupMobileLayout(
   }
   let offScreenRule = generateRandomRule()
 
-  // Load and start the onScreen CA
-  loadRule(onScreenCA, onScreenRule, lookup)
+  prepareRule(onScreenCA, onScreenRule, lookup)
+  startRule(onScreenCA, onScreenRule) // start only onScreen
 
-  // Pre-load the offScreen CA with the next rule (paused, ready for first swap)
-  loadRule(offScreenCA, offScreenRule, lookup)
-  offScreenCA.pause()
+  prepareRule(offScreenCA, offScreenRule, lookup) // stays paused
 
   onScreenCA.getStatistics().initializeSimulation({
     name: `Mobile - ${onScreenRule.name}`,
@@ -650,7 +668,10 @@ export async function setupMobileLayout(
 
   let reload = createReloadButton(
     wrapper,
-    () => loadRule(onScreenCA, onScreenRule, lookup),
+    () => {
+      prepareRule(onScreenCA, onScreenRule, lookup)
+      startRule(onScreenCA, onScreenRule)
+    },
     onScreenCanvas,
     offScreenCanvas,
   )
@@ -701,21 +722,25 @@ export async function setupMobileLayout(
 
       // Defer CA operations by one frame to let layout settle
       setTimeout(() => {
-        // Start playing the new onScreen CA
-        onScreenCA.play(STEPS_PER_SECOND, onScreenRule.ruleset)
+        // Start the newly visible CA
+        startRule(onScreenCA, onScreenRule)
 
-        // Prepare offScreen canvas for NEXT swap
+        // Prepare offscreen CA for the next swipe
         offScreenCA.pause()
         offScreenCA.resetZoom()
+
         offScreenRule = generateRandomRule()
-        loadRule(offScreenCA, offScreenRule, lookup, 50, false)
+        prepareRule(offScreenCA, offScreenRule, lookup, 50)
       }, 16)
 
       // Recreate reload button with updated canvas references
       reload.remove()
       reload = createReloadButton(
         wrapper,
-        () => loadRule(onScreenCA, onScreenRule, lookup),
+        () => {
+          prepareRule(onScreenCA, onScreenRule, lookup)
+          startRule(onScreenCA, onScreenRule)
+        },
         onScreenCanvas,
         offScreenCanvas,
       )
