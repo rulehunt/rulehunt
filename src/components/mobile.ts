@@ -22,7 +22,6 @@ const SWIPE_COMMIT_MIN_DISTANCE = 40
 const SWIPE_VELOCITY_THRESHOLD = -0.25
 const SWIPE_FAST_THROW_THRESHOLD = -0.4
 
-
 const LIGHT_FG_COLORS = [
   '#2563eb', // blue-600
   '#dc2626', // red-600
