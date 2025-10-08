@@ -22,6 +22,7 @@ import {
   makeC4Ruleset,
   randomC4RulesetByDensity,
 } from '../utils.ts'
+import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
@@ -156,7 +157,7 @@ function setupDualCanvasSwipe(
   let startT = 0
   let dragging = false
   let directionLocked: 'up' | 'down' | null = null
-  let lastSwipeTime = 0
+  let lastSwipeTime = -1
   const samples: { t: number; y: number }[] = []
   const getHeight = () => wrapper.clientHeight
 
@@ -179,7 +180,7 @@ function setupDualCanvasSwipe(
 
     if (e.touches.length !== 1) return
     const now = performance.now()
-    if (now - lastSwipeTime < SWIPE_COOLDOWN_MS) return
+    if (lastSwipeTime > 0 && now - lastSwipeTime < SWIPE_COOLDOWN_MS) return
     if (isTransitioning) return
 
     startY = e.touches[0].clientY
@@ -510,6 +511,45 @@ function saveRunStatistics(
   )
 }
 
+// --- Stats Button -----------------------------------------------------------
+function createStatsButton(
+  parent: HTMLElement,
+  onShowStats: () => void,
+): HTMLButtonElement {
+  const btn = document.createElement('button')
+  btn.setAttribute('data-swipe-ignore', 'true')
+  btn.style.touchAction = 'manipulation' // avoids 300ms delay on iOS
+
+  btn.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+         fill="currentColor" class="w-6 h-6">
+      <path d="M3 13h2v8H3v-8zm4-4h2v12H7V9zm4-4h2v16h-2V5zm4 2h2v14h-2V7z"/>
+    </svg>`
+  btn.className =
+    'absolute bottom-4 right-20 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition z-10'
+  btn.title = 'View statistics'
+
+  // Swallow events so they don't reach the wrapper
+  const swallow = (e: Event) => e.stopPropagation()
+  btn.addEventListener('pointerdown', swallow)
+  btn.addEventListener('pointerup', swallow)
+  btn.addEventListener('mousedown', swallow)
+  btn.addEventListener('mouseup', swallow)
+  btn.addEventListener('touchstart', swallow, { passive: true })
+  btn.addEventListener('touchmove', swallow, { passive: true })
+  btn.addEventListener('touchend', swallow, { passive: true })
+  btn.addEventListener('touchcancel', swallow, { passive: true })
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (isTransitioning) return
+    onShowStats()
+  })
+
+  parent.appendChild(btn)
+  return btn
+}
+
 // --- Reload Button ----------------------------------------------------------
 function createReloadButton(
   parent: HTMLElement,
@@ -703,6 +743,63 @@ export async function setupMobileLayout(
     requestedStepsPerSecond: STEPS_PER_SECOND,
   })
 
+  // Create stats overlay
+  const {
+    elements: statsElements,
+    show: showStats,
+    hide: hideStats,
+  } = createStatsOverlay()
+  const cleanupStatsOverlay = setupStatsOverlay(statsElements, hideStats)
+
+  // Helper function to get current run data
+  const getCurrentRunData = (): RunSubmission => {
+    const stats = onScreenCA.getStatistics()
+    const metadata = stats.getMetadata()
+    const recent = stats.getRecentStats(1)[0] ?? {
+      population: 0,
+      activity: 0,
+      populationChange: 0,
+      entropy2x2: 0,
+      entropy4x4: 0,
+      entropy8x8: 0,
+    }
+
+    return {
+      userId: getUserIdentity().userId,
+      userLabel: getUserIdentity().userLabel,
+      rulesetName: onScreenRule.name,
+      rulesetHex: onScreenRule.hex,
+      seed: onScreenCA.getSeed(),
+      seedType: (metadata?.seedType ?? 'patch') as
+        | 'center'
+        | 'random'
+        | 'patch',
+      seedPercentage: metadata?.seedPercentage ?? 50,
+      stepCount: metadata?.stepCount ?? 0,
+      watchedSteps: metadata?.stepCount ?? 0,
+      watchedWallMs: stats.getElapsedTime(),
+      gridSize: onScreenCA.getGridSize(),
+      progress_bar_steps: undefined,
+      requestedSps: metadata?.requestedStepsPerSecond ?? STEPS_PER_SECOND,
+      actualSps: stats.getActualStepsPerSecond(),
+      population: recent.population,
+      activity: recent.activity,
+      populationChange: recent.populationChange,
+      entropy2x2: recent.entropy2x2,
+      entropy4x4: recent.entropy4x4,
+      entropy8x8: recent.entropy8x8,
+      interestScore: stats.calculateInterestScore(),
+      simVersion: 'v0.1.0',
+      engineCommit: undefined,
+      extraScores: undefined,
+    }
+  }
+
+  // Create buttons
+  let statsBtn = createStatsButton(wrapper, () =>
+    showStats(getCurrentRunData()),
+  )
+
   let reload = createReloadButton(
     wrapper,
     () => {
@@ -732,11 +829,9 @@ export async function setupMobileLayout(
       ;[onScreenCA, offScreenCA] = [offScreenCA, onScreenCA]
       ;[onScreenRule, offScreenRule] = [offScreenRule, onScreenRule]
 
-      // Hide offScreen canvas immediately, then restore visibility
-      offScreenCanvas.style.visibility = 'hidden'
-      requestAnimationFrame(() => {
-        offScreenCanvas.style.visibility = 'visible'
-      })
+      // clear the old data
+      offScreenCA.pause()
+      offScreenCA.clearGrid() // also clears canvas
 
       // Update z-index and positioning explicitly
       const h = onScreenCanvas.height
@@ -763,13 +858,17 @@ export async function setupMobileLayout(
         startRule(onScreenCA, onScreenRule)
 
         // Prepare offscreen CA for the next swipe with explicit render
-        offScreenCA.pause()
         offScreenRule = generateRandomRule()
         prepareRule(offScreenCA, offScreenRule, lookup, 50)
       }, 16)
 
-      // Recreate reload button with updated canvas references
       reload.remove()
+      statsBtn.remove()
+
+      statsBtn = createStatsButton(wrapper, () =>
+        showStats(getCurrentRunData()),
+      )
+
       reload = createReloadButton(
         wrapper,
         () => {
@@ -839,6 +938,7 @@ export async function setupMobileLayout(
     cleanupZoomOnScreen()
     cleanupZoomOffScreen()
     cleanupHeader()
+    cleanupStatsOverlay()
     window.removeEventListener('resize', handleResize)
   }
 }

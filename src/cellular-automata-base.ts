@@ -112,7 +112,18 @@ export abstract class CellularAutomataBase {
     this.bgRGB = hexToRGB(bgColor)
   }
 
+  /** Explicitly clear the visible canvas to the background color */
+  protected clearCanvas(): void {
+    const ctx = this.ctx
+    if (!ctx) return
+    ctx.save()
+    ctx.fillStyle = this.bgColor
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
+    ctx.restore()
+  }
+
   clearGrid() {
+    this.clearCanvas()
     this.grid.fill(0)
     this.onGridChanged()
   }
@@ -382,6 +393,8 @@ export abstract class CellularAutomataBase {
 
     // Let subclass clean up engine-specific resources
     this.cleanup()
+
+    this.clearCanvas()
 
     switch (this.lastSeedMethod) {
       case 'center':
