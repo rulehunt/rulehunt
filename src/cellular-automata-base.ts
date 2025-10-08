@@ -1,3 +1,4 @@
+import type { CellularAutomataOptions } from './cellular-automata-interface.ts'
 import type { Ruleset } from './schema.ts'
 import { StatisticsTracker } from './statistics.ts'
 
@@ -22,48 +23,47 @@ function hexToRGB(hex: string): [number, number, number] {
   ]
 }
 
-export class CellularAutomata {
-  private grid: Uint8Array
-  private nextGrid: Uint8Array
-  private canvas: HTMLCanvasElement
-  private ctx: CanvasRenderingContext2D
-  private isPlaying = false
-  private playInterval: number | null = null
-  private statistics: StatisticsTracker
-  private gridRows: number
-  private gridCols: number
-  private gridArea: number
-  private fgColor: string
-  private bgColor: string
-  private fgRGB: [number, number, number]
-  private bgRGB: [number, number, number]
-  private neighborOffsets: number[]
-  private imageData: ImageData
-  private pixelData: Uint8ClampedArray
+/**
+ * Base class for cellular automata implementations.
+ * Handles all common functionality: rendering, zoom/pan, playback, seeding.
+ * Subclasses only implement the actual CA step computation.
+ */
+export abstract class CellularAutomataBase {
+  protected grid: Uint8Array
+  protected canvas: HTMLCanvasElement
+  protected ctx: CanvasRenderingContext2D
+  protected statistics: StatisticsTracker
+  protected gridRows: number
+  protected gridCols: number
+  protected gridArea: number
+  protected fgColor: string
+  protected bgColor: string
+  protected fgRGB: [number, number, number]
+  protected bgRGB: [number, number, number]
+  protected imageData: ImageData
+  protected pixelData: Uint8ClampedArray
 
-  private seed = Math.floor(Math.random() * 0xffffffff)
-  private rng = makeRng(this.seed)
-  private lastSeedMethod: 'center' | 'random' | 'patch' = 'random'
-  private lastAlivePercentage = 50
+  protected seed = Math.floor(Math.random() * 0xffffffff)
+  protected rng = makeRng(this.seed)
+  protected lastSeedMethod: 'center' | 'random' | 'patch' = 'random'
+  protected lastAlivePercentage = 50
 
-  private currentRuleset: Ruleset | null = null
-  private lastStepsPerSecond = 10
+  protected currentRuleset: Ruleset | null = null
+  protected lastStepsPerSecond = 10
+  protected isPlaying = false
+  protected playInterval: number | null = null
 
-  private zoom = 1
-  private panX = 0
-  private panY = 0
+  protected zoom = 1
+  protected panX = 0
+  protected panY = 0
 
-  constructor(
-    canvas: HTMLCanvasElement,
-    options: {
-      gridRows: number
-      gridCols: number
-      fgColor: string
-      bgColor: string
-    },
-  ) {
+  constructor(canvas: HTMLCanvasElement, options: CellularAutomataOptions) {
     this.canvas = canvas
-    this.ctx = canvas.getContext('2d') as CanvasRenderingContext2D
+    this.ctx = canvas.getContext('2d', {
+      alpha: false,
+      willReadFrequently: false,
+    }) as CanvasRenderingContext2D
+
     this.gridRows = options.gridRows
     this.gridCols = options.gridCols
     this.gridArea = this.gridRows * this.gridCols
@@ -73,19 +73,38 @@ export class CellularAutomata {
     this.bgRGB = hexToRGB(this.bgColor)
 
     this.grid = new Uint8Array(this.gridArea)
-    this.nextGrid = new Uint8Array(this.gridArea)
     this.statistics = new StatisticsTracker(this.gridRows, this.gridCols)
-
-    // Precompute neighbor offsets for the 3x3 kernel
-    const c = this.gridCols
-    this.neighborOffsets = [-c - 1, -c, -c + 1, -1, 0, 1, c - 1, c, c + 1]
 
     this.imageData = this.ctx.createImageData(this.gridCols, this.gridRows)
     this.pixelData = this.imageData.data
-
-    this.randomSeed()
   }
 
+  // --- Abstract methods (implemented by subclasses) -------------------------
+  /**
+   * Compute one CA step using the given ruleset.
+   * Implementation must update this.grid to reflect the next generation.
+   *
+   * @param ruleset The ruleset defining cell behavior (512 entries for 3x3 neighborhoods)
+   */
+  protected abstract computeStep(ruleset: Ruleset): void
+
+  /**
+   * Called after this.grid is modified by seeding operations.
+   * Subclasses should sync any internal state that mirrors the grid.
+   *
+   * Example: GPU implementation syncs to grid2D array, CPU does nothing.
+   */
+  protected abstract onGridChanged(): void
+
+  /**
+   * Cleanup engine-specific resources.
+   * Called before grid resize and during destruction.
+   *
+   * Example: GPU implementation destroys kernels, CPU reallocates buffers.
+   */
+  protected abstract cleanup(): void
+
+  // --- Seeding (common to all implementations) ------------------------------
   setColors(fgColor: string, bgColor: string) {
     this.fgColor = fgColor
     this.bgColor = bgColor
@@ -95,6 +114,7 @@ export class CellularAutomata {
 
   clearGrid() {
     this.grid.fill(0)
+    this.onGridChanged()
   }
 
   centerSeed() {
@@ -103,6 +123,7 @@ export class CellularAutomata {
     const cy = Math.floor(this.gridRows / 2)
     this.grid[cy * this.gridCols + cx] = 1
     this.lastSeedMethod = 'center'
+    this.onGridChanged()
   }
 
   randomSeed(alivePercentage = 50) {
@@ -113,6 +134,7 @@ export class CellularAutomata {
     }
     this.lastSeedMethod = 'random'
     this.lastAlivePercentage = alivePercentage
+    this.onGridChanged()
   }
 
   patchSeed(alivePercentage = 50) {
@@ -135,49 +157,81 @@ export class CellularAutomata {
     }
     this.lastSeedMethod = 'patch'
     this.lastAlivePercentage = alivePercentage
+    this.onGridChanged()
   }
 
-  // --- Simulation step (optimized) ------------------------------------------
+  // --- Simulation step (calls subclass implementation) ----------------------
   step(ruleset: Ruleset) {
-    const cols = this.gridCols
-    const rows = this.gridRows
-    const grid = this.grid
-    const next = this.nextGrid
-    const offsets = this.neighborOffsets
-
-    for (let y = 0; y < rows; y++) {
-      const yOffset = y * cols
-      for (let x = 0; x < cols; x++) {
-        let index = 0
-        let bit = 0
-        for (let k = 0; k < 9; k++) {
-          const off = offsets[k]
-          const nx = (x + (off % cols) + cols) % cols
-          const ny = (y + Math.floor(off / cols) + rows) % rows
-          if (grid[ny * cols + nx]) index |= 1 << bit
-          bit++
-        }
-        next[yOffset + x] = ruleset[index]
-      }
-    }
-
-    const tmp = this.grid
-    this.grid = this.nextGrid
-    this.nextGrid = tmp
-
+    this.computeStep(ruleset)
     this.statistics.recordStep(this.grid)
-    this.render() // preserve auto-render side effect
+    this.render()
   }
 
-  // --- Explicit render (optimized) ------------------------------------------
+  // --- Rendering (common to all implementations) ----------------------------
   render() {
-    const ctx = this.ctx
-    const grid = this.grid
     const data = this.pixelData
+    const grid = this.grid
     const [fr, fg, fb] = this.fgRGB
     const [br, bg, bb] = this.bgRGB
+    const len = grid.length
 
-    for (let i = 0, j = 0; i < grid.length; i++, j += 4) {
+    // Unrolled loop for performance
+    let i = 0
+    let j = 0
+    const len4 = len - (len % 4)
+
+    for (; i < len4; i += 4, j += 16) {
+      // Cell 0
+      if (grid[i]) {
+        data[j] = fr
+        data[j + 1] = fg
+        data[j + 2] = fb
+      } else {
+        data[j] = br
+        data[j + 1] = bg
+        data[j + 2] = bb
+      }
+      data[j + 3] = 255
+
+      // Cell 1
+      if (grid[i + 1]) {
+        data[j + 4] = fr
+        data[j + 5] = fg
+        data[j + 6] = fb
+      } else {
+        data[j + 4] = br
+        data[j + 5] = bg
+        data[j + 6] = bb
+      }
+      data[j + 7] = 255
+
+      // Cell 2
+      if (grid[i + 2]) {
+        data[j + 8] = fr
+        data[j + 9] = fg
+        data[j + 10] = fb
+      } else {
+        data[j + 8] = br
+        data[j + 9] = bg
+        data[j + 10] = bb
+      }
+      data[j + 11] = 255
+
+      // Cell 3
+      if (grid[i + 3]) {
+        data[j + 12] = fr
+        data[j + 13] = fg
+        data[j + 14] = fb
+      } else {
+        data[j + 12] = br
+        data[j + 13] = bg
+        data[j + 14] = bb
+      }
+      data[j + 15] = 255
+    }
+
+    // Remainder
+    for (; i < len; i++, j += 4) {
       if (grid[i]) {
         data[j] = fr
         data[j + 1] = fg
@@ -190,6 +244,7 @@ export class CellularAutomata {
       data[j + 3] = 255
     }
 
+    const ctx = this.ctx
     ctx.save()
     ctx.fillStyle = this.bgColor
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
@@ -199,7 +254,7 @@ export class CellularAutomata {
     ctx.restore()
   }
 
-  // --- Zoom and pan (unchanged) ---------------------------------------------
+  // --- Zoom and pan (common to all implementations) -------------------------
   setZoom(zoom: number, centerX: number, centerY: number) {
     const oldZoom = this.zoom
     this.zoom = Math.max(0.5, Math.min(3, zoom))
@@ -273,7 +328,7 @@ export class CellularAutomata {
     return this.zoom
   }
 
-  // --- Playback control (unchanged API) -------------------------------------
+  // --- Playback control (common to all implementations) ---------------------
   play(stepsPerSecond: number, ruleset: Ruleset) {
     if (this.isPlaying) return
     this.currentRuleset = ruleset
@@ -313,16 +368,21 @@ export class CellularAutomata {
     const wasPlaying = this.isPlaying
     const ruleset = this.currentRuleset
     if (wasPlaying) this.pause()
+
     this.canvas.width = this.canvas.clientWidth
     this.canvas.height = this.canvas.clientHeight
     this.gridRows = newRows
     this.gridCols = newCols
     this.gridArea = newRows * newCols
+
     this.grid = new Uint8Array(this.gridArea)
-    this.nextGrid = new Uint8Array(this.gridArea)
     this.statistics = new StatisticsTracker(this.gridRows, this.gridCols)
     this.imageData = this.ctx.createImageData(this.gridCols, this.gridRows)
     this.pixelData = this.imageData.data
+
+    // Let subclass clean up engine-specific resources
+    this.cleanup()
+
     switch (this.lastSeedMethod) {
       case 'center':
         this.centerSeed()
@@ -334,21 +394,30 @@ export class CellularAutomata {
         this.randomSeed(this.lastAlivePercentage)
         break
     }
+
     this.render()
     if (wasPlaying && ruleset) this.play(this.lastStepsPerSecond, ruleset)
   }
 
-  // --- Getters (unchanged) --------------------------------------------------
+  // --- Getters (common to all implementations) ------------------------------
   isCurrentlyPlaying(): boolean {
     return this.isPlaying
   }
+
   getStatistics(): StatisticsTracker {
     return this.statistics
   }
+
   getSeed(): number {
     return this.seed
   }
+
   getGridSize(): number {
     return this.gridArea
+  }
+  destroy() {
+    this.pause()
+    // Subclasses can override to clean up engine-specific resources
+    this.cleanup()
   }
 }

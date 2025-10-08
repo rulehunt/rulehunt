@@ -1,6 +1,12 @@
 // src/components/mobile.ts
+import { GPU } from 'gpu.js'
 import { saveRun } from '../api/save'
-import { CellularAutomata } from '../cellular-automata.ts'
+import { CellularAutomata } from '../cellular-automata-cpu.ts'
+import { GPUCellularAutomata } from '../cellular-automata-gpu.ts'
+import type {
+  CellularAutomataOptions,
+  ICellularAutomata,
+} from '../cellular-automata-interface.ts'
 import { getUserIdentity } from '../identity.ts'
 import type {
   C4OrbitsData,
@@ -24,8 +30,8 @@ const ENABLE_ZOOM_AND_PAN = false
 
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
-const STEPS_PER_SECOND = 100
-const TARGET_GRID_SIZE = 500_000
+const STEPS_PER_SECOND = 60
+const TARGET_GRID_SIZE = 600_000
 
 const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1
 const SWIPE_COMMIT_MIN_DISTANCE = 50
@@ -59,6 +65,7 @@ const DARK_FG_COLORS = [
 ]
 
 // --- Types ------------------------------------------------------------------
+
 export type CleanupFunction = () => void
 
 // Runtime rule container used only on mobile.ts.
@@ -68,6 +75,29 @@ export type RuleData = {
   hex: string
   ruleset: C4Ruleset | Ruleset
   expanded?: Ruleset
+}
+
+// --- Cellular Automata Engine  ----------------------------------------------
+function createCA(
+  canvas: HTMLCanvasElement,
+  options: CellularAutomataOptions,
+): ICellularAutomata {
+  try {
+    // Test GPU support
+    const testGPU = new GPU({ mode: 'gpu' })
+    const hasGPU = testGPU.mode === 'gpu'
+    testGPU.destroy()
+
+    if (hasGPU) {
+      console.log('[CA] Using GPU acceleration')
+      return new GPUCellularAutomata(canvas, options)
+    }
+  } catch (e) {
+    console.warn('[CA] GPU not available, using CPU:', e)
+  }
+
+  console.log('[CA] Using optimized CPU')
+  return new CellularAutomata(canvas, options)
 }
 
 // --- Helpers ----------------------------------------------------------------
@@ -320,7 +350,7 @@ function setupDualCanvasSwipe(
 // --- Pinch Zoom & Pan (centered on midpoint) -------------------------------
 function setupPinchZoomAndPan(
   canvas: HTMLCanvasElement,
-  cellularAutomata: CellularAutomata,
+  cellularAutomata: ICellularAutomata,
 ): CleanupFunction {
   let initialDistance = 0
   let initialZoom = 1
@@ -399,7 +429,7 @@ function generateRandomRule(): RuleData {
  * All operations are explicit - no hidden side effects.
  */
 function prepareRule(
-  cellularAutomata: CellularAutomata,
+  cellularAutomata: ICellularAutomata,
   rule: RuleData,
   orbitLookup: Uint8Array,
   seedPercentage = 50,
@@ -420,14 +450,14 @@ function prepareRule(
 /**
  * Start or resume the CA with its expanded rule.
  */
-function startRule(cellularAutomata: CellularAutomata, rule: RuleData): void {
+function startRule(cellularAutomata: ICellularAutomata, rule: RuleData): void {
   const expanded = rule.expanded ?? rule.ruleset
   cellularAutomata.play(STEPS_PER_SECOND, expanded)
 }
 
 // --- Save run ---------------------------------------------------------------
 function saveRunStatistics(
-  cellularAutomata: CellularAutomata,
+  cellularAutomata: ICellularAutomata,
   ruleName: string,
   ruleHex: string,
 ): void {
@@ -635,13 +665,14 @@ export async function setupMobileLayout(
   }
 
   // Create cellular automata instances
-  let onScreenCA = new CellularAutomata(onScreenCanvas, {
+  let onScreenCA = createCA(onScreenCanvas, {
     gridRows,
     gridCols,
     fgColor: palette[colorIndex],
     bgColor,
   })
-  let offScreenCA = new CellularAutomata(offScreenCanvas, {
+
+  let offScreenCA = createCA(offScreenCanvas, {
     gridRows,
     gridCols,
     fgColor: palette[(colorIndex + 1) % palette.length],

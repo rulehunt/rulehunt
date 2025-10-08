@@ -3,7 +3,6 @@
   "type": "module",
   "version": "0.1.0",
   "private": true,
-
   "scripts": {
     "dev": "vite",
     "dev:worker": "wrangler dev",
@@ -17,11 +16,11 @@
     "format": "biome format --write .",
     "generate:c4-orbits": "tsx scripts/generate-c4-orbits.ts && pnpm run format"
   },
-
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@cloudflare/workers-types": "^4.20241022.0",
     "@types/node": "^22.8.7",
+    "gpu.js": "^2.16.0",
     "tsx": "^4.20.6",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",

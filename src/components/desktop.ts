@@ -1,5 +1,5 @@
 import { saveRun } from '../api/save'
-import { CellularAutomata } from '../cellular-automata.ts'
+import { CellularAutomata } from '../cellular-automata-cpu.ts'
 import { outlierRule } from '../outlier-rule.ts'
 import type { C4OrbitsData, C4Ruleset, RunSubmission } from '../schema.ts'
 import {
