@@ -88,13 +88,17 @@ function setupSwipeDetection(
   }
 }
 
-// --- Pinch-to-Zoom ----------------------------------------------------------
-function setupPinchZoom(
+// --- Pinch-to-Zoom and Pan --------------------------------------------------
+function setupPinchZoomAndPan(
   canvas: HTMLCanvasElement,
   cellularAutomata: CellularAutomata,
 ): CleanupFunction {
   let initialDistance = 0
   let initialZoom = 1
+  let lastMidX = 0
+  let lastMidY = 0
+  let initialPanX = 0
+  let initialPanY = 0
 
   const handleTouchStart = (e: TouchEvent) => {
     if (e.touches.length === 2) {
@@ -103,6 +107,19 @@ function setupPinchZoom(
       const dy = t1.clientY - t2.clientY
       initialDistance = Math.sqrt(dx * dx + dy * dy)
       initialZoom = cellularAutomata.getZoom()
+
+      // Store initial midpoint and pan position
+      const rect = canvas.getBoundingClientRect()
+      lastMidX =
+        ((t1.clientX + t2.clientX) / 2 - rect.left) *
+        (canvas.width / rect.width)
+      lastMidY =
+        ((t1.clientY + t2.clientY) / 2 - rect.top) *
+        (canvas.height / rect.height)
+
+      const panState = cellularAutomata.getPan()
+      initialPanX = panState.x
+      initialPanY = panState.y
     }
   }
 
@@ -118,22 +135,44 @@ function setupPinchZoom(
       if (!initialDistance) {
         initialDistance = distance
         initialZoom = cellularAutomata.getZoom()
+        const rect = canvas.getBoundingClientRect()
+        lastMidX =
+          ((t1.clientX + t2.clientX) / 2 - rect.left) *
+          (canvas.width / rect.width)
+        lastMidY =
+          ((t1.clientY + t2.clientY) / 2 - rect.top) *
+          (canvas.height / rect.height)
+        const panState = cellularAutomata.getPan()
+        initialPanX = panState.x
+        initialPanY = panState.y
         return
       }
 
+      // Calculate zoom
       const scaleChange = distance / initialDistance
       const newZoom = initialZoom * scaleChange
 
-      // Get canvas-relative coordinates of pinch center
+      // Calculate current midpoint
       const rect = canvas.getBoundingClientRect()
-      const centerX =
+      const currentMidX =
         ((t1.clientX + t2.clientX) / 2 - rect.left) *
         (canvas.width / rect.width)
-      const centerY =
+      const currentMidY =
         ((t1.clientY + t2.clientY) / 2 - rect.top) *
         (canvas.height / rect.height)
 
-      cellularAutomata.setZoom(newZoom, centerX, centerY)
+      // Calculate pan delta
+      const deltaX = currentMidX - lastMidX
+      const deltaY = currentMidY - lastMidY
+
+      // Apply both zoom and pan
+      cellularAutomata.setZoomAndPan(
+        newZoom,
+        currentMidX,
+        currentMidY,
+        initialPanX + deltaX,
+        initialPanY + deltaY,
+      )
     }
   }
 
@@ -155,6 +194,48 @@ function setupPinchZoom(
     canvas.removeEventListener('touchcancel', handleTouchEnd)
   }
 }
+
+// --- Overlay Reload Button ---------------------------------------------------
+function createReloadButton(
+  canvas: HTMLCanvasElement,
+  onReload: () => void,
+): HTMLButtonElement {
+  const btn = document.createElement('button')
+  btn.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
+         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round"
+            d="M4 4v6h6M20 20v-6h-6M5.41 18.59A9 9 0 1018.59 5.41" />
+    </svg>
+  `
+  btn.title = 'Reload simulation'
+  btn.className =
+    'absolute top-2 right-2 bg-white/70 dark:bg-gray-800/70 rounded-full shadow-md hover:bg-white hover:dark:bg-gray-700 transition-all p-2 text-lg leading-none'
+  btn.style.zIndex = '10'
+  btn.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+
+  const parent = canvas.parentElement
+  if (parent) {
+    parent.style.position = 'relative'
+    parent.appendChild(btn)
+  }
+
+  // ✅ Move animation logic inside the click handler
+  btn.addEventListener('click', () => {
+    // Run reload callback
+    onReload()
+
+    // Spin animation feedback
+    btn.style.transition = 'transform 0.4s ease'
+    btn.style.transform = 'rotate(360deg)'
+    setTimeout(() => {
+      btn.style.transform = ''
+    }, 400)
+  })
+
+  return btn
+}
+
 // --- Mobile Layout ----------------------------------------------------------
 export async function setupMobileLayout(
   appRoot: HTMLDivElement,
@@ -257,6 +338,21 @@ export async function setupMobileLayout(
   cellularAutomata.patchSeed(50)
   const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
   cellularAutomata.play(stepsPerSecond, expanded)
+
+  // --- Reload Button --------------------------------------------------------
+  createReloadButton(canvas, () => {
+    cellularAutomata.pause()
+    cellularAutomata.softReset()
+    const expandedRuleset = expandC4Ruleset(currentRuleset, orbitLookup)
+    cellularAutomata.play(stepsPerSecond, expandedRuleset)
+
+    // Pulse animation feedback
+    canvas.style.transition = 'transform 0.15s ease'
+    canvas.style.transform = 'scale(0.96)'
+    setTimeout(() => {
+      canvas.style.transform = 'scale(1)'
+    }, 150)
+  })
 
   const stats = cellularAutomata.getStatistics()
   stats.initializeSimulation({
@@ -411,7 +507,7 @@ export async function setupMobileLayout(
   })
 
   // --- Pinch Zoom Handler ---------------------------------------------------
-  const cleanupZoom = setupPinchZoom(canvas, cellularAutomata)
+  const cleanupZoom = setupPinchZoomAndPan(canvas, cellularAutomata)
 
   // --- Resize Handling ------------------------------------------------------
   const resizeHandler = () => {
