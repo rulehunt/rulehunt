@@ -603,8 +603,14 @@ export async function setupMobileLayout(
 
   let reload = createReloadButton(wrapper, () => {
     loadRule(currentCA, currentRule, lookup)
-    // Get whichever canvas is currently in front
     const frontCanvas = canvasA.style.zIndex === '2' ? canvasA : canvasB
+
+    const cleanup = () => {
+      frontCanvas.style.transition = ''
+      frontCanvas.removeEventListener('transitionend', cleanup)
+    }
+
+    frontCanvas.addEventListener('transitionend', cleanup)
     frontCanvas.style.transition = 'transform 0.15s ease'
     frontCanvas.style.transform = 'scale(0.96)'
     setTimeout(() => {
@@ -655,10 +661,18 @@ export async function setupMobileLayout(
       reload.remove()
       reload = createReloadButton(wrapper, () => {
         loadRule(currentCA, currentRule, lookup)
-        canvasA.style.transition = 'transform 0.15s ease'
-        canvasA.style.transform = 'scale(0.96)'
+        const frontCanvas = canvasA.style.zIndex === '2' ? canvasA : canvasB
+
+        const cleanup = () => {
+          frontCanvas.style.transition = ''
+          frontCanvas.removeEventListener('transitionend', cleanup)
+        }
+
+        frontCanvas.addEventListener('transitionend', cleanup)
+        frontCanvas.style.transition = 'transform 0.15s ease'
+        frontCanvas.style.transform = 'scale(0.96)'
         setTimeout(() => {
-          canvasA.style.transform = 'scale(1)'
+          frontCanvas.style.transform = 'scale(1)'
         }, 150)
       })
 
