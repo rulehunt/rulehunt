@@ -13,7 +13,7 @@ import {
 import {
   createMobileHeader,
   setupMobileHeader,
-} from './components/mobileHeader'
+} from './mobileHeader.ts'
 
 // --- Types -----------------------------------------------------------------
 export type CleanupFunction = () => void
