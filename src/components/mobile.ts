@@ -153,7 +153,7 @@ function setupDualCanvasSwipe(
     canvasB.style.opacity = `${Math.min(1, 0.3 + progress * 0.7)}`
   }
 
-  const handleTouchEnd = (e: TouchEvent) => {
+  const handleTouchEnd = (_: TouchEvent) => {
     if (!dragging) return
     dragging = false
 
