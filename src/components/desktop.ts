@@ -1,6 +1,7 @@
+import { saveRun } from '../api/save'
 import { CellularAutomata } from '../cellular-automata.ts'
 import { outlierRule } from '../outlier-rule.ts'
-import type { C4OrbitsData, C4Ruleset } from '../schema.ts'
+import type { C4OrbitsData, C4Ruleset, RunSubmission } from '../schema.ts'
 import {
   buildOrbitLookup,
   c4RulesetToHex,
@@ -13,6 +14,7 @@ import {
 } from '../utils.ts'
 
 import { createHeader, setupTheme } from './header.ts'
+import { createLeaderboardPanel } from './leaderboard.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
 import { createSimulationPanel } from './simulation.ts'
@@ -280,7 +282,10 @@ export async function setupDesktopLayout(
   appRoot.appendChild(header.root)
 
   // Create progress bar
-  const progressBar = createProgressBar(0)
+  const progressBar = createProgressBar({
+    initialValue: 0,
+    buttonLabel: 'Save to Leaderboard',
+  })
   const progressContainer = document.createElement('div')
   progressContainer.className =
     'w-full px-6 py-4 border-b border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900'
@@ -307,10 +312,16 @@ export async function setupDesktopLayout(
   leftColumn.appendChild(simulationPanel.root)
   leftColumn.appendChild(summaryPanel.root)
 
+  const rightColumn = document.createElement('div')
+  rightColumn.className = 'flex flex-col items-center gap-3'
+
   const rulesetPanel = createRulesetPanel()
+  const leaderboardPanel = createLeaderboardPanel()
+  rightColumn.appendChild(rulesetPanel.root)
+  rightColumn.appendChild(leaderboardPanel.root)
 
   mainContainer.appendChild(leftColumn)
-  mainContainer.appendChild(rulesetPanel.root)
+  mainContainer.appendChild(rightColumn)
   mainContent.appendChild(mainContainer)
   appRoot.appendChild(mainContent)
 
@@ -667,6 +678,67 @@ export async function setupDesktopLayout(
       applyInitialCondition()
     }
   })
+
+  // Save button click handler
+  if (progressBar.elements.saveButton) {
+    addEventListener(progressBar.elements.saveButton, 'click', () => {
+      // --- Gather statistics ---
+      const stats = cellularAutomata.getStatistics()
+      const metadata = stats.getMetadata()
+      const recent = stats.getRecentStats(1)[0] ?? {
+        population: 0,
+        activity: 0,
+        populationChange: 0,
+        entropy2x2: 0,
+        entropy4x4: 0,
+        entropy8x8: 0,
+      }
+
+      const interestScore = stats.calculateInterestScore()
+      const watchedWallMs = stats.getElapsedTime()
+      const actualSps = stats.getActualStepsPerSecond()
+      const stepCount = metadata?.stepCount ?? 0
+
+      const runPayload: Omit<RunSubmission, 'userId' | 'userLabel'> = {
+        rulesetName: metadata?.rulesetName ?? 'Unknown',
+        rulesetHex: metadata?.rulesetHex ?? c4RulesetToHex(currentRuleset),
+        seed: 0,
+        seedType: (metadata?.seedType ?? 'patch') as
+          | 'center'
+          | 'random'
+          | 'patch',
+        seedPercentage: metadata?.seedPercentage,
+        stepCount,
+        watchedSteps: stepCount,
+        watchedWallMs,
+        gridSize: undefined,
+        progress_bar_steps: 10000,
+        requestedSps: metadata?.requestedStepsPerSecond,
+        actualSps,
+        population: recent.population,
+        activity: recent.activity,
+        populationChange: recent.populationChange,
+        entropy2x2: recent.entropy2x2,
+        entropy4x4: recent.entropy4x4,
+        entropy8x8: recent.entropy8x8,
+        interestScore,
+        simVersion: 'v0.1.0',
+        engineCommit: undefined,
+        extraScores: undefined,
+      }
+
+      // --- Fire and forget background save ---
+      setTimeout(() => {
+        saveRun(runPayload).then((res) => {
+          if (res.ok) {
+            console.log(`[saveRun] ✅ recorded run ${res.runHash}`)
+          } else {
+            console.warn('[saveRun] ❌ failed to record run')
+          }
+        })
+      }, 0)
+    })
+  }
 
   // Return cleanup function
   return () => {

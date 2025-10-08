@@ -79,3 +79,24 @@ export function setupTheme(
 
   return { setTheme }
 }
+
+/** Apply the stored theme (without requiring UI elements). */
+export function applyThemeFromStorage() {
+  const savedTheme = (localStorage.getItem('theme') as Theme | null) || 'system'
+  if (savedTheme === 'system') {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    document.documentElement.classList.toggle('dark', isDark)
+  } else {
+    document.documentElement.classList.toggle('dark', savedTheme === 'dark')
+  }
+}
+
+export function watchSystemThemeChange(onChange?: () => void) {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)')
+  mq.addEventListener('change', () => {
+    if (localStorage.getItem('theme') === 'system') {
+      applyThemeFromStorage()
+      onChange?.()
+    }
+  })
+}

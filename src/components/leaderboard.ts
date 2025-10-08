@@ -1,5 +1,5 @@
 // src/components/leaderboard.ts
-import type { LeaderboardResponse } from '../schema'
+import { fetchLeaderboard } from '../api/leaderboard'
 
 export interface LeaderboardElements {
   tableBody: HTMLTableSectionElement
@@ -54,29 +54,18 @@ export function createLeaderboardPanel(): {
   // --- Helper to load leaderboard data ---
   async function loadLeaderboard() {
     try {
-      const res = await fetch('/api/leaderboard')
-      const data: LeaderboardResponse = await res.json()
-
-      // Fixed: Use for...of instead of forEach
-      for (const row of data.results) {
-        console.log(row.ruleset_name, row.watched_wall_ms)
-      }
+      const results = await fetchLeaderboard(10)
 
       elements.tableBody.innerHTML = ''
 
-      if (
-        !data.ok ||
-        !Array.isArray(data.results) ||
-        data.results.length === 0
-      ) {
+      if (results.length === 0) {
         elements.tableBody.innerHTML = `
           <tr><td colspan="6" class="text-center py-3 text-gray-500 dark:text-gray-400">No results yet.</td></tr>
         `
         return
       }
 
-      // Fixed: Use for...of with entries() instead of forEach with any
-      for (const [idx, row] of data.results.entries()) {
+      for (const [idx, row] of results.entries()) {
         const tr = document.createElement('tr')
         tr.className =
           idx < 3
@@ -102,7 +91,7 @@ export function createLeaderboardPanel(): {
         elements.tableBody.appendChild(tr)
       }
     } catch (err) {
-      console.error('Leaderboard fetch failed:', err)
+      console.error('Leaderboard load failed:', err)
       elements.tableBody.innerHTML = `
         <tr><td colspan="6" class="text-center py-3 text-red-500">Error loading leaderboard</td></tr>
       `

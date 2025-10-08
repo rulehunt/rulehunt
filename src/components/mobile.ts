@@ -1,5 +1,6 @@
+import { saveRun } from '../api/save'
 import { CellularAutomata } from '../cellular-automata.ts'
-import type { C4OrbitsData } from '../schema.ts'
+import type { C4OrbitsData, RunSubmission } from '../schema.ts'
 import {
   buildOrbitLookup,
   c4RulesetToHex,
@@ -12,11 +13,11 @@ import {
 // --- Types -----------------------------------------------------------------
 export type CleanupFunction = () => void
 
-// --- Swipe Detection --------------------------------------------------------
 interface SwipeHandler {
   onSwipeUp: () => void
 }
 
+// --- Swipe Detection --------------------------------------------------------
 function setupSwipeDetection(
   element: HTMLElement,
   handler: SwipeHandler,
@@ -56,7 +57,6 @@ function setupSwipeDetection(
 export async function setupMobileLayout(
   appRoot: HTMLDivElement,
 ): Promise<CleanupFunction> {
-  // Track cleanup tasks
   const eventListeners: Array<{
     element: EventTarget
     event: string
@@ -81,12 +81,11 @@ export async function setupMobileLayout(
     })
   }
 
-  // Create full-screen container
+  // --- UI Setup -------------------------------------------------------------
   const container = document.createElement('div')
   container.className =
     'fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900'
 
-  // Create canvas
   const canvas = document.createElement('canvas')
   canvas.className = 'touch-none'
 
@@ -98,7 +97,7 @@ export async function setupMobileLayout(
 
   container.appendChild(canvas)
 
-  // Add swipe instruction overlay
+  // Instruction overlay
   const instruction = document.createElement('div')
   instruction.className =
     'fixed bottom-8 left-0 right-0 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none'
@@ -114,29 +113,23 @@ export async function setupMobileLayout(
   container.appendChild(instruction)
   appRoot.appendChild(container)
 
-  // Load orbit data
+  // --- Simulation Setup -----------------------------------------------------
   const response = await fetch('./resources/c4-orbits.json')
   const orbitsData: C4OrbitsData = await response.json()
   const orbitLookup = buildOrbitLookup(orbitsData)
-
   console.log(`Loaded ${orbitsData.orbits.length} C4 orbits`)
 
-  // Initialize cellular automata
   const cellularAutomata = new CellularAutomata(canvas)
+  const stepsPerSecond = 10
 
   // Start with Conway
   let currentRuleset = makeC4Ruleset(conwayRule, orbitLookup)
   let currentRuleName = "Conway's Game of Life"
 
-  // Initialize with patch seed
   cellularAutomata.patchSeed(50)
-
-  // Auto-play at 10 steps per second
-  const stepsPerSecond = 10
   const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
   cellularAutomata.play(stepsPerSecond, expanded)
 
-  // Initialize simulation metadata
   const stats = cellularAutomata.getStatistics()
   stats.initializeSimulation({
     name: `Mobile - ${currentRuleName}`,
@@ -148,25 +141,74 @@ export async function setupMobileLayout(
     requestedStepsPerSecond: stepsPerSecond,
   })
 
-  // Setup swipe detection
+  // --- Swipe Handler --------------------------------------------------------
   const cleanupSwipe = setupSwipeDetection(container, {
     onSwipeUp: () => {
-      // Generate new random rule
-      const density = Math.random() * 0.6 + 0.2 // 20-80% density
+      // --- Gather statistics before switching rule ---
+      const metadata = stats.getMetadata()
+      const recent = stats.getRecentStats(1)[0] ?? {
+        population: 0,
+        activity: 0,
+        populationChange: 0,
+        entropy2x2: 0,
+        entropy4x4: 0,
+        entropy8x8: 0,
+      }
+
+      const interestScore = stats.calculateInterestScore()
+      const watchedWallMs = stats.getElapsedTime()
+      const actualSps = stats.getActualStepsPerSecond()
+      const stepCount = metadata?.stepCount ?? 0
+
+      const runPayload: Omit<RunSubmission, 'userId' | 'userLabel'> = {
+        rulesetName: metadata?.rulesetName ?? currentRuleName,
+        rulesetHex: metadata?.rulesetHex ?? c4RulesetToHex(currentRuleset),
+        seed: 0,
+        seedType: (metadata?.seedType ?? 'patch') as
+          | 'center'
+          | 'random'
+          | 'patch',
+        seedPercentage: metadata?.seedPercentage ?? 50,
+        stepCount,
+        watchedSteps: stepCount,
+        watchedWallMs,
+        gridSize: undefined,
+        progress_bar_steps: undefined,
+        requestedSps: metadata?.requestedStepsPerSecond ?? stepsPerSecond,
+        actualSps,
+        population: recent.population,
+        activity: recent.activity,
+        populationChange: recent.populationChange,
+        entropy2x2: recent.entropy2x2,
+        entropy4x4: recent.entropy4x4,
+        entropy8x8: recent.entropy8x8,
+        interestScore,
+        simVersion: 'v0.1.0',
+        engineCommit: undefined,
+        extraScores: undefined,
+      }
+
+      // --- Fire and forget background save ---
+      setTimeout(() => {
+        saveRun(runPayload).then((res) => {
+          if (res.ok) {
+            console.log(`[saveRun] ✅ recorded run ${res.runHash}`)
+          } else {
+            console.warn('[saveRun] ❌ failed to record run')
+          }
+        })
+      }, 0)
+
+      // --- Switch to new random rule ---
+      const density = Math.random() * 0.6 + 0.2
       currentRuleset = randomC4RulesetByDensity(density)
       currentRuleName = `Random (${Math.round(density * 100)}%)`
 
-      // Stop current simulation
       cellularAutomata.pause()
-
-      // Reset with new rule
       cellularAutomata.patchSeed(50)
-
-      // Start playing with new rule
       const newExpanded = expandC4Ruleset(currentRuleset, orbitLookup)
       cellularAutomata.play(stepsPerSecond, newExpanded)
 
-      // Update metadata
       stats.initializeSimulation({
         name: `Mobile - ${currentRuleName}`,
         seedType: 'patch',
@@ -177,7 +219,6 @@ export async function setupMobileLayout(
         requestedStepsPerSecond: stepsPerSecond,
       })
 
-      // Brief flash to indicate new rule
       instruction.style.opacity = '1'
       setTimeout(() => {
         instruction.style.opacity = '0.7'
@@ -187,7 +228,7 @@ export async function setupMobileLayout(
     },
   })
 
-  // Handle window resize
+  // --- Resize Handling ------------------------------------------------------
   const resizeHandler = () => {
     const newSize = Math.min(window.innerWidth, window.innerHeight)
     canvas.style.width = `${newSize}px`
@@ -195,17 +236,7 @@ export async function setupMobileLayout(
   }
   addEventListener(window, 'resize', resizeHandler)
 
-  // Setup theme (dark mode support)
-  const savedTheme =
-    (localStorage.getItem('theme') as 'light' | 'dark' | 'system') || 'system'
-  if (savedTheme === 'system') {
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    document.documentElement.classList.toggle('dark', isDark)
-  } else {
-    document.documentElement.classList.toggle('dark', savedTheme === 'dark')
-  }
-
-  // Return cleanup function
+  // --- Cleanup --------------------------------------------------------------
   return () => {
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()

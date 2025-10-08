@@ -3,14 +3,16 @@ import {
   setupDesktopLayout,
 } from './components/desktop.ts'
 import { setupMobileLayout } from './components/mobile.ts'
+import { applyThemeFromStorage } from './components/theme'
 
-// --- Mobile Detection -------------------------------------------------------
 function isMobile(): boolean {
-  return window.innerWidth < 1024 // lg breakpoint
+  return window.innerWidth < 640
 }
 
-// --- Main ------------------------------------------------------------------
 window.addEventListener('DOMContentLoaded', async () => {
+  // --- Apply theme before mounting UI ---
+  applyThemeFromStorage()
+
   const appRoot = document.getElementById('app') as HTMLDivElement
   let currentLayout: 'mobile' | 'desktop' | null = null
   let currentCleanup: CleanupFunction | null = null
@@ -21,16 +23,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     if (currentLayout === targetLayout) return
 
-    // Clean up current layout
     if (currentCleanup) {
       currentCleanup()
       currentCleanup = null
     }
 
-    // Clear DOM
     appRoot.innerHTML = ''
 
-    // Setup new layout
     if (shouldBeMobile) {
       currentCleanup = await setupMobileLayout(appRoot)
       currentLayout = 'mobile'
@@ -42,10 +41,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Initial layout
   await updateLayout()
 
-  // Handle resize with debouncing
   let resizeTimeout: number
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimeout)

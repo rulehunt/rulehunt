@@ -4,18 +4,33 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>RuleHunt</title>
+
+    <!-- ✅ Preload stored theme before Tailwind and CSS -->
+    <script>
+      const t = localStorage.getItem('theme');
+      const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (t === 'dark' || (t === 'system' && sysDark)) {
+        document.documentElement.classList.add('dark');
+      }
+    </script>
+
+    <!-- Tailwind config -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         darkMode: 'class'
       }
     </script>
+
     <link rel="stylesheet" href="./style.css" />
   </head>
-  <body class="bg-white dark:bg-gray-900 min-h-screen flex flex-col font-sans text-gray-800 dark:text-gray-200 transition-colors">
+
+  <body
+    class="bg-white dark:bg-gray-900 min-h-screen flex flex-col font-sans text-gray-800 dark:text-gray-200 transition-colors"
+  >
     <!-- App root - components will be mounted here -->
     <div id="app"></div>
-    
+
     <script type="module" src="./src/main.ts"></script>
   </body>
 </html>
