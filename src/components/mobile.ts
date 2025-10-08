@@ -11,7 +11,7 @@ import {
   makeC4Ruleset,
   randomC4RulesetByDensity,
 } from '../utils.ts'
-import { createDebugFooter, updateDebugText } from './debugFooter.ts'
+import { createDebugFooter, debugFooterLog } from './debugFooter.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
 // --- Feature Flags ----------------------------------------------------------
@@ -20,13 +20,14 @@ const ENABLE_DEBUG = true
 
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
-const STEPS_PER_SECOND = 10
+const STEPS_PER_SECOND = 100
+const TARGET_GRID_SIZE = 50_000
 
-const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1 // Just 10% of screen height
-const SWIPE_COMMIT_MIN_DISTANCE = 40 // Just 40px
-const SWIPE_VELOCITY_THRESHOLD = -0.15 // Very lenient: -150 px/s
-const SWIPE_FAST_THROW_THRESHOLD = -0.25 // Very lenient: -250 px/s
-const SWIPE_COOLDOWN_MS = 400 // Cooldown between swipe attempts
+const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1
+const SWIPE_COMMIT_MIN_DISTANCE = 50
+const SWIPE_VELOCITY_THRESHOLD = -0.3
+const SWIPE_FAST_THROW_THRESHOLD = -0.5
+const SWIPE_COOLDOWN_MS = 500
 
 const LIGHT_FG_COLORS = [
   '#2563eb', // blue-600
@@ -80,7 +81,7 @@ interface SwipeDebugInfo {
  * Compute grid dimensions and cell size to fit the current screen,
  * keeping total cells ≤ maxCells.
  */
-function computeAdaptiveGrid(maxCells = 100_000) {
+function computeAdaptiveGrid(maxCells = TARGET_GRID_SIZE) {
   const screenWidth = window.innerWidth
   const screenHeight = window.innerHeight
 
@@ -132,6 +133,12 @@ function setupDualCanvasSwipe(
     }
 
     startY = e.touches[0].clientY
+
+    debugFooterLog('DRAG_START', {
+      startY,
+      isTransitioning,
+    })
+
     currentY = startY
     startT = e.timeStamp
     directionLocked = null
@@ -165,6 +172,11 @@ function setupDualCanvasSwipe(
       canvasB.style.opacity = '1'
       return
     }
+
+    debugFooterLog('DRAG_MOVE', {
+      delta: dy,
+      progress: Math.abs(dy) / getHeight(),
+    })
 
     currentY = y
     samples.push({ t: e.timeStamp, y })
@@ -230,6 +242,12 @@ function setupDualCanvasSwipe(
       (dragDistance > SWIPE_COMMIT_MIN_DISTANCE &&
         vy < SWIPE_VELOCITY_THRESHOLD)
 
+    debugFooterLog('DRAG_END', {
+      delta,
+      vy: Math.round(vy * 1000),
+      dragDistance,
+    })
+
     // Only cancel if it's clearly accidental
     const shouldCommit =
       !tinyAccidentalMove && !slowPullback && (fastFlick || normalFlick)
@@ -265,6 +283,12 @@ function setupDualCanvasSwipe(
       `opacity ${transitionDuration} ease`
     canvasA.style.transition = transition
     canvasB.style.transition = transition
+
+    debugFooterLog('ANIM_START', {
+      shouldCommit,
+      duration: transitionDuration,
+    })
+
     void canvasA.offsetWidth // 👈 force layout flush before applying transform
 
     if (shouldCommit) {
@@ -600,17 +624,6 @@ export async function setupMobileLayout(
     }, 150)
   })
 
-  // Debug callback
-  const debugCallback =
-    ENABLE_DEBUG && debugFooter
-      ? (info: SwipeDebugInfo) => {
-          const debugText = `${info.timestamp} | ${info.direction.toUpperCase()} | dist:${info.dragDistance}px vel:${info.velocity}px/s
-locked:${info.directionLocked} dragging:${info.dragging} anim:${info.animationExecuted}
-→ ${info.committed ? '✅ COMMIT' : '❌ CANCEL'} (${info.reason})`
-          updateDebugText(debugFooter, debugText)
-        }
-      : undefined
-
   let hasSwipedOnce = false
   const cleanupSwipe = setupDualCanvasSwipe(
     wrapper,
@@ -677,7 +690,7 @@ locked:${info.directionLocked} dragging:${info.dragging} anim:${info.animationEx
     },
     () => currentCA.play(STEPS_PER_SECOND, currentRule.ruleset),
     () => currentCA.pause(),
-    debugCallback,
+    () => {}, // debugCallback
   )
 
   // Conditionally setup zoom and pan based on feature flag
@@ -694,6 +707,12 @@ locked:${info.directionLocked} dragging:${info.dragging} anim:${info.animationEx
 
     const { gridCols, gridRows, cellSize, screenWidth, screenHeight } =
       computeAdaptiveGrid()
+
+    debugFooterLog('RESIZE', {
+      isTransitioning,
+      width: screenWidth,
+      height: screenHeight,
+    })
 
     wrapper.style.width = `${screenWidth}px`
     wrapper.style.height = `${screenHeight}px`

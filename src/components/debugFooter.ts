@@ -1,10 +1,12 @@
-// src/components/debugFooter.ts
-
 export interface DebugFooterElements {
   container: HTMLDivElement
   textElement: HTMLDivElement
 }
 
+// --- Internal state ---------------------------------------------------------
+let globalFooter: DebugFooterElements | null = null
+
+// --- Create / Initialize ----------------------------------------------------
 export function createDebugFooter(): DebugFooterElements {
   const container = document.createElement('div')
   container.className =
@@ -14,12 +16,43 @@ export function createDebugFooter(): DebugFooterElements {
   textElement.className = 'whitespace-pre-wrap leading-tight'
   container.appendChild(textElement)
 
-  return { container, textElement }
+  const footer = { container, textElement }
+  globalFooter = footer // store reference globally
+
+  return footer
 }
 
+// --- Text Update (rolling log) ----------------------------------------------
 export function updateDebugText(
-  elements: DebugFooterElements,
+  footer: DebugFooterElements,
   text: string,
+  maxLines = 6,
 ): void {
-  elements.textElement.textContent = text
+  const lines = footer.textElement.textContent
+    ? footer.textElement.textContent.split('\n')
+    : []
+  lines.push(text)
+  while (lines.length > maxLines) lines.shift()
+  footer.textElement.textContent = lines.join('\n')
+}
+
+// --- Global Logging Helper ---------------------------------------------------
+/**
+ * Append a structured log entry to the global debug footer.
+ * Example:
+ *   debugFooterLog('DRAG_START', { delta: -120, vy: -0.35 })
+ */
+export function debugFooterLog(
+  tag: string,
+  data: Record<string, unknown> = {},
+): void {
+  if (!globalFooter) return
+  const time = new Date().toLocaleTimeString()
+  const msg = `[${time}] ${tag}: ${JSON.stringify(data)}`
+  updateDebugText(globalFooter, msg)
+}
+
+// --- Optional helper for explicit control -----------------------------------
+export function getDebugFooter(): DebugFooterElements | null {
+  return globalFooter
 }
