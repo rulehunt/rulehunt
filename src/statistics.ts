@@ -7,17 +7,67 @@ export interface GridStatistics {
   entropy8x8: number
 }
 
+export interface SimulationMetadata {
+  name: string
+  seedType: 'center' | 'random' | 'patch'
+  seedPercentage?: number
+  rulesetName: string
+  rulesetHex: string
+  startTime: number
+  stepCount: number
+  requestedStepsPerSecond?: number
+  lastStepTime: number
+}
+
 export class StatisticsTracker {
   private history: GridStatistics[] = []
   private maxHistory = 100
   private previousGrid: Uint8Array | null = null
   private gridSize: number
+  private metadata: SimulationMetadata | null = null
+  private stepTimes: number[] = [] // Track last 20 step times for SPS calculation
+  private maxStepTimes = 20
 
   constructor(gridSize: number) {
     this.gridSize = gridSize
   }
 
+  initializeSimulation(
+    metadata: Omit<SimulationMetadata, 'stepCount' | 'lastStepTime'>,
+  ) {
+    this.metadata = {
+      ...metadata,
+      stepCount: 0,
+      lastStepTime: Date.now(),
+    }
+    this.stepTimes = []
+    this.history = []
+    this.previousGrid = null
+  }
+
+  getMetadata(): SimulationMetadata | null {
+    return this.metadata
+  }
+
+  getElapsedTime(): number {
+    if (!this.metadata) return 0
+    return Date.now() - this.metadata.startTime
+  }
+
+  getActualStepsPerSecond(): number {
+    if (this.stepTimes.length < 2) return 0
+
+    const intervals = []
+    for (let i = 1; i < this.stepTimes.length; i++) {
+      intervals.push(this.stepTimes[i] - this.stepTimes[i - 1])
+    }
+
+    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length
+    return avgInterval > 0 ? 1000 / avgInterval : 0
+  }
+
   recordStep(grid: Uint8Array) {
+    const now = Date.now()
     const stats = this.calculateStatistics(grid)
     this.history.push(stats)
 
@@ -25,6 +75,25 @@ export class StatisticsTracker {
       this.history.shift()
     }
 
+    this.previousGrid = new Uint8Array(grid)
+
+    // Update metadata
+    if (this.metadata) {
+      this.metadata.stepCount++
+      this.metadata.lastStepTime = now
+    }
+
+    // Track step timing
+    this.stepTimes.push(now)
+    if (this.stepTimes.length > this.maxStepTimes) {
+      this.stepTimes.shift()
+    }
+  }
+
+  recordInitialState(grid: Uint8Array) {
+    // Record the initial state without incrementing step count
+    const stats = this.calculateStatistics(grid)
+    this.history.push(stats)
     this.previousGrid = new Uint8Array(grid)
   }
 
@@ -192,5 +261,7 @@ export class StatisticsTracker {
   reset() {
     this.history = []
     this.previousGrid = null
+    this.metadata = null
+    this.stepTimes = []
   }
 }

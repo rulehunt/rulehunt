@@ -12,6 +12,15 @@ import {
   randomC4RulesetByDensity,
 } from './utils.ts'
 
+// Import components
+import { createHeader, setupTheme } from './components/header.ts'
+import { createRulesetPanel } from './components/ruleset.ts'
+import { createSimulationPanel } from './components/simulation.ts'
+import {
+  type SummaryPanelElements,
+  createSummaryPanel,
+} from './components/summary.ts'
+
 // --- Display Mode -----------------------------------------------------------
 type DisplayMode = 'orbits' | 'full'
 
@@ -80,38 +89,79 @@ function renderRule(
 }
 
 // --- Statistics Display ----------------------------------------------------
-function updateStatisticsDisplay(cellularAutomata: CellularAutomata) {
+function updateStatisticsDisplay(
+  cellularAutomata: CellularAutomata,
+  elements: SummaryPanelElements,
+) {
   const stats = cellularAutomata.getStatistics()
   const recentStats = stats.getRecentStats(1)
+  const metadata = stats.getMetadata()
 
   if (recentStats.length === 0) return
 
   const current = recentStats[0]
   const interestScore = stats.calculateInterestScore()
 
-  // Update text displays
-  const populationEl = document.getElementById('stat-population')
-  const activityEl = document.getElementById('stat-activity')
-  const entropy2x2El = document.getElementById('stat-entropy-2x2')
-  const entropy4x4El = document.getElementById('stat-entropy-4x4')
-  const entropy8x8El = document.getElementById('stat-entropy-8x8')
-  const interestEl = document.getElementById('stat-interest')
+  // Update simulation info
+  if (metadata) {
+    elements.simName.textContent = metadata.name
+    elements.simRule.textContent = `${metadata.rulesetName} (${metadata.rulesetHex})`
+    elements.simRule.title = `${metadata.rulesetName} (${metadata.rulesetHex})`
 
-  if (populationEl) populationEl.textContent = current.population.toFixed(0)
-  if (activityEl) activityEl.textContent = current.activity.toFixed(0)
-  if (entropy2x2El) entropy2x2El.textContent = current.entropy2x2.toFixed(2)
-  if (entropy4x4El) entropy4x4El.textContent = current.entropy4x4.toFixed(2)
-  if (entropy8x8El) entropy8x8El.textContent = current.entropy8x8.toFixed(2)
-  if (interestEl) {
-    interestEl.textContent = (interestScore * 100).toFixed(1) + '%'
-    // Color code the interest score
-    if (interestScore > 0.7) {
-      interestEl.className = 'font-mono text-green-600 dark:text-green-400'
-    } else if (interestScore > 0.4) {
-      interestEl.className = 'font-mono text-yellow-600 dark:text-yellow-400'
-    } else {
-      interestEl.className = 'font-mono text-red-600 dark:text-red-400'
+    let seedText = metadata.seedType
+    if (metadata.seedPercentage !== undefined) {
+      seedText += ` (${metadata.seedPercentage}%)`
     }
+    elements.simSeed.textContent = seedText
+
+    elements.simSteps.textContent = metadata.stepCount.toString()
+
+    const elapsed = stats.getElapsedTime()
+    const seconds = Math.floor(elapsed / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+
+    if (hours > 0) {
+      elements.simTime.textContent = `${hours}h ${minutes % 60}m ${seconds % 60}s`
+    } else if (minutes > 0) {
+      elements.simTime.textContent = `${minutes}m ${seconds % 60}s`
+    } else {
+      elements.simTime.textContent = `${seconds}s`
+    }
+
+    const actualSps = stats.getActualStepsPerSecond()
+    const requestedSps = metadata.requestedStepsPerSecond
+    if (actualSps > 0) {
+      let spsText = actualSps.toFixed(1)
+      if (requestedSps) {
+        spsText += ` / ${requestedSps}`
+      }
+      elements.simSps.textContent = spsText
+    } else {
+      elements.simSps.textContent = requestedSps
+        ? `${requestedSps} (target)`
+        : '—'
+    }
+  }
+
+  // Update grid statistics
+  elements.statPopulation.textContent = current.population.toFixed(0)
+  elements.statActivity.textContent = current.activity.toFixed(0)
+  elements.statEntropy2x2.textContent = current.entropy2x2.toFixed(2)
+  elements.statEntropy4x4.textContent = current.entropy4x4.toFixed(2)
+  elements.statEntropy8x8.textContent = current.entropy8x8.toFixed(2)
+  elements.statInterest.textContent = `${(interestScore * 100).toFixed(1)}%`
+
+  // Color code the interest score
+  if (interestScore > 0.7) {
+    elements.statInterest.className =
+      'font-mono text-lg font-bold text-green-600 dark:text-green-400'
+  } else if (interestScore > 0.4) {
+    elements.statInterest.className =
+      'font-mono text-lg font-bold text-yellow-600 dark:text-yellow-400'
+  } else {
+    elements.statInterest.className =
+      'font-mono text-lg font-bold text-red-600 dark:text-red-400'
   }
 }
 
@@ -193,81 +243,68 @@ function handleCanvasClick(
 
 // --- Main ------------------------------------------------------------------
 window.addEventListener('DOMContentLoaded', async () => {
-  // Theme Management
-  const themeLight = document.getElementById('theme-light') as HTMLButtonElement
-  const themeDark = document.getElementById('theme-dark') as HTMLButtonElement
-  const themeSystem = document.getElementById(
-    'theme-system',
-  ) as HTMLButtonElement
+  const appRoot = document.getElementById('app') as HTMLDivElement
 
-  function setTheme(theme: 'light' | 'dark' | 'system') {
-    localStorage.setItem('theme', theme)
+  // Create header with theme toggle and GitHub link
+  const header = createHeader()
+  appRoot.appendChild(header.root)
 
-    // Update button styles
-    const baseClasses = 'px-3 py-1 rounded text-sm transition-colors'
-    const activeClasses = `${baseClasses} bg-blue-500 text-white`
-    const inactiveClasses = `${baseClasses} hover:bg-gray-200 dark:hover:bg-gray-700`
+  // Create main content container
+  const mainContent = document.createElement('main')
+  mainContent.className =
+    'flex-1 flex items-center justify-center gap-6 p-6 lg:p-12'
 
-    themeLight.className = theme === 'light' ? activeClasses : inactiveClasses
-    themeDark.className = theme === 'dark' ? activeClasses : inactiveClasses
-    themeSystem.className = theme === 'system' ? activeClasses : inactiveClasses
+  // Create main layout container
+  const mainContainer = document.createElement('div')
+  mainContainer.className =
+    'flex flex-col lg:flex-row items-start justify-center gap-12 w-full max-w-7xl'
 
-    if (theme === 'system') {
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      document.documentElement.classList.toggle('dark', isDark)
-    } else {
-      document.documentElement.classList.toggle('dark', theme === 'dark')
-    }
+  // Create left column (simulation + summary)
+  const leftColumn = document.createElement('div')
+  leftColumn.className = 'flex flex-col items-center gap-3'
 
-    // Re-render canvases with new colors (only if they exist)
-    try {
-      if (typeof cellularAutomata !== 'undefined' && cellularAutomata) {
-        cellularAutomata.render()
-        updateStatisticsDisplay(cellularAutomata)
-      }
-      if (typeof currentRuleset !== 'undefined' && currentRuleset) {
-        renderRule(
-          currentRuleset,
-          orbitLookup,
-          ctx,
-          canvas,
-          ruleLabelDisplay,
-          ruleIdDisplay,
-          ruleLabelDisplay.textContent || 'Loading...',
-          displayMode,
-        )
-      }
-    } catch (e) {
-      // Variables not initialized yet - will use correct theme when first rendered
-    }
-  }
+  const simulationPanel = createSimulationPanel()
+  const summaryPanel = createSummaryPanel()
+  leftColumn.appendChild(simulationPanel.root)
+  leftColumn.appendChild(summaryPanel.root)
 
-  themeLight.addEventListener('click', () => setTheme('light'))
-  themeDark.addEventListener('click', () => setTheme('dark'))
-  themeSystem.addEventListener('click', () => setTheme('system'))
+  // Create right column (ruleset)
+  const rulesetPanel = createRulesetPanel()
 
-  // Initialize theme
-  const savedTheme = localStorage.getItem('theme') as
-    | 'light'
-    | 'dark'
-    | 'system'
-    | null
-  setTheme(savedTheme || 'system')
+  // Assemble layout
+  mainContainer.appendChild(leftColumn)
+  mainContainer.appendChild(rulesetPanel.root)
+  mainContent.appendChild(mainContainer)
+  appRoot.appendChild(mainContent)
 
-  // Listen for system theme changes
-  window
-    .matchMedia('(prefers-color-scheme: dark)')
-    .addEventListener('change', () => {
-      if (localStorage.getItem('theme') === 'system') {
-        setTheme('system')
-      }
-    })
+  // Extract elements for easier access
+  const {
+    canvas: simCanvas,
+    btnStep,
+    btnReset,
+    btnPlay,
+    stepsPerSecondInput,
+    aliveSlider,
+    aliveValue,
+    radioCenterSeed,
+    radioRandomSeed,
+    radioPatchSeed,
+  } = simulationPanel.elements
 
-  const ruleLabelDisplay = document.getElementById('rule-label') as HTMLElement
-  const ruleIdDisplay = document.getElementById('rule-id') as HTMLElement
+  const {
+    canvas: ruleCanvas,
+    ruleLabel: ruleLabelDisplay,
+    ruleId: ruleIdDisplay,
+    btnConway,
+    btnOutlier,
+    btnRandomC4Ruleset,
+    orbitSlider,
+    orbitValue,
+    radioDisplayOrbits,
+    radioDisplayFull,
+  } = rulesetPanel.elements
 
-  const canvas = document.getElementById('truth') as HTMLCanvasElement
-  const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
+  const ctx = ruleCanvas.getContext('2d') as CanvasRenderingContext2D
 
   // Load orbit data
   const response = await fetch('./resources/c4-orbits.json')
@@ -277,11 +314,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   console.log(`Loaded ${orbitsData.orbits.length} C4 orbits`)
 
   // Initialize cellular automata simulation
-  const simCanvas = document.getElementById('simulation') as HTMLCanvasElement
   const cellularAutomata = new CellularAutomata(simCanvas)
 
   // Initialize statistics display
-  updateStatisticsDisplay(cellularAutomata)
+  updateStatisticsDisplay(cellularAutomata, summaryPanel.elements)
 
   // Track current ruleset for click handler
   let currentRuleset: C4Ruleset
@@ -291,11 +327,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Track current display mode
   let displayMode: DisplayMode = 'orbits'
-
-  // Get slider early so we can use it in applyInitialCondition
-  const aliveSlider = document.getElementById(
-    'alive-slider',
-  ) as HTMLInputElement
 
   // Function to apply the selected initial condition
   function applyInitialCondition() {
@@ -309,7 +340,33 @@ window.addEventListener('DOMContentLoaded', async () => {
       cellularAutomata.randomSeed(percentage)
     }
     cellularAutomata.render()
-    updateStatisticsDisplay(cellularAutomata)
+    updateStatisticsDisplay(cellularAutomata, summaryPanel.elements)
+
+    // Initialize simulation metadata
+    initializeSimulationMetadata()
+  }
+
+  // Function to initialize simulation metadata
+  function initializeSimulationMetadata() {
+    const stats = cellularAutomata.getStatistics()
+    const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
+
+    let seedPercentage: number | undefined
+    if (initialConditionType === 'random' || initialConditionType === 'patch') {
+      seedPercentage = Number.parseInt(aliveSlider.value)
+    }
+
+    stats.initializeSimulation({
+      name: `Simulation ${new Date().toLocaleTimeString()}`,
+      seedType: initialConditionType,
+      seedPercentage,
+      rulesetName: ruleLabelDisplay.textContent || 'Unknown',
+      rulesetHex: ruleIdDisplay.textContent || 'Unknown',
+      startTime: Date.now(),
+      requestedStepsPerSecond: cellularAutomata.isCurrentlyPlaying()
+        ? stepsPerSecond
+        : undefined,
+    })
   }
 
   // Apply the initial patch seed
@@ -322,39 +379,46 @@ window.addEventListener('DOMContentLoaded', async () => {
     conwayRuleset,
     orbitLookup,
     ctx,
-    canvas,
+    ruleCanvas,
     ruleLabelDisplay,
     ruleIdDisplay,
     'Conway',
     displayMode,
   )
 
-  // Add click listener
-  canvas.addEventListener('click', (e) => {
+  // Setup theme with re-render callback
+  setupTheme(header.elements.themeToggle, () => {
+    // Re-render canvases when theme changes
+    cellularAutomata.render()
+    updateStatisticsDisplay(cellularAutomata, summaryPanel.elements)
+    renderRule(
+      currentRuleset,
+      orbitLookup,
+      ctx,
+      ruleCanvas,
+      ruleLabelDisplay,
+      ruleIdDisplay,
+      ruleLabelDisplay.textContent || 'Loading...',
+      displayMode,
+    )
+  })
+
+  // Add click listener to ruleset canvas
+  ruleCanvas.addEventListener('click', (e) => {
     handleCanvasClick(
       e,
-      canvas,
+      ruleCanvas,
       currentRuleset,
       orbitsData,
       orbitLookup,
       displayMode,
     )
   })
-  canvas.style.cursor = 'pointer'
+  ruleCanvas.style.cursor = 'pointer'
 
-  // Buttons
-  const btnConway = document.getElementById('btn-conway') as HTMLButtonElement
-  const btnOutlier = document.getElementById('btn-outlier') as HTMLButtonElement
-  const btnRandomC4Ruleset = document.getElementById(
-    'btn-random-c4-ruleset',
-  ) as HTMLButtonElement
+  // --- Event Listeners -------------------------------------------------------
 
-  // Orbit slider elements
-  const orbitSlider = document.getElementById(
-    'orbit-slider',
-  ) as HTMLInputElement
-  const orbitValue = document.getElementById('orbit-value') as HTMLButtonElement
-
+  // Conway button
   btnConway.addEventListener('click', () => {
     const ruleset = makeC4Ruleset(conwayRule, orbitLookup)
     currentRuleset = ruleset
@@ -362,7 +426,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       ruleset,
       orbitLookup,
       ctx,
-      canvas,
+      ruleCanvas,
       ruleLabelDisplay,
       ruleIdDisplay,
       'Conway',
@@ -380,6 +444,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   })
 
+  // Outlier button
   btnOutlier.addEventListener('click', () => {
     const ruleset = makeC4Ruleset(outlierRule, orbitLookup)
     currentRuleset = ruleset
@@ -387,7 +452,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       ruleset,
       orbitLookup,
       ctx,
-      canvas,
+      ruleCanvas,
       ruleLabelDisplay,
       ruleIdDisplay,
       'Outlier',
@@ -425,7 +490,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       ruleset,
       orbitLookup,
       ctx,
-      canvas,
+      ruleCanvas,
       ruleLabelDisplay,
       ruleIdDisplay,
       `Random Pattern (${percentage}% orbits)`,
@@ -444,24 +509,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Display mode radio buttons
-  const radioDisplayOrbits = document.getElementById(
-    'radio-display-orbits',
-  ) as HTMLInputElement
-  const radioDisplayFull = document.getElementById(
-    'radio-display-full',
-  ) as HTMLInputElement
-
   radioDisplayOrbits.checked = true
 
   radioDisplayOrbits.addEventListener('change', () => {
     if (radioDisplayOrbits.checked) {
       displayMode = 'orbits'
-      // Re-render current ruleset with new display mode
       renderRule(
         currentRuleset,
         orbitLookup,
         ctx,
-        canvas,
+        ruleCanvas,
         ruleLabelDisplay,
         ruleIdDisplay,
         ruleLabelDisplay.textContent || 'Loading...',
@@ -473,12 +530,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   radioDisplayFull.addEventListener('change', () => {
     if (radioDisplayFull.checked) {
       displayMode = 'full'
-      // Re-render current ruleset with new display mode
       renderRule(
         currentRuleset,
         orbitLookup,
         ctx,
-        canvas,
+        ruleCanvas,
         ruleLabelDisplay,
         ruleIdDisplay,
         ruleLabelDisplay.textContent || 'Loading...',
@@ -488,17 +544,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   })
 
   // Initial condition radio buttons
-  const radioCenterSeed = document.getElementById(
-    'radio-center-seed',
-  ) as HTMLInputElement
-  const radioRandomSeed = document.getElementById(
-    'radio-random-seed',
-  ) as HTMLInputElement
-  const radioPatchSeed = document.getElementById(
-    'radio-patch-seed',
-  ) as HTMLInputElement
-
-  // Listen for radio button changes
   radioCenterSeed.addEventListener('change', () => {
     if (radioCenterSeed.checked) {
       initialConditionType = 'center'
@@ -521,32 +566,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   })
 
   // Simulation buttons
-  const btnStep = document.getElementById('btn-step') as HTMLButtonElement
-  const btnRestart = document.getElementById('btn-reset') as HTMLButtonElement
-
-  const btnPlay = document.getElementById('btn-play') as HTMLButtonElement
-
-  const aliveValue = document.getElementById('alive-value') as HTMLButtonElement
-  const stepsPerSecondInput = document.getElementById(
-    'steps-per-second',
-  ) as HTMLInputElement
-
-  // Update slider value display
-  aliveSlider.addEventListener('input', () => {
-    aliveValue.textContent = `${aliveSlider.value}%`
-    // If random seed or patch seed is selected, update the grid
-    if (initialConditionType === 'random' || initialConditionType === 'patch') {
-      applyInitialCondition()
-    }
-  })
-
   btnStep.addEventListener('click', () => {
     const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
     cellularAutomata.step(expanded)
-    updateStatisticsDisplay(cellularAutomata)
+    updateStatisticsDisplay(cellularAutomata, summaryPanel.elements)
   })
 
-  btnRestart.addEventListener('click', () => {
+  btnReset.addEventListener('click', () => {
     applyInitialCondition()
   })
 
@@ -567,9 +593,16 @@ window.addEventListener('DOMContentLoaded', async () => {
       cellularAutomata.play(stepsPerSecond, expanded)
       btnPlay.textContent = 'Pause'
 
+      // Update metadata with requested SPS
+      const stats = cellularAutomata.getStatistics()
+      const metadata = stats.getMetadata()
+      if (metadata) {
+        metadata.requestedStepsPerSecond = stepsPerSecond
+      }
+
       // Update statistics display periodically
       statsUpdateInterval = window.setInterval(() => {
-        updateStatisticsDisplay(cellularAutomata)
+        updateStatisticsDisplay(cellularAutomata, summaryPanel.elements)
       }, 100)
     }
   })
@@ -585,9 +618,25 @@ window.addEventListener('DOMContentLoaded', async () => {
       const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
       cellularAutomata.play(stepsPerSecond, expanded)
 
+      // Update metadata with new requested SPS
+      const stats = cellularAutomata.getStatistics()
+      const metadata = stats.getMetadata()
+      if (metadata) {
+        metadata.requestedStepsPerSecond = stepsPerSecond
+      }
+
       statsUpdateInterval = window.setInterval(() => {
-        updateStatisticsDisplay(cellularAutomata)
+        updateStatisticsDisplay(cellularAutomata, summaryPanel.elements)
       }, 100)
+    }
+  })
+
+  // Update alive slider value display
+  aliveSlider.addEventListener('input', () => {
+    aliveValue.textContent = `${aliveSlider.value}%`
+    // If random seed or patch seed is selected, update the grid
+    if (initialConditionType === 'random' || initialConditionType === 'patch') {
+      applyInitialCondition()
     }
   })
 })
