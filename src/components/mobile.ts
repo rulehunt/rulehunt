@@ -12,6 +12,9 @@ import {
 } from '../utils.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
+// avoid strobing
+const FORCE_RULE_ZERO_OFF = true
+
 // --- Types -----------------------------------------------------------------
 export type CleanupFunction = () => void
 
@@ -208,7 +211,7 @@ function createReloadButton(
   `
   btn.title = 'Reload simulation'
   btn.className =
-    'fixed bottom-4 right-4 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition'
+    'absolute bottom-4 right-4 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition'
   btn.style.zIndex = '10'
   btn.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
 
@@ -218,12 +221,9 @@ function createReloadButton(
     parent.appendChild(btn)
   }
 
-  // ✅ Move animation logic inside the click handler
   btn.addEventListener('click', () => {
-    // Run reload callback
     onReload()
 
-    // Spin animation feedback
     btn.style.transition = 'transform 0.4s ease'
     btn.style.transform = 'rotate(360deg)'
     setTimeout(() => {
@@ -456,7 +456,7 @@ export async function setupMobileLayout(
       setTimeout(() => {
         // --- Switch to new random rule ---
         const density = Math.random() * 0.6 + 0.2
-        currentRuleset = randomC4RulesetByDensity(density)
+        currentRuleset = randomC4RulesetByDensity(density, FORCE_RULE_ZERO_OFF)
         currentRuleName = `Random (${Math.round(density * 100)}%)`
 
         cellularAutomata.pause()

@@ -228,6 +228,7 @@ export const LeaderboardEntry = z.object({
 export const LeaderboardResponse = z.object({
   ok: z.literal(true),
   results: z.array(LeaderboardEntry),
+  sort: z.enum(['recent', 'longest', 'interesting']).optional(),
 })
 
 // ============================================================================

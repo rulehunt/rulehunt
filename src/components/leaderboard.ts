@@ -1,10 +1,12 @@
-// src/components/leaderboard.ts
 import { fetchLeaderboard } from '../api/leaderboard'
 
 export interface LeaderboardElements {
   tableBody: HTMLTableSectionElement
   refreshButton: HTMLButtonElement
+  sortSelect: HTMLSelectElement
 }
+
+type SortMode = 'recent' | 'longest' | 'interesting'
 
 export function createLeaderboardPanel(): {
   root: HTMLDivElement
@@ -14,15 +16,30 @@ export function createLeaderboardPanel(): {
   root.className =
     'w-full border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 mt-4'
 
+  // --- Construct HTML skeleton ---
   root.innerHTML = `
     <div class="flex justify-between items-center mb-3">
       <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">🏆 Leaderboard</h3>
-      <button
-        id="refresh-leaderboard"
-        class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-      >
-        Refresh
-      </button>
+
+      <div class="flex items-center space-x-2">
+        <select
+          id="sort-mode"
+          class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          title="Sort leaderboard"
+        >
+          <option value="longest" selected>⏱️ Longest Watched</option>
+          <option value="recent">🕒 Most Recent</option>
+          <option value="interesting">💡 Most Interesting</option>
+        </select>
+
+        <button
+          id="refresh-leaderboard"
+          class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+          title="Refresh leaderboard"
+        >
+          Refresh
+        </button>
+      </div>
     </div>
 
     <div class="overflow-x-auto">
@@ -49,18 +66,23 @@ export function createLeaderboardPanel(): {
     refreshButton: root.querySelector(
       '#refresh-leaderboard',
     ) as HTMLButtonElement,
+    sortSelect: root.querySelector('#sort-mode') as HTMLSelectElement,
   }
+
+  let currentSort: SortMode = 'longest'
 
   // --- Helper to load leaderboard data ---
   async function loadLeaderboard() {
     try {
-      const results = await fetchLeaderboard(10)
+      const results = await fetchLeaderboard(10, currentSort)
 
       elements.tableBody.innerHTML = ''
 
       if (results.length === 0) {
         elements.tableBody.innerHTML = `
-          <tr><td colspan="6" class="text-center py-3 text-gray-500 dark:text-gray-400">No results yet.</td></tr>
+          <tr><td colspan="6" class="text-center py-3 text-gray-500 dark:text-gray-400">
+            No results yet for this mode.
+          </td></tr>
         `
         return
       }
@@ -93,13 +115,19 @@ export function createLeaderboardPanel(): {
     } catch (err) {
       console.error('Leaderboard load failed:', err)
       elements.tableBody.innerHTML = `
-        <tr><td colspan="6" class="text-center py-3 text-red-500">Error loading leaderboard</td></tr>
+        <tr><td colspan="6" class="text-center py-3 text-red-500">
+          Error loading leaderboard
+        </td></tr>
       `
     }
   }
 
-  // --- Hook up the refresh button ---
+  // --- Event listeners ---
   elements.refreshButton.addEventListener('click', () => loadLeaderboard())
+  elements.sortSelect.addEventListener('change', (e) => {
+    currentSort = (e.target as HTMLSelectElement).value as SortMode
+    loadLeaderboard()
+  })
 
   // --- Initial load ---
   loadLeaderboard()
