@@ -9,6 +9,8 @@ import type { RunSubmission } from '../schema'
 export const SaveResponse = z.object({
   ok: z.boolean(),
   runHash: z.string().optional(),
+  error: z.string().optional(),
+  details: z.array(z.any()).optional(),
 })
 
 export type SaveResponse = z.infer<typeof SaveResponse>
@@ -26,6 +28,14 @@ export async function saveRun(
   const { userId, userLabel } = getUserIdentity()
   const body: RunSubmission = { ...data, userId, userLabel }
 
+  console.log('[saveRun] 📤 Sending payload:', {
+    rulesetHex: body.rulesetHex,
+    rulesetHexLength: body.rulesetHex?.length,
+    rulesetName: body.rulesetName,
+    userId: body.userId,
+    userLabel: body.userLabel,
+  })
+
   try {
     const res = await fetch('/api/save', {
       method: 'POST',
@@ -33,16 +43,29 @@ export async function saveRun(
       body: JSON.stringify(body),
     })
 
+    const responseText = await res.text()
+    console.log('[saveRun] 📥 Response:', {
+      status: res.status,
+      ok: res.ok,
+      body: responseText,
+    })
+
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${await res.text()}`)
+      throw new Error(`HTTP ${res.status}: ${responseText}`)
     }
 
-    const json = await res.json()
+    const json = JSON.parse(responseText)
     const result = SaveResponse.parse(json) // ✅ schema-validated
-    console.log('[saveRun] ✅', result)
+
+    if (result.ok) {
+      console.log('[saveRun] ✅ Success:', result.runHash)
+    } else {
+      console.warn('[saveRun] ⚠️  Server returned ok: false:', result)
+    }
+
     return result
   } catch (err) {
-    console.error('[saveRun] ❌ failed', err)
+    console.error('[saveRun] ❌ Failed:', err)
     return { ok: false }
   }
 }
