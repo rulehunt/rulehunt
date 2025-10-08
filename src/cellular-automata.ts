@@ -32,6 +32,9 @@ export class CellularAutomata {
   private lastSeedMethod: 'center' | 'random' | 'patch' = 'random'
   private lastAlivePercentage = 50
 
+  private currentRuleset: Ruleset | null = null
+  private lastStepsPerSecond = 10
+
   // Add zoom and pan state
   private zoom = 1
   private panX = 0
@@ -57,7 +60,7 @@ export class CellularAutomata {
 
     this.grid = new Uint8Array(this.gridArea)
     this.nextGrid = new Uint8Array(this.gridArea)
-    this.statistics = new StatisticsTracker(this.gridCols * this.gridRows)
+    this.statistics = new StatisticsTracker(this.gridRows, this.gridCols)
 
     this.randomSeed()
     this.render()
@@ -290,10 +293,11 @@ export class CellularAutomata {
 
   play(stepsPerSecond: number, ruleset: Ruleset) {
     if (this.isPlaying) return
-
+    this.currentRuleset = ruleset
+    this.lastStepsPerSecond = stepsPerSecond
     this.isPlaying = true
-    const intervalMs = 1000 / stepsPerSecond
 
+    const intervalMs = 1000 / stepsPerSecond
     this.playInterval = window.setInterval(() => {
       this.step(ruleset)
     }, intervalMs)
@@ -361,6 +365,52 @@ export class CellularAutomata {
     }
   }
 
+  /**
+   * Resize the grid to new dimensions, reinitializing buffers and reseeding.
+   * If a ruleset is currently playing, it will resume after resize.
+   */
+  resize(newRows: number, newCols: number) {
+    const wasPlaying = this.isPlaying
+    const ruleset = this.currentRuleset // remember before pausing
+
+    if (wasPlaying) this.pause()
+
+    // Make sure we have up-to-date canvas width/height
+    this.canvas.width = this.canvas.clientWidth
+    this.canvas.height = this.canvas.clientHeight
+
+    this.gridRows = newRows
+    this.gridCols = newCols
+    this.gridArea = newRows * newCols
+    this.cellSize = this.canvas.width / this.gridCols
+
+    // Allocate new buffers
+    this.grid = new Uint8Array(this.gridArea)
+    this.nextGrid = new Uint8Array(this.gridArea)
+    this.statistics = new StatisticsTracker(this.gridRows, this.gridCols)
+
+    // Re-seed using the last seed method
+    switch (this.lastSeedMethod) {
+      case 'center':
+        this.centerSeed()
+        break
+      case 'patch':
+        this.patchSeed(this.lastAlivePercentage)
+        break
+      default:
+        this.randomSeed(this.lastAlivePercentage)
+        break
+    }
+
+    // Redraw
+    this.render()
+
+    // Resume simulation if it was running
+    if (wasPlaying && ruleset) {
+      this.play(this.lastStepsPerSecond, ruleset)
+    }
+  }
+
   isCurrentlyPlaying(): boolean {
     return this.isPlaying
   }
@@ -371,5 +421,9 @@ export class CellularAutomata {
 
   getSeed(): number {
     return this.seed
+  }
+
+  getGridSize(): number {
+    return this.gridArea
   }
 }

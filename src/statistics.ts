@@ -23,13 +23,15 @@ export class StatisticsTracker {
   private history: GridStatistics[] = []
   private maxHistory = 100
   private previousGrid: Uint8Array | null = null
-  private gridSize: number
+  private gridRows: number
+  private gridCols: number
   private metadata: SimulationMetadata | null = null
   private stepTimes: number[] = [] // Track last 20 step times for SPS calculation
   private maxStepTimes = 20
 
-  constructor(gridSize: number) {
-    this.gridSize = gridSize
+  constructor(gridRows: number, gridCols: number) {
+    this.gridRows = gridRows
+    this.gridCols = gridCols
   }
 
   initializeSimulation(
@@ -137,8 +139,8 @@ export class StatisticsTracker {
     const blockCounts = new Map<number, number>()
     const stride = Math.floor(blockSize / 2) // Overlapping blocks for better sampling
 
-    for (let y = 0; y <= this.gridSize - blockSize; y += stride) {
-      for (let x = 0; x <= this.gridSize - blockSize; x += stride) {
+    for (let y = 0; y <= this.gridRows - blockSize; y += stride) {
+      for (let x = 0; x <= this.gridCols - blockSize; x += stride) {
         const pattern = this.getBlockPattern(grid, x, y, blockSize)
         blockCounts.set(pattern, (blockCounts.get(pattern) || 0) + 1)
       }
@@ -174,7 +176,7 @@ export class StatisticsTracker {
       for (let dx = 0; dx < blockSize; dx++) {
         const x = startX + dx
         const y = startY + dy
-        if (grid[y * this.gridSize + x]) {
+        if (grid[y * this.gridCols + x]) {
           pattern |= 1 << bit
         }
         bit++
@@ -188,7 +190,7 @@ export class StatisticsTracker {
     if (this.history.length < 10) return 0
 
     const recent = this.history.slice(-20)
-    const totalCells = this.gridSize * this.gridSize
+    const totalCells = this.gridRows * this.gridCols
 
     // Get average values
     const avgPopulation =

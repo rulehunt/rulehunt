@@ -752,7 +752,7 @@ export async function setupDesktopLayout(
         stepCount,
         watchedSteps: stepCount,
         watchedWallMs,
-        gridSize: undefined,
+        gridSize: cellularAutomata.getGridSize(),
         progress_bar_steps: PROGRESS_BAR_STEPS,
         requestedSps: metadata?.requestedStepsPerSecond,
         actualSps,

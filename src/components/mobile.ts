@@ -18,8 +18,6 @@ const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 10
 const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.25
 const SWIPE_COMMIT_MIN_DISTANCE = 80
-const GRID_ROWS = 300
-const GRID_COLS = 300
 
 const LIGHT_FG_COLORS = [
   '#2563eb', // blue-600
@@ -53,6 +51,32 @@ interface RuleData {
   name: string
   hex: string
   ruleset: Ruleset
+}
+
+// --- Helpers ----------------------------------------------------------------
+
+/**
+ * Compute grid dimensions and cell size to fit the current screen,
+ * keeping total cells ≤ maxCells.
+ */
+function computeAdaptiveGrid(maxCells = 100_000) {
+  const screenWidth = window.innerWidth
+  const screenHeight = window.innerHeight
+
+  let cellSize = 1
+  let gridCols = screenWidth
+  let gridRows = screenHeight
+  let totalCells = gridCols * gridRows
+
+  // Increase cell size until total cells ≤ maxCells
+  while (totalCells > maxCells) {
+    cellSize += 1
+    gridCols = Math.floor(screenWidth / cellSize)
+    gridRows = Math.floor(screenHeight / cellSize)
+    totalCells = gridCols * gridRows
+  }
+
+  return { gridCols, gridRows, cellSize, totalCells, screenWidth, screenHeight }
 }
 
 // --- Dual-Canvas Swipe Handler ----------------------------------------------
@@ -152,7 +176,7 @@ function setupDualCanvasSwipe(
 // --- Pinch Zoom & Pan -------------------------------------------------------
 function setupPinchZoomAndPan(
   canvas: HTMLCanvasElement,
-  automata: CellularAutomata,
+  cellularAutomata: CellularAutomata,
 ): CleanupFunction {
   let initialDistance = 0
   let initialZoom = 1
@@ -167,7 +191,7 @@ function setupPinchZoomAndPan(
       const dx = t1.clientX - t2.clientX
       const dy = t1.clientY - t2.clientY
       initialDistance = Math.sqrt(dx * dx + dy * dy)
-      initialZoom = automata.getZoom()
+      initialZoom = cellularAutomata.getZoom()
 
       const rect = canvas.getBoundingClientRect()
       lastMidX =
@@ -176,7 +200,7 @@ function setupPinchZoomAndPan(
       lastMidY =
         ((t1.clientY + t2.clientY) / 2 - rect.top) *
         (canvas.height / rect.height)
-      const pan = automata.getPan()
+      const pan = cellularAutomata.getPan()
       initialPanX = pan.x
       initialPanY = pan.y
     }
@@ -204,7 +228,7 @@ function setupPinchZoomAndPan(
       const deltaX = midX - lastMidX
       const deltaY = midY - lastMidY
 
-      automata.setZoomAndPan(
+      cellularAutomata.setZoomAndPan(
         newZoom,
         midX,
         midY,
@@ -243,24 +267,24 @@ function generateRandomRule(): RuleData {
 }
 
 function loadRule(
-  automata: CellularAutomata,
+  cellularAutomata: CellularAutomata,
   rule: RuleData,
   orbitLookup: Uint8Array,
   seedPercentage = 50,
 ): void {
-  automata.pause()
-  automata.patchSeed(seedPercentage)
+  cellularAutomata.pause()
+  cellularAutomata.patchSeed(seedPercentage)
   const expanded = expandC4Ruleset(rule.ruleset, orbitLookup)
-  automata.play(STEPS_PER_SECOND, expanded)
+  cellularAutomata.play(STEPS_PER_SECOND, expanded)
 }
 
 // --- Save run ---------------------------------------------------------------
 function saveRunStatistics(
-  automata: CellularAutomata,
+  cellularAutomata: CellularAutomata,
   ruleName: string,
   ruleHex: string,
 ): void {
-  const stats = automata.getStatistics()
+  const stats = cellularAutomata.getStatistics()
   const metadata = stats.getMetadata()
   const recent = stats.getRecentStats(1)[0] ?? {
     population: 0,
@@ -276,13 +300,13 @@ function saveRunStatistics(
     userLabel: getUserIdentity().userLabel,
     rulesetName: ruleName,
     rulesetHex: ruleHex,
-    seed: automata.getSeed(),
+    seed: cellularAutomata.getSeed(),
     seedType: (metadata?.seedType ?? 'patch') as 'center' | 'random' | 'patch',
     seedPercentage: metadata?.seedPercentage ?? 50,
     stepCount: metadata?.stepCount ?? 0,
     watchedSteps: metadata?.stepCount ?? 0,
     watchedWallMs: stats.getElapsedTime(),
-    gridSize: undefined,
+    gridSize: cellularAutomata.getGridSize(),
     progress_bar_steps: undefined,
     requestedSps: metadata?.requestedStepsPerSecond ?? STEPS_PER_SECOND,
     actualSps: stats.getActualStepsPerSecond(),
@@ -390,15 +414,37 @@ export async function setupMobileLayout(
   const orbits: C4OrbitsData = await res.json()
   const lookup = buildOrbitLookup(orbits)
 
+  const {
+    gridCols,
+    gridRows,
+    cellSize,
+    totalCells,
+    screenWidth,
+    screenHeight,
+  } = computeAdaptiveGrid()
+
+  console.log(
+    `[grid] ${gridCols}×${gridRows} = ${totalCells.toLocaleString()} cells @ cellSize=${cellSize}px`,
+  )
+
+  wrapper.style.width = `${screenWidth}px`
+  wrapper.style.height = `${screenHeight}px`
+  for (const c of [canvasA, canvasB]) {
+    c.width = screenWidth
+    c.height = screenHeight
+    c.style.width = `${screenWidth}px`
+    c.style.height = `${screenHeight}px`
+  }
+
   let currentCA = new CellularAutomata(canvasA, {
-    gridRows: GRID_ROWS,
-    gridCols: GRID_COLS,
+    gridRows,
+    gridCols,
     fgColor: palette[colorIndex],
     bgColor,
   })
   let nextCA = new CellularAutomata(canvasB, {
-    gridRows: GRID_ROWS,
-    gridCols: GRID_COLS,
+    gridRows,
+    gridCols,
     fgColor: palette[(colorIndex + 1) % palette.length],
     bgColor,
   })
@@ -470,9 +516,6 @@ export async function setupMobileLayout(
       currentCA.setColors(col, bgColor)
       nextCA.setColors(nextCol, bgColor)
 
-      document.documentElement.style.setProperty('--canvas-a-fg', col)
-      document.documentElement.style.setProperty('--canvas-b-fg', nextCol)
-
       currentCA.resetZoom()
 
       nextRule = generateRandomRule()
@@ -508,20 +551,29 @@ export async function setupMobileLayout(
   const cleanupZoomB = setupPinchZoomAndPan(canvasB, nextCA)
 
   const handleResize = () => {
-    const newSize = Math.min(window.innerWidth, window.innerHeight)
-    wrapper.style.width = `${newSize}px`
-    wrapper.style.height = `${newSize}px`
+    const { gridCols, gridRows, cellSize, screenWidth, screenHeight } =
+      computeAdaptiveGrid()
 
-    // Only resize CSS dimensions - setting canvas.width/height clears the buffer!
+    wrapper.style.width = `${screenWidth}px`
+    wrapper.style.height = `${screenHeight}px`
+
     for (const c of [canvasA, canvasB]) {
-      c.style.width = `${newSize}px`
-      c.style.height = `${newSize}px`
+      c.style.width = `${screenWidth}px`
+      c.style.height = `${screenHeight}px`
     }
+
+    currentCA.pause()
+    nextCA.pause()
+    currentCA.resize(gridRows, gridCols)
+    nextCA.resize(gridRows, gridCols)
 
     if (canvasB.style.transform.includes('translateY')) {
-      canvasB.style.transform = `translateY(${newSize}px)`
+      canvasB.style.transform = `translateY(${screenHeight}px)`
     }
+
+    console.log(`[resize] ${gridCols}×${gridRows} @ cellSize=${cellSize}px`)
   }
+
   window.addEventListener('resize', handleResize)
 
   return () => {
