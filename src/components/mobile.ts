@@ -98,8 +98,8 @@ function waitForTransitionEnd(el: HTMLElement): Promise<void> {
 let isTransitioning = false
 function setupDualCanvasSwipe(
   wrapper: HTMLElement,
-  canvasA: HTMLCanvasElement,
-  canvasB: HTMLCanvasElement,
+  outgoingCanvas: HTMLCanvasElement,
+  incomingCanvas: HTMLCanvasElement,
   onCommit: () => void,
   onCancel: () => void,
   onDragStart?: () => void,
@@ -115,10 +115,10 @@ function setupDualCanvasSwipe(
   const getHeight = () => wrapper.clientHeight
 
   const resetTransforms = (h: number) => {
-    canvasA.style.transform = 'translateY(0)'
-    canvasB.style.transform = `translateY(${h}px)`
-    canvasA.style.opacity = '1'
-    canvasB.style.opacity = '1'
+    outgoingCanvas.style.transform = 'translateY(0)'
+    incomingCanvas.style.transform = `translateY(${h}px)`
+    outgoingCanvas.style.opacity = '1'
+    incomingCanvas.style.opacity = '1'
   }
 
   const handleTouchStart = (e: TouchEvent) => {
@@ -145,8 +145,8 @@ function setupDualCanvasSwipe(
     samples.push({ t: startT, y: startY })
 
     wrapper.style.transition = 'none'
-    canvasA.style.transition = 'none'
-    canvasB.style.transition = 'none'
+    outgoingCanvas.style.transition = 'none'
+    incomingCanvas.style.transition = 'none'
     onDragStart?.()
   }
 
@@ -177,30 +177,30 @@ function setupDualCanvasSwipe(
     const height = getHeight()
     const progress = Math.abs(delta) / height
 
-    canvasA.style.transform = `translateY(${delta}px)`
-    canvasB.style.transform = `translateY(${height + delta}px)`
-    canvasA.style.opacity = `${Math.max(0.3, 1 - progress * 0.7)}`
-    canvasB.style.opacity = `${Math.min(1, 0.3 + progress * 0.7)}`
+    outgoingCanvas.style.transform = `translateY(${delta}px)`
+    incomingCanvas.style.transform = `translateY(${height + delta}px)`
+    outgoingCanvas.style.opacity = `${Math.max(0.3, 1 - progress * 0.7)}`
+    incomingCanvas.style.opacity = `${Math.min(1, 0.3 + progress * 0.7)}`
   }
 
   const doCancel = async () => {
     const height = getHeight()
     const duration = 0.25
     const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1), opacity ${duration}s ease`
-    canvasA.style.transition = transition
-    canvasB.style.transition = transition
+    outgoingCanvas.style.transition = transition
+    incomingCanvas.style.transition = transition
 
-    canvasA.style.transform = 'translateY(0)'
-    canvasB.style.transform = `translateY(${height}px)`
-    canvasA.style.opacity = '1'
-    canvasB.style.opacity = '1'
+    outgoingCanvas.style.transform = 'translateY(0)'
+    incomingCanvas.style.transform = `translateY(${height}px)`
+    outgoingCanvas.style.opacity = '1'
+    incomingCanvas.style.opacity = '1'
 
     await Promise.all([
-      waitForTransitionEnd(canvasA),
-      waitForTransitionEnd(canvasB),
+      waitForTransitionEnd(outgoingCanvas),
+      waitForTransitionEnd(incomingCanvas),
     ])
-    canvasA.style.transition = 'none'
-    canvasB.style.transition = 'none'
+    outgoingCanvas.style.transition = 'none'
+    incomingCanvas.style.transition = 'none'
     onCancel()
   }
 
@@ -240,9 +240,9 @@ function setupDualCanvasSwipe(
 
     const duration = shouldCommit ? 0.35 : 0.25
     const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1), opacity ${duration}s ease`
-    canvasA.style.transition = transition
-    canvasB.style.transition = transition
-    void canvasA.offsetWidth
+    outgoingCanvas.style.transition = transition
+    incomingCanvas.style.transition = transition
+    void outgoingCanvas.offsetWidth
 
     isTransitioning = true
 
@@ -254,18 +254,18 @@ function setupDualCanvasSwipe(
       onPrepareNextCanvas?.()
 
       // Run the transition
-      canvasA.style.transform = `translateY(-${height}px)`
-      canvasB.style.transform = 'translateY(0)'
-      canvasA.style.opacity = '0'
-      canvasB.style.opacity = '1'
+      outgoingCanvas.style.transform = `translateY(-${height}px)`
+      incomingCanvas.style.transform = 'translateY(0)'
+      outgoingCanvas.style.opacity = '0'
+      incomingCanvas.style.opacity = '1'
 
       await Promise.all([
-        waitForTransitionEnd(canvasA),
-        waitForTransitionEnd(canvasB),
+        waitForTransitionEnd(outgoingCanvas),
+        waitForTransitionEnd(incomingCanvas),
       ])
 
-      canvasA.style.transition = 'none'
-      canvasB.style.transition = 'none'
+      outgoingCanvas.style.transition = 'none'
+      incomingCanvas.style.transition = 'none'
 
       // Swap ownership/content after animation
       onCommit()
@@ -443,7 +443,12 @@ function saveRunStatistics(
 }
 
 // --- Reload Button ----------------------------------------------------------
-function createReloadButton(parent: HTMLElement, onReload: () => void) {
+function createReloadButton(
+  parent: HTMLElement,
+  onReload: () => void,
+  visibleCanvas: HTMLCanvasElement,
+  hiddenCanvas: HTMLCanvasElement,
+) {
   const btn = document.createElement('button')
   btn.setAttribute('data-swipe-ignore', 'true')
   btn.style.touchAction = 'manipulation' // avoids 300ms delay on iOS
@@ -455,6 +460,7 @@ function createReloadButton(parent: HTMLElement, onReload: () => void) {
     </svg>`
   btn.className =
     'absolute bottom-4 right-4 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition z-10'
+  btn.title = 'Reload simulation'
 
   // Swallow events so they don't reach the wrapper
   const swallow = (e: Event) => e.stopPropagation()
@@ -462,24 +468,38 @@ function createReloadButton(parent: HTMLElement, onReload: () => void) {
   btn.addEventListener('pointerup', swallow)
   btn.addEventListener('mousedown', swallow)
   btn.addEventListener('mouseup', swallow)
-
-  // Also swallow touch* (with passive:true where allowed)
   btn.addEventListener('touchstart', swallow, { passive: true })
   btn.addEventListener('touchmove', swallow, { passive: true })
   btn.addEventListener('touchend', swallow, { passive: true })
   btn.addEventListener('touchcancel', swallow, { passive: true })
 
-  btn.title = 'Reload simulation'
   btn.addEventListener('click', (e) => {
     e.stopPropagation()
+    if (isTransitioning) return
+    isTransitioning = true
+
     onReload()
-    btn.style.transition = 'transform 0.4s ease'
-    btn.style.transform = 'rotate(360deg)'
+
+    // Hide the off-screen canvas during animation to prevent visual glitches
+    const prevVis = hiddenCanvas.style.visibility
+    hiddenCanvas.style.visibility = 'hidden'
+
+    const cleanup = () => {
+      visibleCanvas.style.transition = ''
+      visibleCanvas.removeEventListener('transitionend', cleanup)
+      hiddenCanvas.style.visibility = prevVis || ''
+      isTransitioning = false
+    }
+
+    visibleCanvas.addEventListener('transitionend', cleanup)
+    void visibleCanvas.offsetWidth // force layout
+    visibleCanvas.style.transition = 'transform 0.15s ease'
+    visibleCanvas.style.transform = 'scale(0.96)'
     setTimeout(() => {
-      btn.style.transform = ''
-    }, 400)
+      visibleCanvas.style.transform = 'scale(1)'
+    }, 15)
   })
-  btn.style.willChange = 'transform'
+
   parent.appendChild(btn)
   return btn
 }
@@ -507,23 +527,29 @@ export async function setupMobileLayout(
   wrapper.style.width = `${size}px`
   wrapper.style.height = `${size}px`
 
-  const canvasA = document.createElement('canvas')
-  const canvasB = document.createElement('canvas')
-  for (const c of [canvasA, canvasB]) {
+  // Create both canvases with semantic initial roles
+  const createCanvas = () => {
+    const c = document.createElement('canvas')
     c.width = size
     c.height = size
     c.className = 'absolute inset-0 rounded-lg touch-none'
     c.style.width = `${size}px`
     c.style.height = `${size}px`
     c.style.willChange = 'transform, opacity'
+    return c
   }
-  canvasA.style.zIndex = '2'
-  canvasB.style.zIndex = '1'
-  canvasB.style.transform = `translateY(${size}px)`
-  canvasB.style.pointerEvents = 'none'
-  wrapper.appendChild(canvasA)
-  wrapper.appendChild(canvasB)
 
+  let onScreenCanvas = createCanvas()
+  let offScreenCanvas = createCanvas()
+
+  onScreenCanvas.style.zIndex = '2'
+  onScreenCanvas.style.pointerEvents = 'auto'
+  offScreenCanvas.style.zIndex = '1'
+  offScreenCanvas.style.pointerEvents = 'none'
+  offScreenCanvas.style.transform = `translateY(${size}px)`
+
+  wrapper.appendChild(onScreenCanvas)
+  wrapper.appendChild(offScreenCanvas)
   container.appendChild(wrapper)
 
   // Instruction
@@ -559,23 +585,22 @@ export async function setupMobileLayout(
 
   wrapper.style.width = `${screenWidth}px`
   wrapper.style.height = `${screenHeight}px`
-  for (const c of [canvasA, canvasB]) {
-    c.width = screenWidth
-    c.height = screenHeight
-    c.style.width = `${screenWidth}px`
-    c.style.height = `${screenHeight}px`
+
+  for (const canvas of [onScreenCanvas, offScreenCanvas]) {
+    canvas.width = screenWidth
+    canvas.height = screenHeight
+    canvas.style.width = `${screenWidth}px`
+    canvas.style.height = `${screenHeight}px`
   }
 
-  // Track which canvas/CA is currently visible
-  let onScreenCanvas = canvasA
-  let offScreenCanvas = canvasB
-  let onScreenCA = new CellularAutomata(canvasA, {
+  // Create cellular automata instances
+  let onScreenCA = new CellularAutomata(onScreenCanvas, {
     gridRows,
     gridCols,
     fgColor: palette[colorIndex],
     bgColor,
   })
-  let offScreenCA = new CellularAutomata(canvasB, {
+  let offScreenCA = new CellularAutomata(offScreenCanvas, {
     gridRows,
     gridCols,
     fgColor: palette[(colorIndex + 1) % palette.length],
@@ -604,40 +629,18 @@ export async function setupMobileLayout(
     requestedStepsPerSecond: STEPS_PER_SECOND,
   })
 
-  let reload = createReloadButton(wrapper, () => {
-    if (isTransitioning) return
-    isTransitioning = true
-
-    loadRule(onScreenCA, onScreenRule, lookup)
-
-    const frontCanvas = onScreenCanvas
-    const backCanvas = offScreenCanvas
-
-    const prevVis = backCanvas.style.visibility
-    backCanvas.style.visibility = 'hidden'
-
-    const cleanup = () => {
-      frontCanvas.style.transition = ''
-      frontCanvas.removeEventListener('transitionend', cleanup)
-      backCanvas.style.visibility = prevVis || ''
-      isTransitioning = false
-    }
-
-    frontCanvas.addEventListener('transitionend', cleanup)
-
-    void frontCanvas.offsetWidth // force layout
-    frontCanvas.style.transition = 'transform 0.15s ease'
-    frontCanvas.style.transform = 'scale(0.96)'
-    setTimeout(() => {
-      frontCanvas.style.transform = 'scale(1)'
-    }, 15)
-  })
+  let reload = createReloadButton(
+    wrapper,
+    () => loadRule(onScreenCA, onScreenRule, lookup),
+    onScreenCanvas,
+    offScreenCanvas,
+  )
 
   let hasSwipedOnce = false
   const cleanupSwipe = setupDualCanvasSwipe(
     wrapper,
-    canvasA,
-    canvasB,
+    onScreenCanvas,
+    offScreenCanvas,
     // --- onCommit -------------------------------------------------------------
     () => {
       if (!hasSwipedOnce) {
@@ -674,22 +677,14 @@ export async function setupMobileLayout(
       offScreenCA.setColors(nextCol, bgColor)
       onScreenCA.resetZoom()
 
+      // Recreate reload button with updated canvas references
       reload.remove()
-      reload = createReloadButton(wrapper, () => {
-        loadRule(onScreenCA, onScreenRule, lookup)
-
-        const cleanup = () => {
-          onScreenCanvas.style.transition = ''
-          onScreenCanvas.removeEventListener('transitionend', cleanup)
-        }
-
-        onScreenCanvas.addEventListener('transitionend', cleanup)
-        onScreenCanvas.style.transition = 'transform 0.15s ease'
-        onScreenCanvas.style.transform = 'scale(0.96)'
-        setTimeout(() => {
-          onScreenCanvas.style.transform = 'scale(1)'
-        }, 150)
-      })
+      reload = createReloadButton(
+        wrapper,
+        () => loadRule(onScreenCA, onScreenRule, lookup),
+        onScreenCanvas,
+        offScreenCanvas,
+      )
 
       console.log(`Switched to: ${onScreenRule.name}`)
     },
@@ -707,12 +702,12 @@ export async function setupMobileLayout(
   )
 
   // Conditionally setup zoom and pan based on feature flag
-  let cleanupZoomA: CleanupFunction = () => {}
-  let cleanupZoomB: CleanupFunction = () => {}
+  let cleanupZoomOnScreen: CleanupFunction = () => {}
+  let cleanupZoomOffScreen: CleanupFunction = () => {}
 
   if (ENABLE_ZOOM_AND_PAN) {
-    cleanupZoomA = setupPinchZoomAndPan(canvasA, onScreenCA)
-    cleanupZoomB = setupPinchZoomAndPan(canvasB, offScreenCA)
+    cleanupZoomOnScreen = setupPinchZoomAndPan(onScreenCanvas, onScreenCA)
+    cleanupZoomOffScreen = setupPinchZoomAndPan(offScreenCanvas, offScreenCA)
   }
 
   const handleResize = () => {
@@ -724,9 +719,11 @@ export async function setupMobileLayout(
     wrapper.style.width = `${screenWidth}px`
     wrapper.style.height = `${screenHeight}px`
 
-    for (const c of [canvasA, canvasB]) {
-      c.style.width = `${screenWidth}px`
-      c.style.height = `${screenHeight}px`
+    for (const canvas of [onScreenCanvas, offScreenCanvas]) {
+      canvas.width = screenWidth
+      canvas.height = screenHeight
+      canvas.style.width = `${screenWidth}px`
+      canvas.style.height = `${screenHeight}px`
     }
 
     onScreenCA.pause()
@@ -752,8 +749,8 @@ export async function setupMobileLayout(
     onScreenCA.pause()
     offScreenCA.pause()
     cleanupSwipe()
-    cleanupZoomA()
-    cleanupZoomB()
+    cleanupZoomOnScreen()
+    cleanupZoomOffScreen()
     cleanupHeader()
     window.removeEventListener('resize', handleResize)
   }
