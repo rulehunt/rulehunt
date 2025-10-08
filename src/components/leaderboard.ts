@@ -59,6 +59,11 @@ export function createLeaderboardPanel(): {
     </div>
   `
 
+  const selectEl = root.querySelector('#sort-mode')
+  if (!(selectEl instanceof HTMLSelectElement)) {
+    throw new Error('Missing #sort-mode <select> element')
+  }
+
   const elements: LeaderboardElements = {
     tableBody: root.querySelector(
       '#leaderboard-body',
@@ -66,7 +71,7 @@ export function createLeaderboardPanel(): {
     refreshButton: root.querySelector(
       '#refresh-leaderboard',
     ) as HTMLButtonElement,
-    sortSelect: root.querySelector('#sort-mode') as HTMLSelectElement,
+    sortSelect: selectEl,
   }
 
   let currentSort: SortMode = 'longest'
