@@ -10,18 +10,15 @@ import {
   makeC4Ruleset,
   randomC4RulesetByDensity,
 } from '../utils.ts'
-import {
-  createMobileHeader,
-  setupMobileHeader,
-} from './mobileHeader.ts'
+import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
 // --- Types -----------------------------------------------------------------
 export type CleanupFunction = () => void
 
 interface SwipeHandler {
-  onSwipeStart: () => void
-  onSwipeAbandoned: () => void
-  onSwipeUp: () => void
+  onSwipeStart: (e: TouchEvent) => void
+  onSwipeAbandoned: (e: TouchEvent) => void
+  onSwipeUp: (e: TouchEvent) => void
 }
 
 // --- Color Palettes --------------------------------------------------------
@@ -60,14 +57,12 @@ function setupSwipeDetection(
   let touchStartTime = 0
 
   const handleTouchStart = (e: TouchEvent) => {
-    if (e.touches.length !== 1) return // Only respond to single finger
     touchStartY = e.touches[0].clientY
     touchStartTime = Date.now()
-    handler.onSwipeStart() // Pause simulation when touch starts
+    handler.onSwipeStart(e) // Pause simulation when touch starts
   }
 
   const handleTouchEnd = (e: TouchEvent) => {
-    if (e.touches.length !== 1) return // Only respond to single finger
     const touchEndY = e.changedTouches[0].clientY
     const touchEndTime = Date.now()
 
@@ -77,10 +72,10 @@ function setupSwipeDetection(
 
     // Swipe up: positive deltaY, sufficient distance and velocity
     if (deltaY > 50 && velocity > 0.3) {
-      handler.onSwipeUp()
+      handler.onSwipeUp(e)
     } else {
       // Not a valid swipe - resume simulation
-      handler.onSwipeAbandoned()
+      handler.onSwipeAbandoned(e)
     }
   }
 
@@ -96,51 +91,70 @@ function setupSwipeDetection(
 // --- Pinch-to-Zoom ----------------------------------------------------------
 function setupPinchZoom(
   canvas: HTMLCanvasElement,
-  onZoom: (scale: number, centerX: number, centerY: number) => void,
+  cellularAutomata: CellularAutomata,
 ): CleanupFunction {
   let initialDistance = 0
-  let currentScale = 1
+  let initialZoom = 1
+
+  const handleTouchStart = (e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      const [t1, t2] = e.touches
+      const dx = t1.clientX - t2.clientX
+      const dy = t1.clientY - t2.clientY
+      initialDistance = Math.sqrt(dx * dx + dy * dy)
+      initialZoom = cellularAutomata.getZoom()
+    }
+  }
 
   const handleTouchMove = (e: TouchEvent) => {
     if (e.touches.length === 2) {
+      e.preventDefault() // Prevent page zoom
+
       const [t1, t2] = e.touches
       const dx = t1.clientX - t2.clientX
       const dy = t1.clientY - t2.clientY
       const distance = Math.sqrt(dx * dx + dy * dy)
 
-      // Midpoint between fingers
-      const centerX = (t1.clientX + t2.clientX) / 2
-      const centerY = (t1.clientY + t2.clientY) / 2
-
       if (!initialDistance) {
         initialDistance = distance
+        initialZoom = cellularAutomata.getZoom()
         return
       }
 
       const scaleChange = distance / initialDistance
-      const newScale = Math.min(Math.max(currentScale * scaleChange, 0.5), 3)
-      onZoom(newScale, centerX, centerY)
+      const newZoom = initialZoom * scaleChange
+
+      // Get canvas-relative coordinates of pinch center
+      const rect = canvas.getBoundingClientRect()
+      const centerX =
+        ((t1.clientX + t2.clientX) / 2 - rect.left) *
+        (canvas.width / rect.width)
+      const centerY =
+        ((t1.clientY + t2.clientY) / 2 - rect.top) *
+        (canvas.height / rect.height)
+
+      cellularAutomata.setZoom(newZoom, centerX, centerY)
     }
   }
 
   const handleTouchEnd = (e: TouchEvent) => {
     if (e.touches.length < 2) {
-      currentScale = Math.min(Math.max(currentScale, 0.5), 3)
       initialDistance = 0
     }
   }
 
-  canvas.addEventListener('touchmove', handleTouchMove)
-  canvas.addEventListener('touchend', handleTouchEnd)
-  canvas.addEventListener('touchcancel', handleTouchEnd)
+  canvas.addEventListener('touchstart', handleTouchStart, { passive: true })
+  canvas.addEventListener('touchmove', handleTouchMove, { passive: false })
+  canvas.addEventListener('touchend', handleTouchEnd, { passive: true })
+  canvas.addEventListener('touchcancel', handleTouchEnd, { passive: true })
 
   return () => {
+    canvas.removeEventListener('touchstart', handleTouchStart)
     canvas.removeEventListener('touchmove', handleTouchMove)
     canvas.removeEventListener('touchend', handleTouchEnd)
     canvas.removeEventListener('touchcancel', handleTouchEnd)
   }
 }
-
 // --- Mobile Layout ----------------------------------------------------------
 export async function setupMobileLayout(
   appRoot: HTMLDivElement,
@@ -257,18 +271,18 @@ export async function setupMobileLayout(
 
   // --- Swipe Handler --------------------------------------------------------
   const cleanupSwipe = setupSwipeDetection(container, {
-    onSwipeStart: () => {
-      // Pause simulation when user starts touching
+    onSwipeStart: (e: TouchEvent) => {
+      // Pause simulation if user starts touch with a single finger
+      if (e.touches.length !== 1) return
       cellularAutomata.pause()
     },
 
-    onSwipeAbandoned: () => {
-      // Resume simulation if swipe wasn't completed
+    onSwipeAbandoned: (e: TouchEvent) => {
       const newExpanded = expandC4Ruleset(currentRuleset, orbitLookup)
       cellularAutomata.play(stepsPerSecond, newExpanded)
     },
 
-    onSwipeUp: () => {
+    onSwipeUp: (_: TouchEvent) => {
       // Simulation is already paused from onSwipeStart
 
       // Hide instruction after first swipe
@@ -377,9 +391,7 @@ export async function setupMobileLayout(
         )
 
         // Reset zoom when switching rules
-        zoomScale = 1
-        canvas.style.transform = 'scale(1)'
-        canvas.style.transformOrigin = 'center center'
+        cellularAutomata.resetZoom()
 
         // Reset position (slide in from bottom)
         canvasWrapper.style.transition = 'none'
@@ -399,17 +411,7 @@ export async function setupMobileLayout(
   })
 
   // --- Pinch Zoom Handler ---------------------------------------------------
-  let zoomScale = 1
-  const cleanupZoom = setupPinchZoom(canvas, (scale, cx, cy) => {
-    zoomScale = scale
-    const rect = canvas.getBoundingClientRect()
-    const offsetX = cx - rect.left - rect.width / 2
-    const offsetY = cy - rect.top - rect.height / 2
-    canvas.style.transformOrigin = `${50 + (offsetX / rect.width) * 100}% ${
-      50 + (offsetY / rect.height) * 100
-    }%`
-    canvas.style.transform = `scale(${zoomScale})`
-  })
+  const cleanupZoom = setupPinchZoom(canvas, cellularAutomata)
 
   // --- Resize Handling ------------------------------------------------------
   const resizeHandler = () => {

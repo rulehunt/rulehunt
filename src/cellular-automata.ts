@@ -1,7 +1,9 @@
 import type { Ruleset } from './schema.ts'
 import { StatisticsTracker } from './statistics.ts'
 
-const GRID_SIZE = 300
+const GRID_ROWS = 300
+const GRID_COLS = 300
+const GRID_AREA = GRID_ROWS * GRID_COLS
 
 export class CellularAutomata {
   private grid: Uint8Array
@@ -13,14 +15,19 @@ export class CellularAutomata {
   private playInterval: number | null = null
   private statistics: StatisticsTracker
 
+  // Add zoom and pan state
+  private zoom = 1
+  private panX = 0
+  private panY = 0
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d') as CanvasRenderingContext2D
-    this.cellSize = canvas.width / GRID_SIZE
+    this.cellSize = canvas.width / GRID_COLS
 
-    this.grid = new Uint8Array(GRID_SIZE * GRID_SIZE)
-    this.nextGrid = new Uint8Array(GRID_SIZE * GRID_SIZE)
-    this.statistics = new StatisticsTracker(GRID_SIZE)
+    this.grid = new Uint8Array(GRID_AREA)
+    this.nextGrid = new Uint8Array(GRID_AREA)
+    this.statistics = new StatisticsTracker(GRID_COLS)
 
     this.randomSeed()
     this.render()
@@ -34,9 +41,9 @@ export class CellularAutomata {
     }
 
     // Set only the center cell to alive
-    const centerX = Math.floor(GRID_SIZE / 2)
-    const centerY = Math.floor(GRID_SIZE / 2)
-    this.grid[centerY * GRID_SIZE + centerX] = 1
+    const centerX = Math.floor(GRID_COLS / 2)
+    const centerY = Math.floor(GRID_ROWS / 2)
+    this.grid[centerY * GRID_COLS + centerX] = 1
 
     this.statistics.reset()
     this.statistics.recordStep(this.grid)
@@ -60,8 +67,8 @@ export class CellularAutomata {
 
     // Fill a 10x10 patch in the center with random noise
     const threshold = alivePercentage / 100
-    const centerX = Math.floor(GRID_SIZE / 2)
-    const centerY = Math.floor(GRID_SIZE / 2)
+    const centerX = Math.floor(GRID_COLS / 2)
+    const centerY = Math.floor(GRID_ROWS / 2)
     const patchSize = 10
     const startX = centerX - Math.floor(patchSize / 2)
     const startY = centerY - Math.floor(patchSize / 2)
@@ -70,8 +77,8 @@ export class CellularAutomata {
       for (let dx = 0; dx < patchSize; dx++) {
         const x = startX + dx
         const y = startY + dy
-        if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-          this.grid[y * GRID_SIZE + x] = Math.random() < threshold ? 1 : 0
+        if (x >= 0 && x < GRID_COLS && y >= 0 && y < GRID_ROWS) {
+          this.grid[y * GRID_COLS + x] = Math.random() < threshold ? 1 : 0
         }
       }
     }
@@ -81,11 +88,11 @@ export class CellularAutomata {
   }
 
   step(ruleset: Ruleset) {
-    for (let y = 0; y < GRID_SIZE; y++) {
-      for (let x = 0; x < GRID_SIZE; x++) {
+    for (let y = 0; y < GRID_ROWS; y++) {
+      for (let x = 0; x < GRID_COLS; x++) {
         const pattern = this.get3x3Pattern(x, y)
         const index = this.patternToIndex(pattern)
-        this.nextGrid[y * GRID_SIZE + x] = ruleset[index]
+        this.nextGrid[y * GRID_COLS + x] = ruleset[index]
       }
     }
 
@@ -105,9 +112,9 @@ export class CellularAutomata {
       const row: number[] = []
       for (let dx = -1; dx <= 1; dx++) {
         // Torus topology: wrap around edges
-        const x = (centerX + dx + GRID_SIZE) % GRID_SIZE
-        const y = (centerY + dy + GRID_SIZE) % GRID_SIZE
-        row.push(this.grid[y * GRID_SIZE + x])
+        const x = (centerX + dx + GRID_COLS) % GRID_COLS
+        const y = (centerY + dy + GRID_ROWS) % GRID_ROWS
+        row.push(this.grid[y * GRID_COLS + x])
       }
       pattern.push(row)
     }
@@ -133,21 +140,56 @@ export class CellularAutomata {
     return index
   }
 
+  // Add methods to control zoom and pan
+  setZoom(zoom: number, centerX: number, centerY: number) {
+    const oldZoom = this.zoom
+    this.zoom = Math.max(0.5, Math.min(3, zoom))
+
+    // Adjust pan to zoom towards the center point
+    const zoomChange = this.zoom / oldZoom
+    this.panX = centerX - (centerX - this.panX) * zoomChange
+    this.panY = centerY - (centerY - this.panY) * zoomChange
+
+    this.render()
+  }
+
+  resetZoom() {
+    this.zoom = 1
+    this.panX = 0
+    this.panY = 0
+    this.render()
+  }
+
+  getZoom(): number {
+    return this.zoom
+  }
+
   render() {
+    const ctx = this.ctx
+
+    // Save the context state
+    ctx.save()
+
     // Get colors from CSS variables
     const styles = getComputedStyle(document.documentElement)
     const bgColor = styles.getPropertyValue('--canvas-bg').trim()
     const fgColor = styles.getPropertyValue('--canvas-fg').trim()
 
-    this.ctx.fillStyle = bgColor
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
+    // Clear the canvas
+    ctx.fillStyle = bgColor
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
 
-    this.ctx.fillStyle = fgColor
+    // Apply zoom and pan transformations
+    ctx.translate(this.panX, this.panY)
+    ctx.scale(this.zoom, this.zoom)
 
-    for (let y = 0; y < GRID_SIZE; y++) {
-      for (let x = 0; x < GRID_SIZE; x++) {
-        if (this.grid[y * GRID_SIZE + x]) {
-          this.ctx.fillRect(
+    // Draw cells
+    ctx.fillStyle = fgColor
+
+    for (let y = 0; y < GRID_ROWS; y++) {
+      for (let x = 0; x < GRID_COLS; x++) {
+        if (this.grid[y * GRID_COLS + x]) {
+          ctx.fillRect(
             x * this.cellSize,
             y * this.cellSize,
             this.cellSize,
@@ -156,6 +198,9 @@ export class CellularAutomata {
         }
       }
     }
+
+    // Restore the context state
+    ctx.restore()
   }
 
   play(stepsPerSecond: number, ruleset: Ruleset) {
