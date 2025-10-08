@@ -1,7 +1,8 @@
+// src/components/mobile.ts
 import { saveRun } from '../api/save'
 import { CellularAutomata } from '../cellular-automata.ts'
 import { getUserIdentity } from '../identity.ts'
-import type { C4OrbitsData, RunSubmission } from '../schema.ts'
+import type { C4OrbitsData, Ruleset, RunSubmission } from '../schema.ts'
 import {
   buildOrbitLookup,
   c4RulesetToHex,
@@ -12,19 +13,12 @@ import {
 } from '../utils.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
-// avoid strobing
-const FORCE_RULE_ZERO_OFF = true
+// --- Constants --------------------------------------------------------------
+const FORCE_RULE_ZERO_OFF = true // avoid strobing
+const STEPS_PER_SECOND = 10
+const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.25
+const SWIPE_COMMIT_MIN_DISTANCE = 80
 
-// --- Types -----------------------------------------------------------------
-export type CleanupFunction = () => void
-
-interface SwipeHandler {
-  onSwipeStart: (e: TouchEvent) => void
-  onSwipeAbandoned: (e: TouchEvent) => void
-  onSwipeUp: (e: TouchEvent) => void
-}
-
-// --- Color Palettes --------------------------------------------------------
 const LIGHT_FG_COLORS = [
   '#2563eb', // blue-600
   '#dc2626', // red-600
@@ -37,7 +31,6 @@ const LIGHT_FG_COLORS = [
   '#7c3aed', // violet-600
   '#0d9488', // teal-600
 ]
-
 const DARK_FG_COLORS = [
   '#60a5fa', // blue-400
   '#f87171', // red-400
@@ -51,50 +44,119 @@ const DARK_FG_COLORS = [
   '#2dd4bf', // teal-400
 ]
 
-// --- Swipe Detection --------------------------------------------------------
-function setupSwipeDetection(
-  element: HTMLElement,
-  handler: SwipeHandler,
+// --- Types ------------------------------------------------------------------
+export type CleanupFunction = () => void
+
+interface RuleData {
+  name: string
+  hex: string
+  ruleset: Ruleset
+}
+
+// --- Dual-Canvas Swipe Handler ----------------------------------------------
+function setupDualCanvasSwipe(
+  wrapper: HTMLElement,
+  canvasA: HTMLCanvasElement,
+  canvasB: HTMLCanvasElement,
+  palette: string[],
+  colorIndex: () => number,
+  onCommit: () => void,
+  onCancel: () => void,
+  onDragStart?: () => void,
 ): CleanupFunction {
-  let touchStartY = 0
-  let touchStartTime = 0
+  let startY = 0
+  let currentY = 0
+  let startT = 0
+  let dragging = false
+
+  const getHeight = () => wrapper.clientHeight
 
   const handleTouchStart = (e: TouchEvent) => {
-    touchStartY = e.touches[0].clientY
-    touchStartTime = Date.now()
-    handler.onSwipeStart(e) // Pause simulation when touch starts
+    if (e.touches.length !== 1) return
+    startY = e.touches[0].clientY
+    currentY = startY
+    startT = e.timeStamp
+    dragging = true
+
+    wrapper.style.transition = 'none'
+    canvasA.style.transition = 'none'
+    canvasB.style.transition = 'none'
+    onDragStart?.()
+  }
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (!dragging || e.touches.length !== 1) return
+    const y = e.touches[0].clientY
+    currentY = y
+    const delta = Math.min(0, y - startY)
+    const height = getHeight()
+    const progress = Math.abs(delta) / height
+
+    canvasA.style.transform = `translateY(${delta}px)`
+    canvasB.style.transform = `translateY(${height + delta}px)`
+
+    const opacityA = Math.max(0.3, 1 - progress * 0.7)
+    const opacityB = Math.min(1, 0.3 + progress * 0.7)
+    canvasA.style.opacity = `${opacityA}`
+    canvasB.style.opacity = `${opacityB}`
+
+    // Smoothly update next canvas border color during drag
+    const nextColorIndex = (colorIndex() + 1) % palette.length
+    canvasB.style.borderColor = palette[nextColorIndex]
   }
 
   const handleTouchEnd = (e: TouchEvent) => {
-    const touchEndY = e.changedTouches[0].clientY
-    const touchEndTime = Date.now()
+    if (!dragging) return
+    dragging = false
 
-    const deltaY = touchStartY - touchEndY
-    const deltaTime = touchEndTime - touchStartTime
-    const velocity = deltaY / deltaTime
+    const delta = currentY - startY
+    const height = getHeight()
+    const dragDistance = Math.abs(delta)
+    const dt = Math.max(1, e.timeStamp - startT)
+    const vy = delta / dt // px/ms, negative = upward
 
-    // Swipe up: positive deltaY, sufficient distance and velocity
-    if (deltaY > 50 && velocity > 0.3) {
-      handler.onSwipeUp(e)
+    const shouldCommit =
+      dragDistance > height * SWIPE_COMMIT_THRESHOLD_PERCENT ||
+      (dragDistance > SWIPE_COMMIT_MIN_DISTANCE && delta < -50) ||
+      vy < -0.7
+
+    const transitionDuration = shouldCommit ? '0.4s' : '0.3s'
+    const transition = `transform ${transitionDuration} cubic-bezier(0.4,0,0.2,1), opacity ${transitionDuration} ease`
+    canvasA.style.transition = transition
+    canvasB.style.transition = transition
+
+    if (shouldCommit) {
+      canvasA.style.transform = `translateY(-${height}px)`
+      canvasB.style.transform = 'translateY(0)'
+      canvasA.style.opacity = '0'
+      canvasB.style.opacity = '1'
+      setTimeout(onCommit, Number.parseFloat(transitionDuration) * 1000)
     } else {
-      // Not a valid swipe - resume simulation
-      handler.onSwipeAbandoned(e)
+      canvasA.style.transform = 'translateY(0)'
+      canvasB.style.transform = `translateY(${height}px)`
+      canvasA.style.opacity = '1'
+      canvasB.style.opacity = '1'
+      setTimeout(onCancel, Number.parseFloat(transitionDuration) * 1000)
     }
   }
 
-  element.addEventListener('touchstart', handleTouchStart)
-  element.addEventListener('touchend', handleTouchEnd)
+  wrapper.addEventListener('touchstart', handleTouchStart, { passive: true })
+  wrapper.addEventListener('touchmove', handleTouchMove, { passive: true })
+  wrapper.addEventListener('touchend', handleTouchEnd, { passive: true })
+  wrapper.addEventListener('touchcancel', handleTouchEnd, { passive: true })
 
   return () => {
-    element.removeEventListener('touchstart', handleTouchStart)
-    element.removeEventListener('touchend', handleTouchEnd)
+    wrapper.removeEventListener('touchstart', handleTouchStart)
+    wrapper.removeEventListener('touchmove', handleTouchMove)
+    wrapper.removeEventListener('touchend', handleTouchEnd)
+    wrapper.removeEventListener('touchcancel', handleTouchEnd)
   }
 }
 
-// --- Pinch-to-Zoom and Pan --------------------------------------------------
+// --- Pinch Zoom & Pan -------------------------------------------------------
 function setupPinchZoomAndPan(
   canvas: HTMLCanvasElement,
-  cellularAutomata: CellularAutomata,
+  automata: CellularAutomata,
 ): CleanupFunction {
   let initialDistance = 0
   let initialZoom = 1
@@ -109,9 +171,8 @@ function setupPinchZoomAndPan(
       const dx = t1.clientX - t2.clientX
       const dy = t1.clientY - t2.clientY
       initialDistance = Math.sqrt(dx * dx + dy * dy)
-      initialZoom = cellularAutomata.getZoom()
+      initialZoom = automata.getZoom()
 
-      // Store initial midpoint and pan position
       const rect = canvas.getBoundingClientRect()
       lastMidX =
         ((t1.clientX + t2.clientX) / 2 - rect.left) *
@@ -119,60 +180,38 @@ function setupPinchZoomAndPan(
       lastMidY =
         ((t1.clientY + t2.clientY) / 2 - rect.top) *
         (canvas.height / rect.height)
-
-      const panState = cellularAutomata.getPan()
-      initialPanX = panState.x
-      initialPanY = panState.y
+      const pan = automata.getPan()
+      initialPanX = pan.x
+      initialPanY = pan.y
     }
   }
 
   const handleTouchMove = (e: TouchEvent) => {
     if (e.touches.length === 2) {
-      e.preventDefault() // Prevent page zoom
-
+      e.preventDefault()
       const [t1, t2] = e.touches
       const dx = t1.clientX - t2.clientX
       const dy = t1.clientY - t2.clientY
       const distance = Math.sqrt(dx * dx + dy * dy)
 
-      if (!initialDistance) {
-        initialDistance = distance
-        initialZoom = cellularAutomata.getZoom()
-        const rect = canvas.getBoundingClientRect()
-        lastMidX =
-          ((t1.clientX + t2.clientX) / 2 - rect.left) *
-          (canvas.width / rect.width)
-        lastMidY =
-          ((t1.clientY + t2.clientY) / 2 - rect.top) *
-          (canvas.height / rect.height)
-        const panState = cellularAutomata.getPan()
-        initialPanX = panState.x
-        initialPanY = panState.y
-        return
-      }
-
-      // Calculate zoom
+      if (!initialDistance) return
       const scaleChange = distance / initialDistance
       const newZoom = initialZoom * scaleChange
 
-      // Calculate current midpoint
       const rect = canvas.getBoundingClientRect()
-      const currentMidX =
+      const midX =
         ((t1.clientX + t2.clientX) / 2 - rect.left) *
         (canvas.width / rect.width)
-      const currentMidY =
+      const midY =
         ((t1.clientY + t2.clientY) / 2 - rect.top) *
         (canvas.height / rect.height)
+      const deltaX = midX - lastMidX
+      const deltaY = midY - lastMidY
 
-      // Calculate pan delta
-      const deltaX = currentMidX - lastMidX
-      const deltaY = currentMidY - lastMidY
-
-      // Apply both zoom and pan
-      cellularAutomata.setZoomAndPan(
+      automata.setZoomAndPan(
         newZoom,
-        currentMidX,
-        currentMidY,
+        midX,
+        midY,
         initialPanX + deltaX,
         initialPanY + deltaY,
       )
@@ -180,9 +219,7 @@ function setupPinchZoomAndPan(
   }
 
   const handleTouchEnd = (e: TouchEvent) => {
-    if (e.touches.length < 2) {
-      initialDistance = 0
-    }
+    if (e.touches.length < 2) initialDistance = 0
   }
 
   canvas.addEventListener('touchstart', handleTouchStart, { passive: true })
@@ -198,334 +235,310 @@ function setupPinchZoomAndPan(
   }
 }
 
-// --- Overlay Reload Button ---------------------------------------------------
-function createReloadButton(
-  canvas: HTMLCanvasElement,
-  onReload: () => void,
-): HTMLButtonElement {
-  const btn = document.createElement('button')
-  btn.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
-      <path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z" />
-    </svg>
-  `
-  btn.title = 'Reload simulation'
-  btn.className =
-    'absolute bottom-4 right-4 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition'
-  btn.style.zIndex = '10'
-  btn.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+// --- Helper: Rule generation and loading ------------------------------------
+function generateRandomRule(): RuleData {
+  const density = Math.random() * 0.6 + 0.2
+  const ruleset = randomC4RulesetByDensity(density, FORCE_RULE_ZERO_OFF)
+  return {
+    name: `Random (${Math.round(density * 100)}%)`,
+    hex: c4RulesetToHex(ruleset),
+    ruleset,
+  }
+}
 
-  const parent = canvas.parentElement
-  if (parent) {
-    parent.style.position = 'relative'
-    parent.appendChild(btn)
+function loadRule(
+  automata: CellularAutomata,
+  rule: RuleData,
+  orbitLookup: Uint8Array,
+  seedPercentage = 50,
+): void {
+  automata.pause()
+  automata.patchSeed(seedPercentage)
+  const expanded = expandC4Ruleset(rule.ruleset, orbitLookup)
+  automata.play(STEPS_PER_SECOND, expanded)
+}
+
+// --- Save run ---------------------------------------------------------------
+function saveRunStatistics(
+  automata: CellularAutomata,
+  ruleName: string,
+  ruleHex: string,
+): void {
+  const stats = automata.getStatistics()
+  const metadata = stats.getMetadata()
+  const recent = stats.getRecentStats(1)[0] ?? {
+    population: 0,
+    activity: 0,
+    populationChange: 0,
+    entropy2x2: 0,
+    entropy4x4: 0,
+    entropy8x8: 0,
   }
 
-  btn.addEventListener('click', () => {
-    onReload()
+  const payload: RunSubmission = {
+    userId: getUserIdentity().userId,
+    userLabel: getUserIdentity().userLabel,
+    rulesetName: ruleName,
+    rulesetHex: ruleHex,
+    seed: automata.getSeed(),
+    seedType: (metadata?.seedType ?? 'patch') as 'center' | 'random' | 'patch',
+    seedPercentage: metadata?.seedPercentage ?? 50,
+    stepCount: metadata?.stepCount ?? 0,
+    watchedSteps: metadata?.stepCount ?? 0,
+    watchedWallMs: stats.getElapsedTime(),
+    gridSize: undefined,
+    progress_bar_steps: undefined,
+    requestedSps: metadata?.requestedStepsPerSecond ?? STEPS_PER_SECOND,
+    actualSps: stats.getActualStepsPerSecond(),
+    population: recent.population,
+    activity: recent.activity,
+    populationChange: recent.populationChange,
+    entropy2x2: recent.entropy2x2,
+    entropy4x4: recent.entropy4x4,
+    entropy8x8: recent.entropy8x8,
+    interestScore: stats.calculateInterestScore(),
+    simVersion: 'v0.1.0',
+    engineCommit: undefined,
+    extraScores: undefined,
+  }
 
+  setTimeout(
+    () =>
+      saveRun(payload).then((r) =>
+        r.ok
+          ? console.log(`[saveRun] ✅ ${r.runHash}`)
+          : console.warn('[saveRun] ❌ failed'),
+      ),
+    0,
+  )
+}
+
+// --- Reload Button ----------------------------------------------------------
+function createReloadButton(parent: HTMLElement, onReload: () => void) {
+  const btn = document.createElement('button')
+  btn.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+         fill="currentColor" class="w-6 h-6">
+      <path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/>
+    </svg>`
+  btn.className =
+    'absolute bottom-4 right-4 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition z-10'
+  btn.title = 'Reload simulation'
+  btn.onclick = () => {
+    onReload()
     btn.style.transition = 'transform 0.4s ease'
     btn.style.transform = 'rotate(360deg)'
     setTimeout(() => {
       btn.style.transform = ''
     }, 400)
-  })
-
+  }
+  parent.appendChild(btn)
   return btn
 }
 
-// --- Mobile Layout ----------------------------------------------------------
+// --- Main -------------------------------------------------------------------
 export async function setupMobileLayout(
   appRoot: HTMLDivElement,
 ): Promise<CleanupFunction> {
-  const eventListeners: Array<{
-    element: EventTarget
-    event: string
-    handler: EventListenerOrEventListenerObject
-  }> = []
-
-  const addEventListener = <K extends keyof HTMLElementEventMap>(
-    element: EventTarget,
-    event: K | string,
-    handler:
-      | EventListenerOrEventListenerObject
-      | ((evt: HTMLElementEventMap[K]) => void),
-  ) => {
-    element.addEventListener(
-      event as string,
-      handler as EventListenerOrEventListenerObject,
-    )
-    eventListeners.push({
-      element,
-      event: event as string,
-      handler: handler as EventListenerOrEventListenerObject,
-    })
-  }
-
-  // --- UI Setup -------------------------------------------------------------
   const container = document.createElement('div')
   container.className =
     'fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 overflow-hidden'
 
-  // Add mobile header
   const { root: headerRoot, elements: headerElements } = createMobileHeader()
   const cleanupHeader = setupMobileHeader(headerElements)
   container.appendChild(headerRoot)
 
-  // Canvas wrapper for swipe animation
-  const canvasWrapper = document.createElement('div')
-  canvasWrapper.className = 'relative'
-  canvasWrapper.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
-
-  const canvas = document.createElement('canvas')
-  canvas.className = 'touch-none transition-transform duration-75 ease-out'
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  const palette = isDark ? DARK_FG_COLORS : LIGHT_FG_COLORS
+  let colorIndex = Math.floor(Math.random() * palette.length)
 
   const size = Math.min(window.innerWidth, window.innerHeight)
-  canvas.width = size
-  canvas.height = size
-  canvas.style.width = `${size}px`
-  canvas.style.height = `${size}px`
-  canvas.style.transformOrigin = 'center center'
+  const wrapper = document.createElement('div')
+  wrapper.className = 'relative overflow-hidden'
+  wrapper.style.width = `${size}px`
+  wrapper.style.height = `${size}px`
 
-  // Detect theme and set initial color
-  const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
-  const colorPalette = isDarkMode ? DARK_FG_COLORS : LIGHT_FG_COLORS
-  let currentColorIndex = Math.floor(Math.random() * colorPalette.length)
-  canvas.style.border = `4px solid ${colorPalette[currentColorIndex]}`
-  canvas.style.borderRadius = '8px'
+  let canvasA = document.createElement('canvas')
+  let canvasB = document.createElement('canvas')
+  for (const c of [canvasA, canvasB]) {
+    c.width = size
+    c.height = size
+    c.className = 'absolute inset-0 rounded-lg border-4 touch-none'
+    c.style.borderColor = palette[colorIndex]
+    // Add smooth border color transition
+    c.style.transition = 'border-color 0.5s ease'
+  }
+  canvasA.style.zIndex = '2'
+  canvasB.style.zIndex = '1'
+  canvasB.style.transform = `translateY(${size}px)`
+  canvasB.style.pointerEvents = 'none'
+  // Set initial next color
+  canvasB.style.borderColor = palette[(colorIndex + 1) % palette.length]
+  wrapper.appendChild(canvasA)
+  wrapper.appendChild(canvasB)
 
-  document.documentElement.style.setProperty(
-    '--canvas-fg',
-    colorPalette[currentColorIndex],
-  )
+  container.appendChild(wrapper)
+  document.documentElement.style.setProperty('--canvas-fg', palette[colorIndex])
 
-  canvasWrapper.appendChild(canvas)
-  container.appendChild(canvasWrapper)
-
-  // Instruction overlay
+  // Instruction
   const instruction = document.createElement('div')
   instruction.className =
     'fixed bottom-8 left-0 right-0 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none transition-opacity duration-300'
   instruction.style.opacity = '0.7'
-  instruction.innerHTML = `
-    <div class="flex flex-col items-center gap-2">
+  instruction.innerHTML = `<div class="flex flex-col items-center gap-2">
       <svg class="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-      </svg>
-      <span>Swipe up for new rule</span>
-    </div>
-  `
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+      </svg><span>Swipe up for new rule</span></div>`
   container.appendChild(instruction)
   appRoot.appendChild(container)
 
-  // Track if user has swiped
-  let hasSwipedOnce = false
+  const res = await fetch('./resources/c4-orbits.json')
+  const orbits: C4OrbitsData = await res.json()
+  const lookup = buildOrbitLookup(orbits)
 
-  // --- Simulation Setup -----------------------------------------------------
-  const response = await fetch('./resources/c4-orbits.json')
-  const orbitsData: C4OrbitsData = await response.json()
-  const orbitLookup = buildOrbitLookup(orbitsData)
-  console.log(`Loaded ${orbitsData.orbits.length} C4 orbits`)
+  let currentCA = new CellularAutomata(canvasA)
+  let nextCA = new CellularAutomata(canvasB)
 
-  const cellularAutomata = new CellularAutomata(canvas)
-  const stepsPerSecond = 10
+  const conway = makeC4Ruleset(conwayRule, lookup)
+  let currentRule: RuleData = {
+    name: "Conway's Game of Life",
+    hex: c4RulesetToHex(conway),
+    ruleset: conway,
+  }
+  let nextRule = generateRandomRule()
 
-  let currentRuleset = makeC4Ruleset(conwayRule, orbitLookup)
-  let currentRuleName = "Conway's Game of Life"
+  loadRule(currentCA, currentRule, lookup)
+  loadRule(nextCA, nextRule, lookup)
 
-  cellularAutomata.patchSeed(50)
-  const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
-  cellularAutomata.play(stepsPerSecond, expanded)
+  currentCA.getStatistics().initializeSimulation({
+    name: `Mobile - ${currentRule.name}`,
+    seedType: 'patch',
+    seedPercentage: 50,
+    rulesetName: currentRule.name,
+    rulesetHex: currentRule.hex,
+    startTime: Date.now(),
+    requestedStepsPerSecond: STEPS_PER_SECOND,
+  })
 
-  // --- Reload Button --------------------------------------------------------
-  createReloadButton(canvas, () => {
-    cellularAutomata.pause()
-    cellularAutomata.softReset()
-    const expandedRuleset = expandC4Ruleset(currentRuleset, orbitLookup)
-    cellularAutomata.play(stepsPerSecond, expandedRuleset)
-
-    // Pulse animation feedback
-    canvas.style.transition = 'transform 0.15s ease'
-    canvas.style.transform = 'scale(0.96)'
+  let reload = createReloadButton(wrapper, () => {
+    loadRule(currentCA, currentRule, lookup)
+    canvasA.style.transition = 'transform 0.15s ease'
+    canvasA.style.transform = 'scale(0.96)'
     setTimeout(() => {
-      canvas.style.transform = 'scale(1)'
+      canvasA.style.transform = 'scale(1)'
+      // Restore border color transition after scale animation
+
+      requestAnimationFrame(() => {
+        canvasA.style.transition = 'border-color 0.5s ease'
+      })
     }, 150)
   })
 
-  const stats = cellularAutomata.getStatistics()
-  stats.initializeSimulation({
-    name: `Mobile - ${currentRuleName}`,
-    seedType: 'patch',
-    seedPercentage: 50,
-    rulesetName: currentRuleName,
-    rulesetHex: c4RulesetToHex(currentRuleset),
-    startTime: Date.now(),
-    requestedStepsPerSecond: stepsPerSecond,
-  })
-
-  // --- Swipe Handler --------------------------------------------------------
-  const cleanupSwipe = setupSwipeDetection(container, {
-    onSwipeStart: (e: TouchEvent) => {
-      // Pause simulation if user starts touch with a single finger
-      if (e.touches.length !== 1) return
-      cellularAutomata.pause()
-    },
-
-    onSwipeAbandoned: (_: TouchEvent) => {
-      const newExpanded = expandC4Ruleset(currentRuleset, orbitLookup)
-      cellularAutomata.play(stepsPerSecond, newExpanded)
-    },
-
-    onSwipeUp: (_: TouchEvent) => {
-      // Simulation is already paused from onSwipeStart
-
-      // Hide instruction after first swipe
+  let hasSwipedOnce = false
+  const cleanupSwipe = setupDualCanvasSwipe(
+    wrapper,
+    canvasA,
+    canvasB,
+    palette,
+    () => colorIndex,
+    () => {
       if (!hasSwipedOnce) {
         hasSwipedOnce = true
         instruction.style.opacity = '0'
+        setTimeout(() => instruction.remove(), 300)
+      }
+      saveRunStatistics(currentCA, currentRule.name, currentRule.hex)
+
+      // swap
+      ;[canvasA, canvasB] = [canvasB, canvasA]
+      ;[currentCA, nextCA] = [nextCA, currentCA]
+      ;[currentRule, nextRule] = [nextRule, currentRule]
+
+      const h = canvasA.height
+      canvasA.style.zIndex = '2'
+      canvasA.style.pointerEvents = 'auto'
+      canvasA.style.transform = 'translateY(0)'
+      canvasA.style.opacity = '1'
+      // Restore border color transition
+      canvasA.style.transition = 'border-color 0.5s ease'
+
+      canvasB.style.zIndex = '1'
+      canvasB.style.pointerEvents = 'none'
+      canvasB.style.transition = 'border-color 0.5s ease'
+      canvasB.style.transform = `translateY(${h}px)`
+      canvasB.style.opacity = '1'
+
+      colorIndex = (colorIndex + 1) % palette.length
+      const col = palette[colorIndex]
+      const nextCol = palette[(colorIndex + 1) % palette.length]
+
+      // Colors will transition smoothly thanks to the CSS transition
+      canvasA.style.borderColor = col
+      canvasB.style.borderColor = nextCol
+
+      document.documentElement.style.setProperty('--canvas-fg', col)
+      currentCA.resetZoom()
+
+      nextRule = generateRandomRule()
+      loadRule(nextCA, nextRule, lookup)
+
+      currentCA.getStatistics().initializeSimulation({
+        name: `Mobile - ${currentRule.name}`,
+        seedType: 'patch',
+        seedPercentage: 50,
+        rulesetName: currentRule.name,
+        rulesetHex: currentRule.hex,
+        startTime: Date.now(),
+        requestedStepsPerSecond: STEPS_PER_SECOND,
+      })
+
+      reload.remove()
+      reload = createReloadButton(wrapper, () => {
+        loadRule(currentCA, currentRule, lookup)
+        canvasA.style.transition = 'transform 0.15s ease'
+        canvasA.style.transform = 'scale(0.96)'
         setTimeout(() => {
-          instruction.style.display = 'none'
-        }, 300)
-      }
+          canvasA.style.transform = 'scale(1)'
+          setTimeout(() => {
+            canvasA.style.transition = 'border-color 0.5s ease'
+          }, 150)
+        }, 150)
+      })
 
-      // --- Gather statistics before switching rule ---
-      const metadata = stats.getMetadata()
-      const recent = stats.getRecentStats(1)[0] ?? {
-        population: 0,
-        activity: 0,
-        populationChange: 0,
-        entropy2x2: 0,
-        entropy4x4: 0,
-        entropy8x8: 0,
-      }
-
-      // Always compute fresh hex from current ruleset to avoid placeholder text
-      const rulesetHex = c4RulesetToHex(currentRuleset)
-
-      const interestScore = stats.calculateInterestScore()
-      const watchedWallMs = stats.getElapsedTime()
-      const actualSps = stats.getActualStepsPerSecond()
-      const stepCount = metadata?.stepCount ?? 0
-
-      const identity = getUserIdentity()
-      const runPayload: RunSubmission = {
-        userId: identity.userId,
-        userLabel: identity.userLabel,
-        rulesetName: currentRuleName,
-        rulesetHex,
-        seed: cellularAutomata.getSeed(),
-        seedType: (metadata?.seedType ?? 'patch') as
-          | 'center'
-          | 'random'
-          | 'patch',
-        seedPercentage: metadata?.seedPercentage ?? 50,
-        stepCount,
-        watchedSteps: stepCount,
-        watchedWallMs,
-        gridSize: undefined,
-        progress_bar_steps: undefined,
-        requestedSps: metadata?.requestedStepsPerSecond ?? stepsPerSecond,
-        actualSps,
-        population: recent.population,
-        activity: recent.activity,
-        populationChange: recent.populationChange,
-        entropy2x2: recent.entropy2x2,
-        entropy4x4: recent.entropy4x4,
-        entropy8x8: recent.entropy8x8,
-        interestScore,
-        simVersion: 'v0.1.0',
-        engineCommit: undefined,
-        extraScores: undefined,
-      }
-
-      // --- Fire and forget background save ---
-      setTimeout(() => {
-        saveRun(runPayload).then((res) => {
-          if (res.ok) {
-            console.log(`[saveRun] ✅ recorded run ${res.runHash}`)
-          } else {
-            console.warn('[saveRun] ❌ failed to record run')
-          }
-        })
-      }, 0)
-
-      // --- Swipe animation ---
-      // Slide current canvas up
-      canvasWrapper.style.transform = 'translateY(-100%)'
-
-      setTimeout(() => {
-        // --- Switch to new random rule ---
-        const density = Math.random() * 0.6 + 0.2
-        currentRuleset = randomC4RulesetByDensity(density, FORCE_RULE_ZERO_OFF)
-        currentRuleName = `Random (${Math.round(density * 100)}%)`
-
-        cellularAutomata.pause()
-        cellularAutomata.patchSeed(50)
-        const newExpanded = expandC4Ruleset(currentRuleset, orbitLookup)
-        cellularAutomata.play(stepsPerSecond, newExpanded)
-
-        stats.initializeSimulation({
-          name: `Mobile - ${currentRuleName}`,
-          seedType: 'patch',
-          seedPercentage: 50,
-          rulesetName: currentRuleName,
-          rulesetHex: c4RulesetToHex(currentRuleset),
-          startTime: Date.now(),
-          requestedStepsPerSecond: stepsPerSecond,
-        })
-
-        // Change to new color
-        currentColorIndex = (currentColorIndex + 1) % colorPalette.length
-        canvas.style.border = `4px solid ${colorPalette[currentColorIndex]}`
-
-        // Add this line to update the foreground color:
-        document.documentElement.style.setProperty(
-          '--canvas-fg',
-          colorPalette[currentColorIndex],
-        )
-
-        // Reset zoom when switching rules
-        cellularAutomata.resetZoom()
-
-        // Reset position (slide in from bottom)
-        canvasWrapper.style.transition = 'none'
-        canvasWrapper.style.transform = 'translateY(100%)'
-
-        // Force a reflow
-        canvasWrapper.offsetHeight
-
-        // Slide to center
-        canvasWrapper.style.transition =
-          'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
-        canvasWrapper.style.transform = 'translateY(0)'
-
-        console.log(`New rule: ${currentRuleName}`)
-      }, 400) // Match the transition duration
+      console.log(`Switched to: ${currentRule.name}`)
     },
-  })
+    () => currentCA.play(STEPS_PER_SECOND, currentRule.ruleset),
+    () => currentCA.pause(),
+  )
 
-  // --- Pinch Zoom Handler ---------------------------------------------------
-  const cleanupZoom = setupPinchZoomAndPan(canvas, cellularAutomata)
+  const cleanupZoomA = setupPinchZoomAndPan(canvasA, currentCA)
+  const cleanupZoomB = setupPinchZoomAndPan(canvasB, nextCA)
 
-  // --- Resize Handling ------------------------------------------------------
-  const resizeHandler = () => {
+  const handleResize = () => {
     const newSize = Math.min(window.innerWidth, window.innerHeight)
-    canvas.style.width = `${newSize}px`
-    canvas.style.height = `${newSize}px`
-  }
-  addEventListener(window, 'resize', resizeHandler)
+    wrapper.style.width = `${newSize}px`
+    wrapper.style.height = `${newSize}px`
 
-  // --- Cleanup --------------------------------------------------------------
+    // CSS resize only (preserve pixel buffer)
+    for (const c of [canvasA, canvasB]) {
+      c.style.width = `${newSize}px`
+      c.style.height = `${newSize}px`
+    }
+
+    if (canvasB.style.transform.includes('translateY')) {
+      canvasB.style.transform = `translateY(${newSize}px)`
+    }
+  }
+
+  window.addEventListener('resize', handleResize)
+
   return () => {
-    if (cellularAutomata.isCurrentlyPlaying()) {
-      cellularAutomata.pause()
-    }
+    currentCA.pause()
+    nextCA.pause()
     cleanupSwipe()
-    cleanupZoom()
-    cleanupHeader() // Add this line
-    for (const { element, event, handler } of eventListeners) {
-      element.removeEventListener(event, handler)
-    }
-    console.log('Mobile layout cleaned up')
+    cleanupZoomA()
+    cleanupZoomB()
+    cleanupHeader()
+    window.removeEventListener('resize', handleResize)
   }
 }
