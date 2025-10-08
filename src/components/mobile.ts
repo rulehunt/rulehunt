@@ -88,7 +88,6 @@ function setupPinchZoom(
 ): CleanupFunction {
   let initialDistance = 0
   let currentScale = 1
-  let lastCenter = { x: 0, y: 0 }
 
   const handleTouchMove = (e: TouchEvent) => {
     if (e.touches.length === 2) {
@@ -100,7 +99,6 @@ function setupPinchZoom(
       // Midpoint between fingers
       const centerX = (t1.clientX + t2.clientX) / 2
       const centerY = (t1.clientY + t2.clientY) / 2
-      lastCenter = { x: centerX, y: centerY }
 
       if (!initialDistance) {
         initialDistance = distance
@@ -120,23 +118,11 @@ function setupPinchZoom(
     }
   }
 
-  const handleTouchStart = (e: TouchEvent) => {
-    if (e.touches.length === 2) {
-      const [t1, t2] = e.touches
-      lastCenter = {
-        x: (t1.clientX + t2.clientX) / 2,
-        y: (t1.clientY + t2.clientY) / 2,
-      }
-    }
-  }
-
-  canvas.addEventListener('touchstart', handleTouchStart)
   canvas.addEventListener('touchmove', handleTouchMove)
   canvas.addEventListener('touchend', handleTouchEnd)
   canvas.addEventListener('touchcancel', handleTouchEnd)
 
   return () => {
-    canvas.removeEventListener('touchstart', handleTouchStart)
     canvas.removeEventListener('touchmove', handleTouchMove)
     canvas.removeEventListener('touchend', handleTouchEnd)
     canvas.removeEventListener('touchcancel', handleTouchEnd)
