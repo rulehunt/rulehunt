@@ -58,6 +58,9 @@ export class CellularAutomata {
     this.fgColor = options.fgColor
     this.bgColor = options.bgColor
 
+    this.ctx.fillStyle = options.bgColor
+    this.ctx.fillRect(0, 0, canvas.width, canvas.height)
+
     this.grid = new Uint8Array(this.gridArea)
     this.nextGrid = new Uint8Array(this.gridArea)
     this.statistics = new StatisticsTracker(this.gridRows, this.gridCols)

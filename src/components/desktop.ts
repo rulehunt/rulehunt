@@ -379,6 +379,9 @@ export async function setupDesktopLayout(
     fgColor: colors.fgColor,
     bgColor: colors.bgColor,
   })
+  ctx.fillStyle = colors.bgColor
+  ctx.fillRect(0, 0, ruleCanvas.width, ruleCanvas.height)
+
   updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
 
   // State
