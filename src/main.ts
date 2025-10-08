@@ -640,7 +640,19 @@ async function setupDesktopLayout(appRoot: HTMLDivElement) {
   })
 
   // Simulation buttons
+
   btnStep.addEventListener('click', () => {
+    // If currently playing, pause first
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause()
+      btnPlay.textContent = 'Play'
+      if (statsUpdateInterval !== null) {
+        clearInterval(statsUpdateInterval)
+        statsUpdateInterval = null
+      }
+    }
+
+    // Now perform a single step
     const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
     cellularAutomata.step(expanded)
     updateStatisticsDisplay(
