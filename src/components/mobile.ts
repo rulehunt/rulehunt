@@ -277,7 +277,7 @@ export async function setupMobileLayout(
       cellularAutomata.pause()
     },
 
-    onSwipeAbandoned: (e: TouchEvent) => {
+    onSwipeAbandoned: (_: TouchEvent) => {
       const newExpanded = expandC4Ruleset(currentRuleset, orbitLookup)
       cellularAutomata.play(stepsPerSecond, newExpanded)
     },
