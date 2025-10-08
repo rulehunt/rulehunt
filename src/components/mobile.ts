@@ -184,6 +184,11 @@ export async function setupMobileLayout(
   canvas.style.border = `4px solid ${colorPalette[currentColorIndex]}`
   canvas.style.borderRadius = '8px'
 
+  document.documentElement.style.setProperty(
+    '--canvas-fg',
+    colorPalette[currentColorIndex],
+  )
+
   canvasWrapper.appendChild(canvas)
   container.appendChild(canvasWrapper)
 
@@ -334,6 +339,12 @@ export async function setupMobileLayout(
         // Change to new color
         currentColorIndex = (currentColorIndex + 1) % colorPalette.length
         canvas.style.border = `4px solid ${colorPalette[currentColorIndex]}`
+
+        // Add this line to update the foreground color:
+        document.documentElement.style.setProperty(
+          '--canvas-fg',
+          colorPalette[currentColorIndex],
+        )
 
         // Reset zoom when switching rules
         zoomScale = 1
