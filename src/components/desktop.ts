@@ -379,6 +379,10 @@ export async function setupDesktopLayout(
     fgColor: colors.fgColor,
     bgColor: colors.bgColor,
   })
+
+  // Initial render after construction (constructor no longer auto-renders)
+  cellularAutomata.render()
+
   ctx.fillStyle = colors.bgColor
   ctx.fillRect(0, 0, ruleCanvas.width, ruleCanvas.height)
 
@@ -401,6 +405,7 @@ export async function setupDesktopLayout(
       const percentage = Number.parseInt(aliveSlider.value)
       cellularAutomata.randomSeed(percentage)
     }
+    // Explicit render after seeding
     cellularAutomata.render()
     updateStatisticsDisplay(
       cellularAutomata,
@@ -480,6 +485,7 @@ export async function setupDesktopLayout(
   const cleanupTheme = setupTheme(header.elements.themeToggle, () => {
     const newColors = getCurrentColors()
     cellularAutomata.setColors(newColors.fgColor, newColors.bgColor)
+    // Explicit render after color change
     cellularAutomata.render()
     updateStatisticsDisplay(
       cellularAutomata,

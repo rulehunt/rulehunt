@@ -35,7 +35,7 @@ export class CellularAutomata {
   private currentRuleset: Ruleset | null = null
   private lastStepsPerSecond = 10
 
-  // Add zoom and pan state
+  // Zoom and pan state
   private zoom = 1
   private panX = 0
   private panY = 0
@@ -58,61 +58,55 @@ export class CellularAutomata {
     this.fgColor = options.fgColor
     this.bgColor = options.bgColor
 
-    this.ctx.fillStyle = options.bgColor
-    this.ctx.fillRect(0, 0, canvas.width, canvas.height)
-
     this.grid = new Uint8Array(this.gridArea)
     this.nextGrid = new Uint8Array(this.gridArea)
     this.statistics = new StatisticsTracker(this.gridRows, this.gridCols)
 
+    // Initialize with a random seed
     this.randomSeed()
-    this.render()
-    this.statistics.recordStep(this.grid)
   }
 
   setColors(fgColor: string, bgColor: string) {
     this.fgColor = fgColor
     this.bgColor = bgColor
-    this.render()
+  }
+  clearGrid() {
+    this.grid.fill(0)
   }
 
   centerSeed() {
-    // Clear the grid first
-    for (let i = 0; i < this.grid.length; i++) {
-      this.grid[i] = 0
-    }
+    this.clearGrid()
 
-    // Set only the center cell to alive
     const centerX = Math.floor(this.gridCols / 2)
     const centerY = Math.floor(this.gridRows / 2)
     this.grid[centerY * this.gridCols + centerX] = 1
 
-    this.statistics.reset()
-    this.statistics.recordStep(this.grid)
+    this.lastSeedMethod = 'center'
   }
 
   randomSeed(alivePercentage = 50) {
-    const threshold = alivePercentage / 100
     this.rng = makeRng(this.seed) // reset PRNG to initial state
+    const threshold = alivePercentage / 100
+
     for (let i = 0; i < this.grid.length; i++) {
       this.grid[i] = this.rng() < threshold ? 1 : 0
     }
 
     this.lastSeedMethod = 'random'
     this.lastAlivePercentage = alivePercentage
-    this.statistics.reset()
-    this.statistics.recordStep(this.grid)
   }
 
   patchSeed(alivePercentage = 50) {
     this.rng = makeRng(this.seed) // reset PRNG to same starting point
-    for (let i = 0; i < this.grid.length; i++) this.grid[i] = 0
+    this.clearGrid()
+
     const threshold = alivePercentage / 100
     const centerX = Math.floor(this.gridCols / 2)
     const centerY = Math.floor(this.gridRows / 2)
     const patchSize = 10
     const startX = centerX - Math.floor(patchSize / 2)
     const startY = centerY - Math.floor(patchSize / 2)
+
     for (let dy = 0; dy < patchSize; dy++) {
       for (let dx = 0; dx < patchSize; dx++) {
         const x = startX + dx
@@ -125,9 +119,9 @@ export class CellularAutomata {
 
     this.lastSeedMethod = 'patch'
     this.lastAlivePercentage = alivePercentage
-    this.statistics.reset()
-    this.statistics.recordStep(this.grid)
   }
+
+  // --- Simulation step ------------------------------------------------------
 
   step(ruleset: Ruleset) {
     for (let y = 0; y < this.gridRows; y++) {
@@ -143,6 +137,7 @@ export class CellularAutomata {
     this.grid = this.nextGrid
     this.nextGrid = temp
 
+    // Step still auto-renders and records stats (part of animation loop)
     this.statistics.recordStep(this.grid)
     this.render()
   }
@@ -153,7 +148,6 @@ export class CellularAutomata {
     for (let dy = -1; dy <= 1; dy++) {
       const row: number[] = []
       for (let dx = -1; dx <= 1; dx++) {
-        // Torus topology: wrap around edges
         const x = (centerX + dx + this.gridCols) % this.gridCols
         const y = (centerY + dy + this.gridRows) % this.gridRows
         row.push(this.grid[y * this.gridCols + x])
@@ -165,8 +159,6 @@ export class CellularAutomata {
   }
 
   private patternToIndex(pattern: number[][]): number {
-    // Convert 3x3 pattern to 9-bit index
-    // Order: top-left to bottom-right, reading left to right, top to bottom
     let index = 0
     let bit = 0
 
@@ -182,26 +174,23 @@ export class CellularAutomata {
     return index
   }
 
-  // Add methods to control zoom and pan
+  // --- Zoom and pan (NO side effects) ---------------------------------------
+
   setZoom(zoom: number, centerX: number, centerY: number) {
     const oldZoom = this.zoom
     this.zoom = Math.max(0.5, Math.min(3, zoom))
 
-    // Adjust pan to zoom towards the center point
     const zoomChange = this.zoom / oldZoom
     this.panX = centerX - (centerX - this.panX) * zoomChange
     this.panY = centerY - (centerY - this.panY) * zoomChange
 
-    // Apply pan boundaries
     this.constrainPan()
-    this.render()
   }
 
   setPan(x: number, y: number) {
     this.panX = x
     this.panY = y
     this.constrainPan()
-    this.render()
   }
 
   getPan(): { x: number; y: number } {
@@ -218,7 +207,6 @@ export class CellularAutomata {
     const oldZoom = this.zoom
     this.zoom = Math.max(0.5, Math.min(3, zoom))
 
-    // Adjust pan based on zoom change around the zoom center
     const zoomChange = this.zoom / oldZoom
     const adjustedPanX = zoomCenterX - (zoomCenterX - panX) * zoomChange
     const adjustedPanY = zoomCenterY - (zoomCenterY - panY) * zoomChange
@@ -226,46 +214,30 @@ export class CellularAutomata {
     this.panX = adjustedPanX
     this.panY = adjustedPanY
 
-    // Apply pan boundaries
     this.constrainPan()
-    this.render()
   }
 
-  /**
-   * Zoom while keeping the specified screen point centered
-   * @param zoom - New zoom level
-   * @param screenX - X coordinate in canvas pixels to keep centered
-   * @param screenY - Y coordinate in canvas pixels to keep centered
-   */
   setZoomCentered(zoom: number, screenX: number, screenY: number) {
     const oldZoom = this.zoom
     this.zoom = Math.max(0.5, Math.min(3, zoom))
 
-    // Calculate which grid point is currently at the screen position
     const gridX = (screenX - this.panX) / oldZoom
     const gridY = (screenY - this.panY) / oldZoom
 
-    // Calculate new pan to keep that grid point at the same screen position
     this.panX = screenX - gridX * this.zoom
     this.panY = screenY - gridY * this.zoom
 
-    // Apply pan boundaries
     this.constrainPan()
-    this.render()
   }
 
-  // Also update the constrainPan method to be less restrictive when zoomed in:
   private constrainPan() {
     if (this.zoom <= 1) {
-      // When zoomed out, center the grid (no panning)
       this.panX = (this.canvas.width * (1 - this.zoom)) / 2
       this.panY = (this.canvas.height * (1 - this.zoom)) / 2
     } else {
-      // When zoomed in, allow some panning beyond edges for better UX
       const gridWidth = this.canvas.width / this.zoom
       const gridHeight = this.canvas.height / this.zoom
 
-      // Allow panning with some margin
       const margin = Math.min(this.canvas.width, this.canvas.height) * 0.2
 
       const minPanX = -gridWidth * this.zoom + margin
@@ -282,28 +254,28 @@ export class CellularAutomata {
     this.zoom = 1
     this.panX = 0
     this.panY = 0
-    this.render()
   }
 
   getZoom(): number {
     return this.zoom
   }
 
+  // --- Explicit render (called by user) ------------------------------------
+
   render() {
     const ctx = this.ctx
 
-    // Save the context state
     ctx.save()
 
-    // Clear the canvas
+    // Clear with background color
     ctx.fillStyle = this.bgColor
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
 
-    // Apply zoom and pan transformations
+    // Apply transformations
     ctx.translate(this.panX, this.panY)
     ctx.scale(this.zoom, this.zoom)
 
-    // Draw cells
+    // Draw alive cells
     ctx.fillStyle = this.fgColor
 
     for (let y = 0; y < this.gridRows; y++) {
@@ -319,9 +291,10 @@ export class CellularAutomata {
       }
     }
 
-    // Restore the context state
     ctx.restore()
   }
+
+  // --- Playback control -----------------------------------------------------
 
   play(stepsPerSecond: number, ruleset: Ruleset) {
     if (this.isPlaying) return
@@ -345,69 +318,32 @@ export class CellularAutomata {
     }
   }
 
-  /**
-   * Recreates the exact same initial grid as the first seed,
-   * without touching stats or rule state.
-   */
+  // --- Soft reset (preserves stats/rule) ------------------------------------
+
   softReset() {
-    this.rng = makeRng(this.seed) // reinitialize RNG for deterministic reset
+    this.rng = makeRng(this.seed)
 
     switch (this.lastSeedMethod) {
-      case 'center': {
-        for (let i = 0; i < this.grid.length; i++) this.grid[i] = 0
-        const cx = Math.floor(this.gridCols / 2)
-        const cy = Math.floor(this.gridRows / 2)
-        this.grid[cy * this.gridCols + cx] = 1
+      case 'center':
+        this.centerSeed()
         break
-      }
       case 'patch':
-        this.applyPatchSeed(this.lastAlivePercentage)
+        this.patchSeed(this.lastAlivePercentage)
         break
       default:
-        this.applyRandomSeed(this.lastAlivePercentage)
+        this.randomSeed(this.lastAlivePercentage)
         break
     }
-
-    this.render()
   }
 
-  private applyRandomSeed(alivePercentage: number) {
-    const threshold = alivePercentage / 100
-    for (let i = 0; i < this.grid.length; i++) {
-      this.grid[i] = this.rng() < threshold ? 1 : 0
-    }
-  }
+  // --- Resize ---------------------------------------------------------------
 
-  private applyPatchSeed(alivePercentage: number) {
-    for (let i = 0; i < this.grid.length; i++) this.grid[i] = 0
-    const threshold = alivePercentage / 100
-    const centerX = Math.floor(this.gridCols / 2)
-    const centerY = Math.floor(this.gridRows / 2)
-    const patchSize = 10
-    const startX = centerX - Math.floor(patchSize / 2)
-    const startY = centerY - Math.floor(patchSize / 2)
-    for (let dy = 0; dy < patchSize; dy++) {
-      for (let dx = 0; dx < patchSize; dx++) {
-        const x = startX + dx
-        const y = startY + dy
-        if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows) {
-          this.grid[y * this.gridCols + x] = this.rng() < threshold ? 1 : 0
-        }
-      }
-    }
-  }
-
-  /**
-   * Resize the grid to new dimensions, reinitializing buffers and reseeding.
-   * If a ruleset is currently playing, it will resume after resize.
-   */
   resize(newRows: number, newCols: number) {
     const wasPlaying = this.isPlaying
-    const ruleset = this.currentRuleset // remember before pausing
+    const ruleset = this.currentRuleset
 
     if (wasPlaying) this.pause()
 
-    // Make sure we have up-to-date canvas width/height
     this.canvas.width = this.canvas.clientWidth
     this.canvas.height = this.canvas.clientHeight
 
@@ -416,12 +352,11 @@ export class CellularAutomata {
     this.gridArea = newRows * newCols
     this.cellSize = this.canvas.width / this.gridCols
 
-    // Allocate new buffers
     this.grid = new Uint8Array(this.gridArea)
     this.nextGrid = new Uint8Array(this.gridArea)
     this.statistics = new StatisticsTracker(this.gridRows, this.gridCols)
 
-    // Re-seed using the last seed method
+    // Re-seed using last method
     switch (this.lastSeedMethod) {
       case 'center':
         this.centerSeed()
@@ -434,14 +369,16 @@ export class CellularAutomata {
         break
     }
 
-    // Redraw
+    // Explicitly render after resize
     this.render()
 
-    // Resume simulation if it was running
+    // Resume if it was playing
     if (wasPlaying && ruleset) {
       this.play(this.lastStepsPerSecond, ruleset)
     }
   }
+
+  // --- Getters --------------------------------------------------------------
 
   isCurrentlyPlaying(): boolean {
     return this.isPlaying

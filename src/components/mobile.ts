@@ -360,6 +360,7 @@ function setupPinchZoomAndPan(
 
       // Zoom centered on the midpoint
       cellularAutomata.setZoomCentered(newZoom, zoomCenterX, zoomCenterY)
+      cellularAutomata.render() // Explicit render after zoom
     }
   }
 
@@ -395,6 +396,7 @@ function generateRandomRule(): RuleData {
 
 /**
  * Prepare a CA with the given rule and seed, paused and rendered.
+ * All operations are explicit - no hidden side effects.
  */
 function prepareRule(
   cellularAutomata: CellularAutomata,
@@ -403,6 +405,7 @@ function prepareRule(
   seedPercentage = 50,
 ): void {
   cellularAutomata.pause()
+  cellularAutomata.clearGrid()
   cellularAutomata.patchSeed(seedPercentage)
 
   if (!rule.expanded && (rule.ruleset as number[]).length === 140) {
@@ -651,10 +654,11 @@ export async function setupMobileLayout(
   }
   let offScreenRule = generateRandomRule()
 
+  // Initial setup with explicit renders
   prepareRule(onScreenCA, onScreenRule, lookup)
-  startRule(onScreenCA, onScreenRule) // start only onScreen
+  startRule(onScreenCA, onScreenRule)
 
-  prepareRule(offScreenCA, offScreenRule, lookup) // stays paused
+  prepareRule(offScreenCA, offScreenRule, lookup)
 
   onScreenCA.getStatistics().initializeSimulation({
     name: `Mobile - ${onScreenRule.name}`,
@@ -713,7 +717,7 @@ export async function setupMobileLayout(
       offScreenCanvas.style.transform = `translateY(${h}px)`
       offScreenCanvas.style.opacity = '1'
 
-      // Update colors
+      // Update colors (no auto-render with refactored CA)
       colorIndex = (colorIndex + 1) % palette.length
       const col = palette[colorIndex]
       const nextCol = palette[(colorIndex + 1) % palette.length]
@@ -722,13 +726,11 @@ export async function setupMobileLayout(
 
       // Defer CA operations by one frame to let layout settle
       setTimeout(() => {
-        // Start the newly visible CA
+        // Start the newly visible CA and render
         startRule(onScreenCA, onScreenRule)
 
-        // Prepare offscreen CA for the next swipe
+        // Prepare offscreen CA for the next swipe with explicit render
         offScreenCA.pause()
-        offScreenCA.resetZoom()
-
         offScreenRule = generateRandomRule()
         prepareRule(offScreenCA, offScreenRule, lookup, 50)
       }, 16)
