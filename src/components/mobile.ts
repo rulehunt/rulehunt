@@ -25,7 +25,7 @@ const ENABLE_DEBUG = true
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 100
-const TARGET_GRID_SIZE = 50_000
+const TARGET_GRID_SIZE = 150_000
 
 const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1
 const SWIPE_COMMIT_MIN_DISTANCE = 50
@@ -80,11 +80,6 @@ interface SwipeDebugInfo {
 }
 
 // --- Helpers ----------------------------------------------------------------
-
-/**
- * Compute grid dimensions and cell size to fit the current screen,
- * keeping total cells ≤ maxCells.
- */
 function computeAdaptiveGrid(maxCells = TARGET_GRID_SIZE) {
   const screenWidth = window.innerWidth
   const screenHeight = window.innerHeight
@@ -94,18 +89,29 @@ function computeAdaptiveGrid(maxCells = TARGET_GRID_SIZE) {
   let gridRows = screenHeight
   let totalCells = gridCols * gridRows
 
-  // Increase cell size until total cells ≤ maxCells
   while (totalCells > maxCells) {
     cellSize += 1
     gridCols = Math.floor(screenWidth / cellSize)
     gridRows = Math.floor(screenHeight / cellSize)
     totalCells = gridCols * gridRows
   }
-
   return { gridCols, gridRows, cellSize, totalCells, screenWidth, screenHeight }
 }
 
-// --- Dual-Canvas Swipe Handler with Direction Lock & Momentum Window -------
+// --- Promise helper ---------------------------------------------------------
+function waitForTransitionEnd(el: HTMLElement): Promise<void> {
+  return new Promise((resolve) => {
+    const done = (ev: TransitionEvent) => {
+      if (ev.propertyName === 'transform') {
+        el.removeEventListener('transitionend', done)
+        resolve()
+      }
+    }
+    el.addEventListener('transitionend', done)
+  })
+}
+
+// --- Dual-Canvas Swipe Handler ----------------------------------------------
 let isTransitioning = false
 
 function setupDualCanvasSwipe(
@@ -124,26 +130,14 @@ function setupDualCanvasSwipe(
   let directionLocked: 'up' | 'down' | null = null
   let lastSwipeTime = 0
   const samples: { t: number; y: number }[] = []
-
   const getHeight = () => wrapper.clientHeight
 
   const handleTouchStart = (e: TouchEvent) => {
     if (e.touches.length !== 1) return
-
-    // Cooldown: ignore if too soon after last swipe
     const now = performance.now()
-    if (now - lastSwipeTime < SWIPE_COOLDOWN_MS) {
-      return
-    }
+    if (now - lastSwipeTime < SWIPE_COOLDOWN_MS) return
 
     startY = e.touches[0].clientY
-
-    debugFooterClear()
-    debugFooterLog('DRAG_START', {
-      startY,
-      isTransitioning,
-    })
-
     currentY = startY
     startT = e.timeStamp
     directionLocked = null
@@ -155,6 +149,8 @@ function setupDualCanvasSwipe(
     canvasA.style.transition = 'none'
     canvasB.style.transition = 'none'
     onDragStart?.()
+    debugFooterClear()
+    debugFooterLog('DRAG_START', { startY, isTransitioning })
   }
 
   const handleTouchMove = (e: TouchEvent) => {
@@ -163,24 +159,17 @@ function setupDualCanvasSwipe(
     const dy = y - startY
     const absDy = Math.abs(dy)
 
-    // Direction lock (after 8px movement)
-    if (!directionLocked && absDy > 8) {
-      directionLocked = dy < 0 ? 'up' : 'down'
-    }
-
-    // Ignore downward motion
+    if (!directionLocked && absDy > 8) directionLocked = dy < 0 ? 'up' : 'down'
     if (directionLocked === 'down') {
       dragging = false
       canvasA.style.transform = 'translateY(0)'
       canvasB.style.transform = `translateY(${getHeight()}px)`
-      canvasA.style.opacity = '1'
-      canvasB.style.opacity = '1'
       return
     }
 
     currentY = y
     samples.push({ t: e.timeStamp, y })
-    const cutoff = e.timeStamp - 100 // 100 ms momentum window
+    const cutoff = e.timeStamp - 100
     while (samples.length > 2 && samples[0].t < cutoff) samples.shift()
 
     const delta = Math.min(0, dy)
@@ -193,69 +182,57 @@ function setupDualCanvasSwipe(
     canvasB.style.opacity = `${Math.min(1, 0.3 + progress * 0.7)}`
   }
 
-  const handleTouchEnd = (_: TouchEvent) => {
+  const handleTouchEnd = async (_: TouchEvent) => {
     const wasDragging = dragging
     const lockedDirection = directionLocked
-
     if (!dragging) {
-      // Early return - log this
-      if (debugCallback) {
-        const debugInfo: SwipeDebugInfo = {
-          dragDistance: 0,
-          velocity: 0,
-          direction: lockedDirection || 'none',
-          committed: false,
-          reason: 'not dragging',
-          timestamp: new Date().toLocaleTimeString(),
-          dragging: wasDragging,
-          directionLocked: lockedDirection || 'none',
-          animationExecuted: false,
-        }
-        debugCallback(debugInfo)
-      }
+      debugCallback?.({
+        dragDistance: 0,
+        velocity: 0,
+        direction: lockedDirection || 'none',
+        committed: false,
+        reason: 'not dragging',
+        timestamp: new Date().toLocaleTimeString(),
+        dragging: wasDragging,
+        directionLocked: lockedDirection || 'none',
+        animationExecuted: false,
+      })
       return
     }
 
     dragging = false
     lastSwipeTime = performance.now()
-
     const height = getHeight()
     const delta = currentY - startY
     const dragDistance = Math.abs(delta)
 
-    // Compute recent (100 ms) velocity from samples
+    // compute velocity
     let vy = 0
     if (samples.length >= 2) {
       const a = samples[0]
       const b = samples[samples.length - 1]
       const dt = Math.max(1, b.t - a.t)
-      vy = (b.y - a.y) / dt // px/ms; negative = upward
+      vy = (b.y - a.y) / dt
     }
 
-    // HEAVILY bias toward committing - only cancel if clearly unintentional
-    const tinyAccidentalMove = dragDistance < 15 // Less than 15px = accidental
-    const slowPullback = delta > 0 // Pulled back down
-
+    const tinyAccidentalMove = dragDistance < 15
+    const slowPullback = delta > 0
     const fastFlick = vy < SWIPE_FAST_THROW_THRESHOLD
     const normalFlick =
       dragDistance > height * SWIPE_COMMIT_THRESHOLD_PERCENT ||
       (dragDistance > SWIPE_COMMIT_MIN_DISTANCE &&
         vy < SWIPE_VELOCITY_THRESHOLD)
+    const shouldCommit =
+      !tinyAccidentalMove && !slowPullback && (fastFlick || normalFlick)
 
     debugFooterLog('DRAG_END', {
       delta,
       vy: Math.round(vy * 1000),
       dragDistance,
     })
-
-    // Only cancel if it's clearly accidental
-    const shouldCommit =
-      !tinyAccidentalMove && !slowPullback && (fastFlick || normalFlick)
-
-    // Debug info
-    const debugInfo: SwipeDebugInfo = {
+    debugCallback?.({
       dragDistance: Math.round(dragDistance),
-      velocity: Math.round(vy * 1000), // Convert to px/s
+      velocity: Math.round(vy * 1000),
       direction: delta < 0 ? 'up' : 'down',
       committed: shouldCommit,
       reason: shouldCommit
@@ -271,50 +248,46 @@ function setupDualCanvasSwipe(
       dragging: wasDragging,
       directionLocked: lockedDirection || 'none',
       animationExecuted: true,
-    }
+    })
 
-    if (debugCallback) {
-      debugCallback(debugInfo)
-    }
-
-    const transitionDuration = shouldCommit ? '0.35s' : '0.25s'
-    const transition =
-      `transform ${transitionDuration} cubic-bezier(0.4,0,0.2,1), ` +
-      `opacity ${transitionDuration} ease`
+    const duration = shouldCommit ? 0.35 : 0.25
+    const ms = duration * 1000
+    const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1), opacity ${duration}s ease`
     canvasA.style.transition = transition
     canvasB.style.transition = transition
+    void canvasA.offsetWidth
 
-    void canvasA.offsetWidth // 👈 force layout flush before applying transform
+    // mark before starting transforms
+    isTransitioning = true
 
     if (shouldCommit) {
-      isTransitioning = true
-
       canvasA.style.transform = `translateY(-${height}px)`
       canvasB.style.transform = 'translateY(0)'
       canvasA.style.opacity = '0'
       canvasB.style.opacity = '1'
-      const ms = Number.parseFloat(transitionDuration) * 1000
-      setTimeout(onCommit, ms)
-      setTimeout(() => {
-        debugFooterLog('FINISHING', {
-          isTransitioning,
-        })
-        isTransitioning = false
-      }, ms + 50)
+      await Promise.all([
+        waitForTransitionEnd(canvasA),
+        waitForTransitionEnd(canvasB),
+      ])
+      canvasA.style.transition = 'none'
+      canvasB.style.transition = 'none'
+      onCommit()
     } else {
       canvasA.style.transform = 'translateY(0)'
       canvasB.style.transform = `translateY(${height}px)`
       canvasA.style.opacity = '1'
       canvasB.style.opacity = '1'
-      const ms = Number.parseFloat(transitionDuration) * 1000
-      setTimeout(onCancel, ms)
-      setTimeout(() => {
-        debugFooterLog('FINISHING', {
-          isTransitioning,
-        })
-        isTransitioning = false
-      }, ms + 50)
+      await Promise.all([
+        waitForTransitionEnd(canvasA),
+        waitForTransitionEnd(canvasB),
+      ])
+      canvasA.style.transition = 'none'
+      canvasB.style.transition = 'none'
+      onCancel()
     }
+
+    debugFooterLog('FINISHING', { isTransitioning })
+    isTransitioning = false
   }
 
   wrapper.addEventListener('touchstart', handleTouchStart, { passive: true })

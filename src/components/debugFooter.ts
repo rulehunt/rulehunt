@@ -54,8 +54,7 @@ export function debugFooterLog(
 
 export function debugFooterClear(): void {
   if (!globalFooter) return
-
-  updateDebugText(globalFooter, '')
+  globalFooter.textElement.textContent = ''
 }
 
 // --- Optional helper for explicit control -----------------------------------
