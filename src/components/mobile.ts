@@ -16,8 +16,10 @@ import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 10
-const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.25
-const SWIPE_COMMIT_MIN_DISTANCE = 80
+const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.2 // %
+const SWIPE_COMMIT_MIN_DISTANCE = 60 // px
+const SWIPE_VELOCITY_THRESHOLD = -0.3 // px/ms
+const SWIPE_FAST_THROW_THRESHOLD = -0.5 // px/ms
 
 const LIGHT_FG_COLORS = [
   '#2563eb', // blue-600
@@ -93,13 +95,19 @@ function setupDualCanvasSwipe(
   let startT = 0
   let dragging = false
 
+  // Track recent positions for instantaneous velocity
+  let lastY = 0
+  let lastT = 0
+
   const getHeight = () => wrapper.clientHeight
 
   const handleTouchStart = (e: TouchEvent) => {
     if (e.touches.length !== 1) return
     startY = e.touches[0].clientY
     currentY = startY
+    lastY = startY
     startT = e.timeStamp
+    lastT = e.timeStamp
     dragging = true
 
     wrapper.style.transition = 'none'
@@ -111,6 +119,11 @@ function setupDualCanvasSwipe(
   const handleTouchMove = (e: TouchEvent) => {
     if (!dragging || e.touches.length !== 1) return
     const y = e.touches[0].clientY
+
+    // Store previous position before updating
+    lastY = currentY
+    lastT = e.timeStamp
+
     currentY = y
     const delta = Math.min(0, y - startY)
     const height = getHeight()
@@ -133,12 +146,19 @@ function setupDualCanvasSwipe(
     const height = getHeight()
     const dragDistance = Math.abs(delta)
     const dt = Math.max(1, e.timeStamp - startT)
-    const vy = delta / dt // px/ms, negative = upward
+    const vy = delta / dt // average velocity (px/ms)
 
+    // Calculate instantaneous velocity from recent motion
+    const recentDt = Math.max(1, e.timeStamp - lastT)
+    const recentVy = (currentY - lastY) / recentDt // px/ms, negative = upward
+
+    // More lenient commit conditions using instantaneous velocity
     const shouldCommit =
       dragDistance > height * SWIPE_COMMIT_THRESHOLD_PERCENT ||
-      (dragDistance > SWIPE_COMMIT_MIN_DISTANCE && delta < -50) ||
-      vy < -0.7
+      (dragDistance > SWIPE_COMMIT_MIN_DISTANCE &&
+        (vy < SWIPE_VELOCITY_THRESHOLD ||
+          recentVy < SWIPE_VELOCITY_THRESHOLD)) ||
+      recentVy < SWIPE_FAST_THROW_THRESHOLD // Fast throw based on recent velocity
 
     const transitionDuration = shouldCommit ? '0.4s' : '0.3s'
     const transition = `transform ${transitionDuration} cubic-bezier(0.4,0,0.2,1), opacity ${transitionDuration} ease`
