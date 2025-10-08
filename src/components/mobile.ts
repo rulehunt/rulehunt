@@ -116,7 +116,7 @@ function setupDualCanvasSwipe(
   onCancel: () => void,
   onDragStart?: () => void,
   debugCallback?: (info: SwipeDebugInfo) => void,
-  onPrepareNextCanvas?: () => void,
+  onPrepareNextCanvas?: () => void, // now runs AFTER swap+animation
 ): CleanupFunction {
   let startY = 0
   let currentY = 0
@@ -127,10 +127,18 @@ function setupDualCanvasSwipe(
   const samples: { t: number; y: number }[] = []
   const getHeight = () => wrapper.clientHeight
 
+  const resetTransforms = (h: number) => {
+    canvasA.style.transform = 'translateY(0)'
+    canvasB.style.transform = `translateY(${h}px)`
+    canvasA.style.opacity = '1'
+    canvasB.style.opacity = '1'
+  }
+
   const handleTouchStart = (e: TouchEvent) => {
     if (e.touches.length !== 1) return
     const now = performance.now()
     if (now - lastSwipeTime < SWIPE_COOLDOWN_MS) return
+    if (isTransitioning) return
 
     startY = e.touches[0].clientY
     currentY = startY
@@ -152,11 +160,16 @@ function setupDualCanvasSwipe(
     const dy = y - startY
     const absDy = Math.abs(dy)
 
+    // Lock direction with a little hysteresis
     if (!directionLocked && absDy > 8) directionLocked = dy < 0 ? 'up' : 'down'
+
+    // Reject downward gestures early & visibly snap back
     if (directionLocked === 'down') {
       dragging = false
-      canvasA.style.transform = 'translateY(0)'
-      canvasB.style.transform = `translateY(${getHeight()}px)`
+      const h = getHeight()
+      resetTransforms(h)
+      // ensure current sim resumes if we had paused it
+      onCancel()
       return
     }
 
@@ -175,31 +188,54 @@ function setupDualCanvasSwipe(
     canvasB.style.opacity = `${Math.min(1, 0.3 + progress * 0.7)}`
   }
 
-  const handleTouchEnd = async (_: TouchEvent) => {
+  const doCancel = async () => {
+    const height = getHeight()
+    const duration = 0.25
+    const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1), opacity ${duration}s ease`
+    canvasA.style.transition = transition
+    canvasB.style.transition = transition
+
+    canvasA.style.transform = 'translateY(0)'
+    canvasB.style.transform = `translateY(${height}px)`
+    canvasA.style.opacity = '1'
+    canvasB.style.opacity = '1'
+
+    await Promise.all([
+      waitForTransitionEnd(canvasA),
+      waitForTransitionEnd(canvasB),
+    ])
+    canvasA.style.transition = 'none'
+    canvasB.style.transition = 'none'
+    onCancel()
+  }
+
+  const handleTouchEndCore = async (forceCancel = false) => {
     const wasDragging = dragging
     const lockedDirection = directionLocked
-    if (!dragging) {
+    dragging = false
+    lastSwipeTime = performance.now()
+
+    if (!wasDragging || forceCancel || lockedDirection === 'down') {
       debugCallback?.({
         dragDistance: 0,
         velocity: 0,
         direction: lockedDirection || 'none',
         committed: false,
-        reason: 'not dragging',
+        reason: forceCancel ? 'touchcancel' : 'not dragging',
         timestamp: new Date().toLocaleTimeString(),
         dragging: wasDragging,
         directionLocked: lockedDirection || 'none',
         animationExecuted: false,
       })
+      await doCancel()
       return
     }
 
-    dragging = false
-    lastSwipeTime = performance.now()
     const height = getHeight()
     const delta = currentY - startY
     const dragDistance = Math.abs(delta)
 
-    // compute velocity
+    // velocity
     let vy = 0
     if (samples.length >= 2) {
       const a = samples[0]
@@ -227,9 +263,7 @@ function setupDualCanvasSwipe(
     isTransitioning = true
 
     if (shouldCommit) {
-      // 👇 PRE-RESET the next canvas before showing it
-      onPrepareNextCanvas?.()
-
+      // IMPORTANT: Defer any next-canvas reseed until AFTER the animation + swap.
       canvasA.style.transform = `translateY(-${height}px)`
       canvasB.style.transform = 'translateY(0)'
       canvasA.style.opacity = '0'
@@ -241,34 +275,39 @@ function setupDualCanvasSwipe(
       ])
       canvasA.style.transition = 'none'
       canvasB.style.transition = 'none'
+
+      // Swap ownership/content first…
       onCommit()
+
+      // …then quietly prep the *new background* canvas for the next swipe
+      // (user won’t see it change now).
+      onPrepareNextCanvas?.()
     } else {
-      canvasA.style.transform = 'translateY(0)'
-      canvasB.style.transform = `translateY(${height}px)`
-      canvasA.style.opacity = '1'
-      canvasB.style.opacity = '1'
-      await Promise.all([
-        waitForTransitionEnd(canvasA),
-        waitForTransitionEnd(canvasB),
-      ])
-      canvasA.style.transition = 'none'
-      canvasB.style.transition = 'none'
-      onCancel()
+      await doCancel()
     }
 
     isTransitioning = false
   }
 
+  const handleTouchEnd = (_: TouchEvent) => {
+    // normal end path
+    void handleTouchEndCore(false)
+  }
+  const handleTouchCancel = (_: TouchEvent) => {
+    // force a cancel path—never commit on touchcancel
+    void handleTouchEndCore(true)
+  }
+
   wrapper.addEventListener('touchstart', handleTouchStart, { passive: true })
   wrapper.addEventListener('touchmove', handleTouchMove, { passive: true })
   wrapper.addEventListener('touchend', handleTouchEnd, { passive: true })
-  wrapper.addEventListener('touchcancel', handleTouchEnd, { passive: true })
+  wrapper.addEventListener('touchcancel', handleTouchCancel, { passive: true })
 
   return () => {
     wrapper.removeEventListener('touchstart', handleTouchStart)
     wrapper.removeEventListener('touchmove', handleTouchMove)
     wrapper.removeEventListener('touchend', handleTouchEnd)
-    wrapper.removeEventListener('touchcancel', handleTouchEnd)
+    wrapper.removeEventListener('touchcancel', handleTouchCancel)
   }
 }
 
@@ -493,6 +532,7 @@ export async function setupMobileLayout(
   instruction.className =
     'fixed bottom-8 left-0 right-0 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none transition-opacity duration-300'
   instruction.style.opacity = '0.7'
+  instruction.style.transition = 'opacity 0.6s ease'
   instruction.innerHTML = `<div class="flex flex-col items-center gap-2">
       <svg class="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
@@ -563,10 +603,12 @@ export async function setupMobileLayout(
 
   let reload = createReloadButton(wrapper, () => {
     loadRule(currentCA, currentRule, lookup)
-    canvasA.style.transition = 'transform 0.15s ease'
-    canvasA.style.transform = 'scale(0.96)'
+    // Get whichever canvas is currently in front
+    const frontCanvas = canvasA.style.zIndex === '2' ? canvasA : canvasB
+    frontCanvas.style.transition = 'transform 0.15s ease'
+    frontCanvas.style.transform = 'scale(0.96)'
     setTimeout(() => {
-      canvasA.style.transform = 'scale(1)'
+      frontCanvas.style.transform = 'scale(1)'
     }, 150)
   })
 
