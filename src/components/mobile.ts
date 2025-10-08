@@ -58,8 +58,6 @@ function setupDualCanvasSwipe(
   wrapper: HTMLElement,
   canvasA: HTMLCanvasElement,
   canvasB: HTMLCanvasElement,
-  palette: string[],
-  colorIndex: () => number,
   onCommit: () => void,
   onCancel: () => void,
   onDragStart?: () => void,
@@ -99,10 +97,6 @@ function setupDualCanvasSwipe(
     const opacityB = Math.min(1, 0.3 + progress * 0.7)
     canvasA.style.opacity = `${opacityA}`
     canvasB.style.opacity = `${opacityB}`
-
-    // Smoothly update next canvas border color during drag
-    const nextColorIndex = (colorIndex() + 1) % palette.length
-    canvasB.style.borderColor = palette[nextColorIndex]
   }
 
   const handleTouchEnd = (e: TouchEvent) => {
@@ -363,25 +357,29 @@ export async function setupMobileLayout(
   for (const c of [canvasA, canvasB]) {
     c.width = size
     c.height = size
-    c.className = 'absolute inset-0 rounded-lg border-4 touch-none'
+    c.className = 'absolute inset-0 rounded-lg touch-none'
     // Set CSS dimensions to match buffer size
     c.style.width = `${size}px`
     c.style.height = `${size}px`
-    c.style.borderColor = palette[colorIndex]
-    // Add smooth border color transition
-    c.style.transition = 'border-color 0.5s ease'
   }
   canvasA.style.zIndex = '2'
   canvasB.style.zIndex = '1'
   canvasB.style.transform = `translateY(${size}px)`
   canvasB.style.pointerEvents = 'none'
-  // Set initial next color
-  canvasB.style.borderColor = palette[(colorIndex + 1) % palette.length]
   wrapper.appendChild(canvasA)
   wrapper.appendChild(canvasB)
 
   container.appendChild(wrapper)
-  document.documentElement.style.setProperty('--canvas-fg', palette[colorIndex])
+
+  // Set initial colors for both canvases
+  document.documentElement.style.setProperty(
+    '--canvas-a-fg',
+    palette[colorIndex],
+  )
+  document.documentElement.style.setProperty(
+    '--canvas-b-fg',
+    palette[(colorIndex + 1) % palette.length],
+  )
 
   // Instruction
   const instruction = document.createElement('div')
@@ -429,9 +427,6 @@ export async function setupMobileLayout(
     canvasA.style.transform = 'scale(0.96)'
     setTimeout(() => {
       canvasA.style.transform = 'scale(1)'
-      requestAnimationFrame(() => {
-        canvasA.style.transition = 'border-color 0.5s ease'
-      })
     }, 150)
   })
 
@@ -440,8 +435,6 @@ export async function setupMobileLayout(
     wrapper,
     canvasA,
     canvasB,
-    palette,
-    () => colorIndex,
     () => {
       if (!hasSwipedOnce) {
         hasSwipedOnce = true
@@ -460,12 +453,9 @@ export async function setupMobileLayout(
       canvasA.style.pointerEvents = 'auto'
       canvasA.style.transform = 'translateY(0)'
       canvasA.style.opacity = '1'
-      // Restore border color transition
-      canvasA.style.transition = 'border-color 0.5s ease'
 
       canvasB.style.zIndex = '1'
       canvasB.style.pointerEvents = 'none'
-      canvasB.style.transition = 'border-color 0.5s ease'
       canvasB.style.transform = `translateY(${h}px)`
       canvasB.style.opacity = '1'
 
@@ -473,11 +463,9 @@ export async function setupMobileLayout(
       const col = palette[colorIndex]
       const nextCol = palette[(colorIndex + 1) % palette.length]
 
-      // Colors will transition smoothly thanks to the CSS transition
-      canvasA.style.borderColor = col
-      canvasB.style.borderColor = nextCol
+      document.documentElement.style.setProperty('--canvas-a-fg', col)
+      document.documentElement.style.setProperty('--canvas-b-fg', nextCol)
 
-      document.documentElement.style.setProperty('--canvas-fg', col)
       currentCA.resetZoom()
 
       nextRule = generateRandomRule()
@@ -500,9 +488,6 @@ export async function setupMobileLayout(
         canvasA.style.transform = 'scale(0.96)'
         setTimeout(() => {
           canvasA.style.transform = 'scale(1)'
-          requestAnimationFrame(() => {
-            canvasA.style.transition = 'border-color 0.5s ease'
-          })
         }, 150)
       })
 

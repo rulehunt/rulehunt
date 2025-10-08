@@ -20,9 +20,13 @@ body {
 :root {
   --canvas-bg: #ffffff;
   --canvas-fg: #9333ea;
+  --canvas-a-fg: #9333ea;
+  --canvas-b-fg: #9333ea;
 }
 
 .dark {
   --canvas-bg: #1e1e1e;
   --canvas-fg: #a78bfa;
+  --canvas-a-fg: #a78bfa;
+  --canvas-b-fg: #a78bfa;
 }
