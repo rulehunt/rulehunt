@@ -62,18 +62,6 @@ interface RuleData {
   ruleset: Ruleset
 }
 
-interface SwipeDebugInfo {
-  dragDistance: number
-  velocity: number
-  direction: string
-  committed: boolean
-  reason: string
-  timestamp: string
-  dragging: boolean
-  directionLocked: string
-  animationExecuted: boolean
-}
-
 // --- Helpers ----------------------------------------------------------------
 function computeAdaptiveGrid(maxCells = TARGET_GRID_SIZE) {
   const screenWidth = window.innerWidth
@@ -115,8 +103,7 @@ function setupDualCanvasSwipe(
   onCommit: () => void,
   onCancel: () => void,
   onDragStart?: () => void,
-  debugCallback?: (info: SwipeDebugInfo) => void,
-  onPrepareNextCanvas?: () => void, // now runs AFTER swap+animation
+  onPrepareNextCanvas?: () => void,
 ): CleanupFunction {
   let startY = 0
   let currentY = 0
@@ -177,7 +164,6 @@ function setupDualCanvasSwipe(
       dragging = false
       const h = getHeight()
       resetTransforms(h)
-      // ensure current sim resumes if we had paused it
       onCancel()
       return
     }
@@ -225,17 +211,6 @@ function setupDualCanvasSwipe(
     lastSwipeTime = performance.now()
 
     if (!wasDragging || forceCancel || lockedDirection === 'down') {
-      debugCallback?.({
-        dragDistance: 0,
-        velocity: 0,
-        direction: lockedDirection || 'none',
-        committed: false,
-        reason: forceCancel ? 'touchcancel' : 'not dragging',
-        timestamp: new Date().toLocaleTimeString(),
-        dragging: wasDragging,
-        directionLocked: lockedDirection || 'none',
-        animationExecuted: false,
-      })
       await doCancel()
       return
     }
@@ -275,7 +250,7 @@ function setupDualCanvasSwipe(
       // Pause the outgoing automaton right away
       onCancel()
 
-      // Prepare the *incoming* canvas BEFORE animation so it shows a new rule
+      // Prepare the incoming canvas BEFORE animation
       onPrepareNextCanvas?.()
 
       // Run the transition
@@ -302,11 +277,9 @@ function setupDualCanvasSwipe(
   }
 
   const handleTouchEnd = (_: TouchEvent) => {
-    // normal end path
     void handleTouchEndCore(false)
   }
   const handleTouchCancel = (_: TouchEvent) => {
-    // force a cancel path—never commit on touchcancel
     void handleTouchEndCore(true)
   }
 
@@ -404,15 +377,11 @@ function loadRule(
   seedPercentage = 50,
   startPlaying = true,
 ): void {
-  // always stop before reseeding
   cellularAutomata.pause()
-
-  // reseed and render immediately so the new state is visible
   cellularAutomata.patchSeed(seedPercentage)
   const expanded = expandC4Ruleset(rule.ruleset, orbitLookup)
   cellularAutomata.render()
 
-  // only start running if requested
   if (startPlaying) {
     cellularAutomata.play(STEPS_PER_SECOND, expanded)
   }
@@ -476,7 +445,7 @@ function saveRunStatistics(
 // --- Reload Button ----------------------------------------------------------
 function createReloadButton(parent: HTMLElement, onReload: () => void) {
   const btn = document.createElement('button')
-  btn.setAttribute('data-swipe-ignore', 'true') // <-- key line
+  btn.setAttribute('data-swipe-ignore', 'true')
   btn.style.touchAction = 'manipulation' // avoids 300ms delay on iOS
 
   btn.innerHTML = `
@@ -493,16 +462,7 @@ function createReloadButton(parent: HTMLElement, onReload: () => void) {
   btn.addEventListener('pointerup', swallow)
   btn.addEventListener('mousedown', swallow)
   btn.addEventListener('mouseup', swallow)
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation()
-    onReload()
-    // icon spin
-    btn.style.transition = 'transform 0.4s ease'
-    btn.style.transform = 'rotate(360deg)'
-    setTimeout(() => {
-      btn.style.transform = ''
-    }, 400)
-  })
+
   // Also swallow touch* (with passive:true where allowed)
   btn.addEventListener('touchstart', swallow, { passive: true })
   btn.addEventListener('touchmove', swallow, { passive: true })
@@ -510,6 +470,16 @@ function createReloadButton(parent: HTMLElement, onReload: () => void) {
   btn.addEventListener('touchcancel', swallow, { passive: true })
 
   btn.title = 'Reload simulation'
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    onReload()
+    btn.style.transition = 'transform 0.4s ease'
+    btn.style.transform = 'rotate(360deg)'
+    setTimeout(() => {
+      btn.style.transform = ''
+    }, 400)
+  })
+  btn.style.willChange = 'transform'
   parent.appendChild(btn)
   return btn
 }
@@ -537,13 +507,12 @@ export async function setupMobileLayout(
   wrapper.style.width = `${size}px`
   wrapper.style.height = `${size}px`
 
-  let canvasA = document.createElement('canvas')
-  let canvasB = document.createElement('canvas')
+  const canvasA = document.createElement('canvas')
+  const canvasB = document.createElement('canvas')
   for (const c of [canvasA, canvasB]) {
     c.width = size
     c.height = size
     c.className = 'absolute inset-0 rounded-lg touch-none'
-    // Set CSS dimensions to match buffer size
     c.style.width = `${size}px`
     c.style.height = `${size}px`
     c.style.willChange = 'transform, opacity'
@@ -597,13 +566,16 @@ export async function setupMobileLayout(
     c.style.height = `${screenHeight}px`
   }
 
-  let currentCA = new CellularAutomata(canvasA, {
+  // Track which canvas/CA is currently visible
+  let onScreenCanvas = canvasA
+  let offScreenCanvas = canvasB
+  let onScreenCA = new CellularAutomata(canvasA, {
     gridRows,
     gridCols,
     fgColor: palette[colorIndex],
     bgColor,
   })
-  let nextCA = new CellularAutomata(canvasB, {
+  let offScreenCA = new CellularAutomata(canvasB, {
     gridRows,
     gridCols,
     fgColor: palette[(colorIndex + 1) % palette.length],
@@ -611,23 +583,23 @@ export async function setupMobileLayout(
   })
 
   const conway = makeC4Ruleset(conwayRule, lookup)
-  let currentRule: RuleData = {
+  let onScreenRule: RuleData = {
     name: "Conway's Game of Life",
     hex: c4RulesetToHex(conway),
     ruleset: conway,
   }
-  let nextRule = generateRandomRule()
+  let offScreenRule = generateRandomRule()
 
-  loadRule(currentCA, currentRule, lookup)
-  loadRule(nextCA, nextRule, lookup)
-  nextCA.pause()
+  loadRule(onScreenCA, onScreenRule, lookup)
+  loadRule(offScreenCA, offScreenRule, lookup)
+  offScreenCA.pause()
 
-  currentCA.getStatistics().initializeSimulation({
-    name: `Mobile - ${currentRule.name}`,
+  onScreenCA.getStatistics().initializeSimulation({
+    name: `Mobile - ${onScreenRule.name}`,
     seedType: 'patch',
     seedPercentage: 50,
-    rulesetName: currentRule.name,
-    rulesetHex: currentRule.hex,
+    rulesetName: onScreenRule.name,
+    rulesetHex: onScreenRule.hex,
     startTime: Date.now(),
     requestedStepsPerSecond: STEPS_PER_SECOND,
   })
@@ -636,19 +608,14 @@ export async function setupMobileLayout(
     if (isTransitioning) return
     isTransitioning = true
 
-    // 1) apply new seed/rule to the current (front) CA
-    loadRule(currentCA, currentRule, lookup)
+    loadRule(onScreenCA, onScreenRule, lookup)
 
-    // 2) figure out which canvas is front/back right now
-    const frontIsA = canvasA.style.zIndex === '2'
-    const frontCanvas = frontIsA ? canvasA : canvasB
-    const backCanvas = frontIsA ? canvasB : canvasA
+    const frontCanvas = onScreenCanvas
+    const backCanvas = offScreenCanvas
 
-    // 3) ensure the back canvas never peeks during the bounce
     const prevVis = backCanvas.style.visibility
     backCanvas.style.visibility = 'hidden'
 
-    // 4) do the quick bounce
     const cleanup = () => {
       frontCanvas.style.transition = ''
       frontCanvas.removeEventListener('transitionend', cleanup)
@@ -657,10 +624,8 @@ export async function setupMobileLayout(
     }
 
     frontCanvas.addEventListener('transitionend', cleanup)
-    // force layout so the transition applies
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    frontCanvas.offsetWidth
 
+    void frontCanvas.offsetWidth // force layout
     frontCanvas.style.transition = 'transform 0.15s ease'
     frontCanvas.style.transform = 'scale(0.96)'
     setTimeout(() => {
@@ -680,65 +645,64 @@ export async function setupMobileLayout(
         instruction.style.opacity = '0'
         setTimeout(() => instruction.remove(), 300)
       }
-      saveRunStatistics(currentCA, currentRule.name, currentRule.hex)
+      saveRunStatistics(onScreenCA, onScreenRule.name, onScreenRule.hex)
 
-      // swap canvases
-      ;[canvasA, canvasB] = [canvasB, canvasA]
-      ;[currentCA, nextCA] = [nextCA, currentCA]
-      ;[currentRule, nextRule] = [nextRule, currentRule]
+      // Swap on-screen/off-screen tracking
+      ;[onScreenCanvas, offScreenCanvas] = [offScreenCanvas, onScreenCanvas]
+      ;[onScreenCA, offScreenCA] = [offScreenCA, onScreenCA]
+      ;[onScreenRule, offScreenRule] = [offScreenRule, onScreenRule]
 
-      const h = canvasA.height
-      canvasA.style.zIndex = '2'
-      canvasA.style.pointerEvents = 'auto'
-      canvasA.style.transform = 'translateY(0)'
-      canvasA.style.opacity = '1'
+      // Update z-index and positioning explicitly
+      const h = onScreenCanvas.height
+      onScreenCanvas.style.zIndex = '2'
+      onScreenCanvas.style.pointerEvents = 'auto'
+      onScreenCanvas.style.transform = 'translateY(0)'
+      onScreenCanvas.style.opacity = '1'
 
-      canvasB.style.zIndex = '1'
-      canvasB.style.pointerEvents = 'none'
-      canvasB.style.transform = `translateY(${h}px)`
-      canvasB.style.opacity = '1'
+      offScreenCanvas.style.zIndex = '1'
+      offScreenCanvas.style.pointerEvents = 'none'
+      offScreenCanvas.style.transform = `translateY(${h}px)`
+      offScreenCanvas.style.opacity = '1'
 
-      nextCA.pause()
-      currentCA.play(STEPS_PER_SECOND, currentRule.ruleset)
+      offScreenCA.pause()
+      onScreenCA.play(STEPS_PER_SECOND, onScreenRule.ruleset)
 
       colorIndex = (colorIndex + 1) % palette.length
       const col = palette[colorIndex]
       const nextCol = palette[(colorIndex + 1) % palette.length]
-      currentCA.setColors(col, bgColor)
-      nextCA.setColors(nextCol, bgColor)
-      currentCA.resetZoom()
+      onScreenCA.setColors(col, bgColor)
+      offScreenCA.setColors(nextCol, bgColor)
+      onScreenCA.resetZoom()
 
       reload.remove()
       reload = createReloadButton(wrapper, () => {
-        loadRule(currentCA, currentRule, lookup)
-        const frontCanvas = canvasA.style.zIndex === '2' ? canvasA : canvasB
+        loadRule(onScreenCA, onScreenRule, lookup)
 
         const cleanup = () => {
-          frontCanvas.style.transition = ''
-          frontCanvas.removeEventListener('transitionend', cleanup)
+          onScreenCanvas.style.transition = ''
+          onScreenCanvas.removeEventListener('transitionend', cleanup)
         }
 
-        frontCanvas.addEventListener('transitionend', cleanup)
-        frontCanvas.style.transition = 'transform 0.15s ease'
-        frontCanvas.style.transform = 'scale(0.96)'
+        onScreenCanvas.addEventListener('transitionend', cleanup)
+        onScreenCanvas.style.transition = 'transform 0.15s ease'
+        onScreenCanvas.style.transform = 'scale(0.96)'
         setTimeout(() => {
-          frontCanvas.style.transform = 'scale(1)'
+          onScreenCanvas.style.transform = 'scale(1)'
         }, 150)
       })
 
-      console.log(`Switched to: ${currentRule.name}`)
+      console.log(`Switched to: ${onScreenRule.name}`)
     },
     // --- onCancel -------------------------------------------------------------
-    () => currentCA.play(STEPS_PER_SECOND, currentRule.ruleset),
+    () => onScreenCA.play(STEPS_PER_SECOND, onScreenRule.ruleset),
     // --- onDragStart ----------------------------------------------------------
-    () => currentCA.pause(),
-
+    () => onScreenCA.pause(),
     // --- onPrepareNextCanvas --------------------------------------------------
     () => {
-      nextCA.pause()
-      nextCA.resetZoom()
-      nextRule = generateRandomRule()
-      loadRule(nextCA, nextRule, lookup, 50, false)
+      offScreenCA.pause()
+      offScreenCA.resetZoom()
+      offScreenRule = generateRandomRule()
+      loadRule(offScreenCA, offScreenRule, lookup, 50, false)
     },
   )
 
@@ -747,8 +711,8 @@ export async function setupMobileLayout(
   let cleanupZoomB: CleanupFunction = () => {}
 
   if (ENABLE_ZOOM_AND_PAN) {
-    cleanupZoomA = setupPinchZoomAndPan(canvasA, currentCA)
-    cleanupZoomB = setupPinchZoomAndPan(canvasB, nextCA)
+    cleanupZoomA = setupPinchZoomAndPan(canvasA, onScreenCA)
+    cleanupZoomB = setupPinchZoomAndPan(canvasB, offScreenCA)
   }
 
   const handleResize = () => {
@@ -765,21 +729,14 @@ export async function setupMobileLayout(
       c.style.height = `${screenHeight}px`
     }
 
-    currentCA.pause()
-    nextCA.pause()
-    currentCA.resize(gridRows, gridCols)
-    nextCA.resize(gridRows, gridCols)
+    onScreenCA.pause()
+    offScreenCA.pause()
+    onScreenCA.resize(gridRows, gridCols)
+    offScreenCA.resize(gridRows, gridCols)
 
-    const frontIsA = canvasA.style.zIndex === '2'
     const h = wrapper.clientHeight
-
-    if (frontIsA) {
-      canvasA.style.transform = 'translateY(0)'
-      canvasB.style.transform = `translateY(${h}px)`
-    } else {
-      canvasB.style.transform = 'translateY(0)'
-      canvasA.style.transform = `translateY(-${h}px)`
-    }
+    onScreenCanvas.style.transform = 'translateY(0)'
+    offScreenCanvas.style.transform = `translateY(${h}px)`
 
     console.log(`[resize] ${gridCols}×${gridRows} @ cellSize=${cellSize}px`)
   }
@@ -792,8 +749,8 @@ export async function setupMobileLayout(
   })
 
   return () => {
-    currentCA.pause()
-    nextCA.pause()
+    onScreenCA.pause()
+    offScreenCA.pause()
     cleanupSwipe()
     cleanupZoomA()
     cleanupZoomB()
