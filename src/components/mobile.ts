@@ -15,6 +15,8 @@ import {
 export type CleanupFunction = () => void
 
 interface SwipeHandler {
+  onSwipeStart: () => void
+  onSwipeAbandoned: () => void
   onSwipeUp: () => void
 }
 
@@ -56,6 +58,7 @@ function setupSwipeDetection(
   const handleTouchStart = (e: TouchEvent) => {
     touchStartY = e.touches[0].clientY
     touchStartTime = Date.now()
+    handler.onSwipeStart() // Pause simulation when touch starts
   }
 
   const handleTouchEnd = (e: TouchEvent) => {
@@ -69,6 +72,9 @@ function setupSwipeDetection(
     // Swipe up: positive deltaY, sufficient distance and velocity
     if (deltaY > 50 && velocity > 0.3) {
       handler.onSwipeUp()
+    } else {
+      // Not a valid swipe - resume simulation
+      handler.onSwipeAbandoned()
     }
   }
 
@@ -240,7 +246,20 @@ export async function setupMobileLayout(
 
   // --- Swipe Handler --------------------------------------------------------
   const cleanupSwipe = setupSwipeDetection(container, {
+    onSwipeStart: () => {
+      // Pause simulation when user starts touching
+      cellularAutomata.pause()
+    },
+
+    onSwipeAbandoned: () => {
+      // Resume simulation if swipe wasn't completed
+      const newExpanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, newExpanded)
+    },
+
     onSwipeUp: () => {
+      // Simulation is already paused from onSwipeStart
+
       // Hide instruction after first swipe
       if (!hasSwipedOnce) {
         hasSwipedOnce = true
