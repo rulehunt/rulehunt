@@ -20,6 +20,8 @@ import { createRulesetPanel } from './ruleset.ts'
 import { createSimulationPanel } from './simulation.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
 
+const PROGRESS_BAR_STEPS = 500
+
 // --- Types -----------------------------------------------------------------
 export type CleanupFunction = () => void
 type DisplayMode = 'orbits' | 'full'
@@ -100,7 +102,10 @@ function updateStatisticsDisplay(
 
   if (metadata) {
     const stepCount = metadata.stepCount
-    const progressPercent = Math.min((stepCount / 10000) * 100, 100)
+    const progressPercent = Math.min(
+      (stepCount / PROGRESS_BAR_STEPS) * 100,
+      100,
+    )
     progressBar.set(Math.round(progressPercent))
   }
 
@@ -712,7 +717,7 @@ export async function setupDesktopLayout(
         watchedSteps: stepCount,
         watchedWallMs,
         gridSize: undefined,
-        progress_bar_steps: 10000,
+        progress_bar_steps: PROGRESS_BAR_STEPS,
         requestedSps: metadata?.requestedStepsPerSecond,
         actualSps,
         population: recent.population,
@@ -739,6 +744,9 @@ export async function setupDesktopLayout(
       }, 0)
     })
   }
+
+  // Auto-start simulation
+  btnPlay.click()
 
   // Return cleanup function
   return () => {

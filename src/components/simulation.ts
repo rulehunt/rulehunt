@@ -57,7 +57,7 @@ export function createSimulationPanel(): {
         Play
       </button>
       <label for="steps-per-second" class="ml-2">Steps/sec:</label>
-      <input type="number" id="steps-per-second" min="1" max="60" value="10" class="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
+      <input type="number" id="steps-per-second" min="1" max="1000" value="1000" class="w-auto min-w-[6rem] px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
     </div>
   `
 
