@@ -228,18 +228,47 @@ export class CellularAutomata {
     this.render()
   }
 
+  /**
+   * Zoom while keeping the specified screen point centered
+   * @param zoom - New zoom level
+   * @param screenX - X coordinate in canvas pixels to keep centered
+   * @param screenY - Y coordinate in canvas pixels to keep centered
+   */
+  setZoomCentered(zoom: number, screenX: number, screenY: number) {
+    const oldZoom = this.zoom
+    this.zoom = Math.max(0.5, Math.min(3, zoom))
+
+    // Calculate which grid point is currently at the screen position
+    const gridX = (screenX - this.panX) / oldZoom
+    const gridY = (screenY - this.panY) / oldZoom
+
+    // Calculate new pan to keep that grid point at the same screen position
+    this.panX = screenX - gridX * this.zoom
+    this.panY = screenY - gridY * this.zoom
+
+    // Apply pan boundaries
+    this.constrainPan()
+    this.render()
+  }
+
+  // Also update the constrainPan method to be less restrictive when zoomed in:
   private constrainPan() {
     if (this.zoom <= 1) {
       // When zoomed out, center the grid (no panning)
       this.panX = (this.canvas.width * (1 - this.zoom)) / 2
       this.panY = (this.canvas.height * (1 - this.zoom)) / 2
     } else {
-      // When zoomed in, constrain pan to keep grid visible
-      // Don't pan beyond the grid edges
-      const minPanX = this.canvas.width * (1 - this.zoom)
-      const maxPanX = 0
-      const minPanY = this.canvas.height * (1 - this.zoom)
-      const maxPanY = 0
+      // When zoomed in, allow some panning beyond edges for better UX
+      const gridWidth = this.canvas.width / this.zoom
+      const gridHeight = this.canvas.height / this.zoom
+
+      // Allow panning with some margin
+      const margin = Math.min(this.canvas.width, this.canvas.height) * 0.2
+
+      const minPanX = -gridWidth * this.zoom + margin
+      const maxPanX = this.canvas.width - margin
+      const minPanY = -gridHeight * this.zoom + margin
+      const maxPanY = this.canvas.height - margin
 
       this.panX = Math.max(minPanX, Math.min(maxPanX, this.panX))
       this.panY = Math.max(minPanY, Math.min(maxPanY, this.panY))

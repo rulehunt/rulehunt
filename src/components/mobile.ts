@@ -17,10 +17,11 @@ import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 10
 
-const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.15
-const SWIPE_COMMIT_MIN_DISTANCE = 40
-const SWIPE_VELOCITY_THRESHOLD = -0.25
-const SWIPE_FAST_THROW_THRESHOLD = -0.4
+const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1 // Just 10% of screen height
+const SWIPE_COMMIT_MIN_DISTANCE = 40 // Just 40px
+const SWIPE_VELOCITY_THRESHOLD = -0.15 // Very lenient: -150 px/s
+const SWIPE_FAST_THROW_THRESHOLD = -0.25 // Very lenient: -250 px/s
+const SWIPE_COOLDOWN_MS = 400 // Cooldown between swipe attempts
 
 const LIGHT_FG_COLORS = [
   '#2563eb', // blue-600
@@ -82,8 +83,7 @@ function computeAdaptiveGrid(maxCells = 100_000) {
   return { gridCols, gridRows, cellSize, totalCells, screenWidth, screenHeight }
 }
 
-// --- Dual-Canvas Swipe Handler ----------------------------------------------
-
+// --- Dual-Canvas Swipe Handler with Direction Lock & Momentum Window -------
 function setupDualCanvasSwipe(
   wrapper: HTMLElement,
   canvasA: HTMLCanvasElement,
@@ -97,12 +97,20 @@ function setupDualCanvasSwipe(
   let startT = 0
   let dragging = false
   let directionLocked: 'up' | 'down' | null = null
+  let lastSwipeTime = 0
   const samples: { t: number; y: number }[] = []
 
   const getHeight = () => wrapper.clientHeight
 
   const handleTouchStart = (e: TouchEvent) => {
     if (e.touches.length !== 1) return
+
+    // Cooldown: ignore if too soon after last swipe
+    const now = performance.now()
+    if (now - lastSwipeTime < SWIPE_COOLDOWN_MS) {
+      return
+    }
+
     startY = e.touches[0].clientY
     currentY = startY
     startT = e.timeStamp
@@ -156,12 +164,13 @@ function setupDualCanvasSwipe(
   const handleTouchEnd = (_: TouchEvent) => {
     if (!dragging) return
     dragging = false
+    lastSwipeTime = performance.now()
 
     const height = getHeight()
     const delta = currentY - startY
     const dragDistance = Math.abs(delta)
 
-    // Compute recent (100 ms) velocity
+    // Compute recent (100 ms) velocity from samples
     let vy = 0
     if (samples.length >= 2) {
       const a = samples[0]
@@ -170,13 +179,19 @@ function setupDualCanvasSwipe(
       vy = (b.y - a.y) / dt // px/ms; negative = upward
     }
 
+    // HEAVILY bias toward committing - only cancel if clearly unintentional
+    const tinyAccidentalMove = dragDistance < 15 // Less than 15px = accidental
+    const slowPullback = delta > 0 // Pulled back down
+
     const fastFlick = vy < SWIPE_FAST_THROW_THRESHOLD
     const normalFlick =
       dragDistance > height * SWIPE_COMMIT_THRESHOLD_PERCENT ||
       (dragDistance > SWIPE_COMMIT_MIN_DISTANCE &&
         vy < SWIPE_VELOCITY_THRESHOLD)
 
-    const shouldCommit = fastFlick || normalFlick
+    // Only cancel if it's clearly accidental
+    const shouldCommit =
+      !tinyAccidentalMove && !slowPullback && (fastFlick || normalFlick)
 
     const transitionDuration = shouldCommit ? '0.35s' : '0.25s'
     const transition =
@@ -213,17 +228,15 @@ function setupDualCanvasSwipe(
   }
 }
 
-// --- Pinch Zoom & Pan -------------------------------------------------------
+// --- Pinch Zoom & Pan (centered on midpoint) -------------------------------
 function setupPinchZoomAndPan(
   canvas: HTMLCanvasElement,
   cellularAutomata: CellularAutomata,
 ): CleanupFunction {
   let initialDistance = 0
   let initialZoom = 1
-  let lastMidX = 0
-  let lastMidY = 0
-  let initialPanX = 0
-  let initialPanY = 0
+  let zoomCenterX = 0
+  let zoomCenterY = 0
 
   const handleTouchStart = (e: TouchEvent) => {
     if (e.touches.length === 2) {
@@ -233,16 +246,14 @@ function setupPinchZoomAndPan(
       initialDistance = Math.sqrt(dx * dx + dy * dy)
       initialZoom = cellularAutomata.getZoom()
 
+      // Calculate midpoint in canvas coordinates
       const rect = canvas.getBoundingClientRect()
-      lastMidX =
+      zoomCenterX =
         ((t1.clientX + t2.clientX) / 2 - rect.left) *
         (canvas.width / rect.width)
-      lastMidY =
+      zoomCenterY =
         ((t1.clientY + t2.clientY) / 2 - rect.top) *
         (canvas.height / rect.height)
-      const pan = cellularAutomata.getPan()
-      initialPanX = pan.x
-      initialPanY = pan.y
     }
   }
 
@@ -258,23 +269,8 @@ function setupPinchZoomAndPan(
       const scaleChange = distance / initialDistance
       const newZoom = initialZoom * scaleChange
 
-      const rect = canvas.getBoundingClientRect()
-      const midX =
-        ((t1.clientX + t2.clientX) / 2 - rect.left) *
-        (canvas.width / rect.width)
-      const midY =
-        ((t1.clientY + t2.clientY) / 2 - rect.top) *
-        (canvas.height / rect.height)
-      const deltaX = midX - lastMidX
-      const deltaY = midY - lastMidY
-
-      cellularAutomata.setZoomAndPan(
-        newZoom,
-        midX,
-        midY,
-        initialPanX + deltaX,
-        initialPanY + deltaY,
-      )
+      // Zoom centered on the midpoint
+      cellularAutomata.setZoomCentered(newZoom, zoomCenterX, zoomCenterY)
     }
   }
 
