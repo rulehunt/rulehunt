@@ -11,7 +11,12 @@ import {
   makeC4Ruleset,
   randomC4RulesetByDensity,
 } from '../utils.ts'
+import { appendDebugLine, createDebugFooter } from './debugFooter.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
+
+// --- Feature Flags ----------------------------------------------------------
+const ENABLE_ZOOM_AND_PAN = false
+const ENABLE_DEBUG = true
 
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
@@ -57,6 +62,15 @@ interface RuleData {
   ruleset: Ruleset
 }
 
+interface SwipeDebugInfo {
+  dragDistance: number
+  velocity: number
+  direction: string
+  committed: boolean
+  reason: string
+  timestamp: string
+}
+
 // --- Helpers ----------------------------------------------------------------
 
 /**
@@ -91,6 +105,7 @@ function setupDualCanvasSwipe(
   onCommit: () => void,
   onCancel: () => void,
   onDragStart?: () => void,
+  debugCallback?: (info: SwipeDebugInfo) => void,
 ): CleanupFunction {
   let startY = 0
   let currentY = 0
@@ -192,6 +207,28 @@ function setupDualCanvasSwipe(
     // Only cancel if it's clearly accidental
     const shouldCommit =
       !tinyAccidentalMove && !slowPullback && (fastFlick || normalFlick)
+
+    // Debug info
+    const debugInfo: SwipeDebugInfo = {
+      dragDistance: Math.round(dragDistance),
+      velocity: Math.round(vy * 1000), // Convert to px/s
+      direction: delta < 0 ? 'up' : 'down',
+      committed: shouldCommit,
+      reason: shouldCommit
+        ? fastFlick
+          ? 'fast flick'
+          : 'normal flick'
+        : tinyAccidentalMove
+          ? 'too small'
+          : slowPullback
+            ? 'pulled back'
+            : 'threshold not met',
+      timestamp: new Date().toLocaleTimeString(),
+    }
+
+    if (debugCallback) {
+      debugCallback(debugInfo)
+    }
 
     const transitionDuration = shouldCommit ? '0.35s' : '0.25s'
     const transition =
@@ -404,6 +441,13 @@ export async function setupMobileLayout(
   const cleanupHeader = setupMobileHeader(headerElements)
   container.appendChild(headerRoot)
 
+  // Debug footer
+  let debugFooter: ReturnType<typeof createDebugFooter> | null = null
+  if (ENABLE_DEBUG) {
+    debugFooter = createDebugFooter()
+    container.appendChild(debugFooter.container)
+  }
+
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   const palette = isDark ? DARK_FG_COLORS : LIGHT_FG_COLORS
   const bgColor = isDark ? '#1e1e1e' : '#ffffff'
@@ -515,6 +559,16 @@ export async function setupMobileLayout(
     }, 150)
   })
 
+  // Debug callback
+  const debugCallback =
+    ENABLE_DEBUG && debugFooter
+      ? (info: SwipeDebugInfo) => {
+          const debugText = `${info.timestamp} | ${info.direction.toUpperCase()} | dist:${info.dragDistance}px vel:${info.velocity}px/s
+→ ${info.committed ? '✅ COMMIT' : '❌ CANCEL'} (${info.reason})`
+          appendDebugLine(debugFooter, debugText)
+        }
+      : undefined
+
   let hasSwipedOnce = false
   const cleanupSwipe = setupDualCanvasSwipe(
     wrapper,
@@ -581,10 +635,17 @@ export async function setupMobileLayout(
     },
     () => currentCA.play(STEPS_PER_SECOND, currentRule.ruleset),
     () => currentCA.pause(),
+    debugCallback,
   )
 
-  const cleanupZoomA = setupPinchZoomAndPan(canvasA, currentCA)
-  const cleanupZoomB = setupPinchZoomAndPan(canvasB, nextCA)
+  // Conditionally setup zoom and pan based on feature flag
+  let cleanupZoomA: CleanupFunction = () => {}
+  let cleanupZoomB: CleanupFunction = () => {}
+
+  if (ENABLE_ZOOM_AND_PAN) {
+    cleanupZoomA = setupPinchZoomAndPan(canvasA, currentCA)
+    cleanupZoomB = setupPinchZoomAndPan(canvasB, nextCA)
+  }
 
   const handleResize = () => {
     const { gridCols, gridRows, cellSize, screenWidth, screenHeight } =
