@@ -135,6 +135,15 @@ function setupDualCanvasSwipe(
   }
 
   const handleTouchStart = (e: TouchEvent) => {
+    const target = e.target as HTMLElement | null
+    if (
+      target?.closest(
+        '[data-swipe-ignore="true"], button, a, input, select, textarea',
+      )
+    ) {
+      return
+    }
+
     if (e.touches.length !== 1) return
     const now = performance.now()
     if (now - lastSwipeTime < SWIPE_COOLDOWN_MS) return
@@ -467,6 +476,9 @@ function saveRunStatistics(
 // --- Reload Button ----------------------------------------------------------
 function createReloadButton(parent: HTMLElement, onReload: () => void) {
   const btn = document.createElement('button')
+  btn.setAttribute('data-swipe-ignore', 'true') // <-- key line
+  btn.style.touchAction = 'manipulation' // avoids 300ms delay on iOS
+
   btn.innerHTML = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
          fill="currentColor" class="w-6 h-6">
@@ -474,15 +486,30 @@ function createReloadButton(parent: HTMLElement, onReload: () => void) {
     </svg>`
   btn.className =
     'absolute bottom-4 right-4 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition z-10'
-  btn.title = 'Reload simulation'
-  btn.onclick = () => {
+
+  // Swallow events so they don't reach the wrapper
+  const swallow = (e: Event) => e.stopPropagation()
+  btn.addEventListener('pointerdown', swallow)
+  btn.addEventListener('pointerup', swallow)
+  btn.addEventListener('mousedown', swallow)
+  btn.addEventListener('mouseup', swallow)
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation()
     onReload()
+    // icon spin
     btn.style.transition = 'transform 0.4s ease'
     btn.style.transform = 'rotate(360deg)'
     setTimeout(() => {
       btn.style.transform = ''
     }, 400)
-  }
+  })
+  // Also swallow touch* (with passive:true where allowed)
+  btn.addEventListener('touchstart', swallow, { passive: true })
+  btn.addEventListener('touchmove', swallow, { passive: true })
+  btn.addEventListener('touchend', swallow, { passive: true })
+  btn.addEventListener('touchcancel', swallow, { passive: true })
+
+  btn.title = 'Reload simulation'
   parent.appendChild(btn)
   return btn
 }
@@ -535,6 +562,7 @@ export async function setupMobileLayout(
   instruction.className =
     'fixed bottom-8 left-0 right-0 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none transition-opacity duration-300'
   instruction.style.opacity = '0.7'
+  instruction.style.zIndex = '1000'
   instruction.style.transition = 'opacity 0.6s ease'
   instruction.innerHTML = `<div class="flex flex-col items-center gap-2">
       <svg class="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -605,20 +633,39 @@ export async function setupMobileLayout(
   })
 
   let reload = createReloadButton(wrapper, () => {
-    loadRule(currentCA, currentRule, lookup)
-    const frontCanvas = canvasA.style.zIndex === '2' ? canvasA : canvasB
+    if (isTransitioning) return
+    isTransitioning = true
 
+    // 1) apply new seed/rule to the current (front) CA
+    loadRule(currentCA, currentRule, lookup)
+
+    // 2) figure out which canvas is front/back right now
+    const frontIsA = canvasA.style.zIndex === '2'
+    const frontCanvas = frontIsA ? canvasA : canvasB
+    const backCanvas = frontIsA ? canvasB : canvasA
+
+    // 3) ensure the back canvas never peeks during the bounce
+    const prevVis = backCanvas.style.visibility
+    backCanvas.style.visibility = 'hidden'
+
+    // 4) do the quick bounce
     const cleanup = () => {
       frontCanvas.style.transition = ''
       frontCanvas.removeEventListener('transitionend', cleanup)
+      backCanvas.style.visibility = prevVis || ''
+      isTransitioning = false
     }
 
     frontCanvas.addEventListener('transitionend', cleanup)
+    // force layout so the transition applies
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    frontCanvas.offsetWidth
+
     frontCanvas.style.transition = 'transform 0.15s ease'
     frontCanvas.style.transform = 'scale(0.96)'
     setTimeout(() => {
       frontCanvas.style.transform = 'scale(1)'
-    }, 150)
+    }, 15)
   })
 
   let hasSwipedOnce = false
