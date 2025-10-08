@@ -52,9 +52,9 @@ export function createStatsOverlay(): {
 
   const header = document.createElement('div')
   header.className =
-    'sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between'
+    'sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-end'
   header.innerHTML = `
-    <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Run Statistics</h2>
+
     <button 
       id="close-stats"
       class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -93,7 +93,6 @@ export function createStatsOverlay(): {
     content.innerHTML = `
       <div class="space-y-4">
         <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">Rule Information</h3>
           <div class="space-y-2 font-mono text-sm">
             <div>
               <span class="text-gray-500 dark:text-gray-400">Name:</span>

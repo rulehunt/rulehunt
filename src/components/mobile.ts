@@ -144,6 +144,7 @@ function waitForTransitionEnd(el: HTMLElement): Promise<void> {
 //    - Prepares offScreen canvas with fresh rule for NEXT swap
 // This timing eliminates race conditions and prevents visible flashes
 let isTransitioning = false
+let offscreenReady = false
 function setupDualCanvasSwipe(
   wrapper: HTMLElement,
   outgoingCanvas: HTMLCanvasElement,
@@ -169,6 +170,8 @@ function setupDualCanvasSwipe(
   }
 
   const handleTouchStart = (e: TouchEvent) => {
+    if (!offscreenReady) return
+
     const target = e.target as HTMLElement | null
     if (
       target?.closest(
@@ -444,8 +447,6 @@ function prepareRule(
   if (!rule.expanded && (rule.ruleset as number[]).length === 140) {
     rule.expanded = expandC4Ruleset(rule.ruleset as C4Ruleset, orbitLookup)
   }
-
-  cellularAutomata.render()
 }
 
 /**
@@ -732,6 +733,7 @@ export async function setupMobileLayout(
   startRule(onScreenCA, onScreenRule)
 
   prepareRule(offScreenCA, offScreenRule, lookup)
+  offscreenReady = true
 
   onScreenCA.getStatistics().initializeSimulation({
     name: `Mobile - ${onScreenRule.name}`,
@@ -817,6 +819,8 @@ export async function setupMobileLayout(
     offScreenCanvas,
     // --- onCommit: Called AFTER animation, swaps and prepares for next -------
     () => {
+      offscreenReady = false
+
       if (!hasSwipedOnce) {
         hasSwipedOnce = true
         instruction.style.opacity = '0'
@@ -828,10 +832,6 @@ export async function setupMobileLayout(
       ;[onScreenCanvas, offScreenCanvas] = [offScreenCanvas, onScreenCanvas]
       ;[onScreenCA, offScreenCA] = [offScreenCA, onScreenCA]
       ;[onScreenRule, offScreenRule] = [offScreenRule, onScreenRule]
-
-      // clear the old data
-      offScreenCA.pause()
-      offScreenCA.clearGrid() // also clears canvas
 
       // Update z-index and positioning explicitly
       const h = onScreenCanvas.height
@@ -860,6 +860,7 @@ export async function setupMobileLayout(
         // Prepare offscreen CA for the next swipe with explicit render
         offScreenRule = generateRandomRule()
         prepareRule(offScreenCA, offScreenRule, lookup, 50)
+        offscreenReady = true
       }, 16)
 
       reload.remove()
