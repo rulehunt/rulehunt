@@ -684,6 +684,8 @@ export async function setupDesktopLayout(
     }
   })
 
+  // Save button click handler// In the desktop layout file, replace the save button click handler with this:
+
   // Save button click handler
   if (progressBar.elements.saveButton) {
     addEventListener(progressBar.elements.saveButton, 'click', () => {
@@ -699,14 +701,18 @@ export async function setupDesktopLayout(
         entropy8x8: 0,
       }
 
+      // Always compute fresh hex from current ruleset to avoid placeholder text
+      const rulesetHex = c4RulesetToHex(currentRuleset)
+      const rulesetName = ruleLabelDisplay.textContent || 'Unknown'
+
       const interestScore = stats.calculateInterestScore()
       const watchedWallMs = stats.getElapsedTime()
       const actualSps = stats.getActualStepsPerSecond()
       const stepCount = metadata?.stepCount ?? 0
 
       const runPayload: Omit<RunSubmission, 'userId' | 'userLabel'> = {
-        rulesetName: metadata?.rulesetName ?? 'Unknown',
-        rulesetHex: metadata?.rulesetHex ?? c4RulesetToHex(currentRuleset),
+        rulesetName,
+        rulesetHex,
         seed: 0,
         seedType: (metadata?.seedType ?? 'patch') as
           | 'center'

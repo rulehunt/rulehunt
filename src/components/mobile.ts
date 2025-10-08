@@ -256,6 +256,9 @@ export async function setupMobileLayout(
         entropy8x8: 0,
       }
 
+      // Always compute fresh hex from current ruleset to avoid placeholder text
+      const rulesetHex = c4RulesetToHex(currentRuleset)
+
       const interestScore = stats.calculateInterestScore()
       const watchedWallMs = stats.getElapsedTime()
       const actualSps = stats.getActualStepsPerSecond()
@@ -265,8 +268,8 @@ export async function setupMobileLayout(
       const runPayload: RunSubmission = {
         userId: identity.userId,
         userLabel: identity.userLabel,
-        rulesetName: metadata?.rulesetName ?? currentRuleName,
-        rulesetHex: metadata?.rulesetHex ?? c4RulesetToHex(currentRuleset),
+        rulesetName: currentRuleName,
+        rulesetHex,
         seed: 0,
         seedType: (metadata?.seedType ?? 'patch') as
           | 'center'
