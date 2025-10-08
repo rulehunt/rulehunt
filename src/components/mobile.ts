@@ -251,7 +251,6 @@ function setupDualCanvasSwipe(
     })
 
     const duration = shouldCommit ? 0.35 : 0.25
-    const ms = duration * 1000
     const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1), opacity ${duration}s ease`
     canvasA.style.transition = transition
     canvasB.style.transition = transition
