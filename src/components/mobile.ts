@@ -11,7 +11,11 @@ import {
   makeC4Ruleset,
   randomC4RulesetByDensity,
 } from '../utils.ts'
-import { createDebugFooter, debugFooterLog } from './debugFooter.ts'
+import {
+  createDebugFooter,
+  debugFooterClear,
+  debugFooterLog,
+} from './debugFooter.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
 // --- Feature Flags ----------------------------------------------------------
@@ -134,6 +138,7 @@ function setupDualCanvasSwipe(
 
     startY = e.touches[0].clientY
 
+    debugFooterClear()
     debugFooterLog('DRAG_START', {
       startY,
       isTransitioning,
@@ -172,11 +177,6 @@ function setupDualCanvasSwipe(
       canvasB.style.opacity = '1'
       return
     }
-
-    debugFooterLog('DRAG_MOVE', {
-      delta: dy,
-      progress: Math.abs(dy) / getHeight(),
-    })
 
     currentY = y
     samples.push({ t: e.timeStamp, y })
@@ -284,11 +284,6 @@ function setupDualCanvasSwipe(
     canvasA.style.transition = transition
     canvasB.style.transition = transition
 
-    debugFooterLog('ANIM_START', {
-      shouldCommit,
-      duration: transitionDuration,
-    })
-
     void canvasA.offsetWidth // 👈 force layout flush before applying transform
 
     if (shouldCommit) {
@@ -301,6 +296,9 @@ function setupDualCanvasSwipe(
       const ms = Number.parseFloat(transitionDuration) * 1000
       setTimeout(onCommit, ms)
       setTimeout(() => {
+        debugFooterLog('FINISHING', {
+          isTransitioning,
+        })
         isTransitioning = false
       }, ms + 50)
     } else {
@@ -311,6 +309,9 @@ function setupDualCanvasSwipe(
       const ms = Number.parseFloat(transitionDuration) * 1000
       setTimeout(onCancel, ms)
       setTimeout(() => {
+        debugFooterLog('FINISHING', {
+          isTransitioning,
+        })
         isTransitioning = false
       }, ms + 50)
     }
@@ -604,6 +605,7 @@ export async function setupMobileLayout(
 
   loadRule(currentCA, currentRule, lookup)
   loadRule(nextCA, nextRule, lookup)
+  nextCA.pause()
 
   currentCA.getStatistics().initializeSimulation({
     name: `Mobile - ${currentRule.name}`,
@@ -653,6 +655,9 @@ export async function setupMobileLayout(
       canvasB.style.transform = `translateY(${h}px)`
       canvasB.style.opacity = '1'
 
+      nextCA.pause()
+      currentCA.play(STEPS_PER_SECOND, currentRule.ruleset)
+
       colorIndex = (colorIndex + 1) % palette.length
       const col = palette[colorIndex]
       const nextCol = palette[(colorIndex + 1) % palette.length]
@@ -665,6 +670,7 @@ export async function setupMobileLayout(
 
       nextRule = generateRandomRule()
       loadRule(nextCA, nextRule, lookup)
+      nextCA.pause()
 
       currentCA.getStatistics().initializeSimulation({
         name: `Mobile - ${currentRule.name}`,

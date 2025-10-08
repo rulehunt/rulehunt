@@ -26,7 +26,7 @@ export function createDebugFooter(): DebugFooterElements {
 export function updateDebugText(
   footer: DebugFooterElements,
   text: string,
-  maxLines = 6,
+  maxLines = 10,
 ): void {
   const lines = footer.textElement.textContent
     ? footer.textElement.textContent.split('\n')
@@ -50,6 +50,12 @@ export function debugFooterLog(
   const time = new Date().toLocaleTimeString()
   const msg = `[${time}] ${tag}: ${JSON.stringify(data)}`
   updateDebugText(globalFooter, msg)
+}
+
+export function debugFooterClear(): void {
+  if (!globalFooter) return
+
+  updateDebugText(globalFooter, '')
 }
 
 // --- Optional helper for explicit control -----------------------------------
