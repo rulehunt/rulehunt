@@ -713,7 +713,7 @@ export async function setupDesktopLayout(
       const runPayload: Omit<RunSubmission, 'userId' | 'userLabel'> = {
         rulesetName,
         rulesetHex,
-        seed: 0,
+        seed: cellularAutomata.getSeed(),
         seedType: (metadata?.seedType ?? 'patch') as
           | 'center'
           | 'random'

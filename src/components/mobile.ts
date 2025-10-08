@@ -415,7 +415,7 @@ export async function setupMobileLayout(
         userLabel: identity.userLabel,
         rulesetName: currentRuleName,
         rulesetHex,
-        seed: 0,
+        seed: cellularAutomata.getSeed(),
         seedType: (metadata?.seedType ?? 'patch') as
           | 'center'
           | 'random'
