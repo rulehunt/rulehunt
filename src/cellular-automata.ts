@@ -16,9 +16,9 @@ function makeRng(initialSeed: number) {
 function hexToRGB(hex: string): [number, number, number] {
   const h = hex.startsWith('#') ? hex.slice(1) : hex
   return [
-    parseInt(h.slice(0, 2), 16),
-    parseInt(h.slice(2, 4), 16),
-    parseInt(h.slice(4, 6), 16),
+    Number.parseInt(h.slice(0, 2), 16),
+    Number.parseInt(h.slice(2, 4), 16),
+    Number.parseInt(h.slice(4, 6), 16),
   ]
 }
 
@@ -27,7 +27,6 @@ export class CellularAutomata {
   private nextGrid: Uint8Array
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
-  private cellSize: number
   private isPlaying = false
   private playInterval: number | null = null
   private statistics: StatisticsTracker
@@ -68,7 +67,6 @@ export class CellularAutomata {
     this.gridRows = options.gridRows
     this.gridCols = options.gridCols
     this.gridArea = this.gridRows * this.gridCols
-    this.cellSize = canvas.width / this.gridCols
     this.fgColor = options.fgColor
     this.bgColor = options.bgColor
     this.fgRGB = hexToRGB(this.fgColor)
@@ -80,11 +78,7 @@ export class CellularAutomata {
 
     // Precompute neighbor offsets for the 3x3 kernel
     const c = this.gridCols
-    this.neighborOffsets = [
-      -c - 1, -c, -c + 1,
-      -1, 0, 1,
-      c - 1, c, c + 1,
-    ]
+    this.neighborOffsets = [-c - 1, -c, -c + 1, -1, 0, 1, c - 1, c, c + 1]
 
     this.imageData = this.ctx.createImageData(this.gridCols, this.gridRows)
     this.pixelData = this.imageData.data
@@ -324,7 +318,6 @@ export class CellularAutomata {
     this.gridRows = newRows
     this.gridCols = newCols
     this.gridArea = newRows * newCols
-    this.cellSize = this.canvas.width / this.gridCols
     this.grid = new Uint8Array(this.gridArea)
     this.nextGrid = new Uint8Array(this.gridArea)
     this.statistics = new StatisticsTracker(this.gridRows, this.gridCols)
