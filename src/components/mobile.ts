@@ -364,6 +364,9 @@ export async function setupMobileLayout(
     c.width = size
     c.height = size
     c.className = 'absolute inset-0 rounded-lg border-4 touch-none'
+    // Set CSS dimensions to match buffer size
+    c.style.width = `${size}px`
+    c.style.height = `${size}px`
     c.style.borderColor = palette[colorIndex]
     // Add smooth border color transition
     c.style.transition = 'border-color 0.5s ease'
@@ -426,8 +429,6 @@ export async function setupMobileLayout(
     canvasA.style.transform = 'scale(0.96)'
     setTimeout(() => {
       canvasA.style.transform = 'scale(1)'
-      // Restore border color transition after scale animation
-
       requestAnimationFrame(() => {
         canvasA.style.transition = 'border-color 0.5s ease'
       })
@@ -499,9 +500,9 @@ export async function setupMobileLayout(
         canvasA.style.transform = 'scale(0.96)'
         setTimeout(() => {
           canvasA.style.transform = 'scale(1)'
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             canvasA.style.transition = 'border-color 0.5s ease'
-          }, 150)
+          })
         }, 150)
       })
 
@@ -519,7 +520,7 @@ export async function setupMobileLayout(
     wrapper.style.width = `${newSize}px`
     wrapper.style.height = `${newSize}px`
 
-    // CSS resize only (preserve pixel buffer)
+    // Only resize CSS dimensions - setting canvas.width/height clears the buffer!
     for (const c of [canvasA, canvasB]) {
       c.style.width = `${newSize}px`
       c.style.height = `${newSize}px`
@@ -529,7 +530,6 @@ export async function setupMobileLayout(
       canvasB.style.transform = `translateY(${newSize}px)`
     }
   }
-
   window.addEventListener('resize', handleResize)
 
   return () => {
