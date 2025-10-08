@@ -117,10 +117,7 @@ export const onRequestPost = async (
     // --- D1 or SQL-related errors ---
     if (error instanceof Error && /D1|SQL|prepare|bind/i.test(error.message)) {
       console.error('Database error saving run:', error)
-      return json(
-        { ok: false, error: 'Failed to save run to database' },
-        500,
-      )
+      return json({ ok: false, error: 'Failed to save run to database' }, 500)
     }
 
     // --- Unknown unexpected errors ---
