@@ -85,7 +85,7 @@ Our algorithm evaluates simulations based on:
 - **Activity levels** (ongoing changes vs. static patterns)
 - **The Goldilocks zone** (population density between 10-70%)
 
-Pattern scores are stored in the database after 1000 steps of evolution.
+Pattern scores are stored in the database automatically.
 
 ## ✨ Current Features
 
@@ -149,10 +149,10 @@ git clone https://github.com/irgolic/rulehunt.git
 cd rulehunt
 
 # Install dependencies (if using a build system)
-npm install
+pnpm install
 
 # Run development server
-npm run dev
+pnpm run dev
 ```
 
 ### Usage

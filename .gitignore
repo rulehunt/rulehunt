@@ -26,3 +26,6 @@ dist-ssr
 /result
 
 .claude/
+
+# Cloudflare Wrangler local state (D1, KV, R2, etc.)
+.wrangler/

@@ -129,9 +129,97 @@ export const C4RulesetHex = z
   .regex(/^[0-9a-f]{35}$/i)
 
 // ============================================================================
-// Type Exports
+// Database schema for run submissions (Cloudflare D1)
 // ============================================================================
 
+// Shared enums reused from your metadata types
+export const SeedType = z.enum(['center', 'random', 'patch'])
+
+// Scores summarized from GridStatistics
+export const Scores = z.object({
+  population: z.number(),
+  activity: z.number(),
+  populationChange: z.number(),
+  entropy2x2: z.number(),
+  entropy4x4: z.number(),
+  entropy8x8: z.number(),
+  interestScore: z.number(),
+})
+
+// Optional metadata for simulation environment
+export const SimulationInfo = z.object({
+  rulesetName: z.string(),
+  rulesetHex: z.string().regex(/^[0-9a-f]{35}$/i),
+  seed: z.number().int(),
+  seedType: SeedType,
+  seedPercentage: z.number().optional(),
+  stepCount: z.number().int().nonnegative(),
+  watchedSteps: z.number().int().nonnegative(),
+  watchedWallMs: z.number().int().nonnegative(),
+  gridSize: z.number().int().positive().optional(),
+  progress_bar_steps: z.number().int().positive().optional(),
+  requestedSps: z.number().optional(),
+  actualSps: z.number().optional(),
+  simVersion: z.string(),
+  engineCommit: z.string().optional(),
+})
+
+// User identity fields (anonymous-safe)
+export const UserIdentity = z.object({
+  userId: z.string().uuid().or(z.literal('anonymous')).default('anonymous'),
+  userLabel: z.string().optional(),
+})
+
+const ISODateString = z
+  .string()
+  .regex(
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/,
+    'must be a valid ISO 8601 datetime string',
+  )
+
+// Full database record as it’s inserted into D1
+export const RunRecord = z
+  .object({
+    runId: z.string().optional(),
+    submittedAt: ISODateString.optional(),
+    ...UserIdentity.shape,
+    ...SimulationInfo.shape,
+    ...Scores.shape,
+    extraScores: z.record(z.string(), z.any()).optional(),
+  })
+  .strict()
+
+// When saving from the frontend, you’ll usually send this shape:
+export const RunSubmission = RunRecord.omit({
+  runId: true,
+  submittedAt: true,
+})
+
+export const RunQuery = z.object({
+  userId: z.string().uuid().or(z.literal('anonymous')).optional(),
+  rulesetHex: z
+    .string()
+    .regex(/^[0-9a-f]{35}$/i)
+    .optional(),
+  limit: z.number().int().positive().max(100).default(20),
+  sortBy: z
+    .enum(['submittedAt', 'interestScore', 'entropy4x4'])
+    .default('submittedAt'),
+  order: z.enum(['asc', 'desc']).default('desc'),
+})
+
+// ============================================================================
+// Type exports
+// ============================================================================
+export type RunSubmission = z.infer<typeof RunSubmission>
+export type RunRecord = z.infer<typeof RunRecord>
+export type RunInsert = {
+  [K in keyof RunSubmission]: RunSubmission[K] | null
+}
+export type RunQuery = z.infer<typeof RunQuery>
+export type Scores = z.infer<typeof Scores>
+export type SimulationInfo = z.infer<typeof SimulationInfo>
+export type UserIdentity = z.infer<typeof UserIdentity>
 export type CellState = z.infer<typeof CellState>
 export type Coordinate = z.infer<typeof Coordinate>
 export type GridDimensions = z.infer<typeof GridDimensions>

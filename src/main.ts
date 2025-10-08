@@ -250,10 +250,56 @@ function handleCanvasClick(
   }
 }
 
+// --- Mobile Detection -------------------------------------------------------
+function isMobile(): boolean {
+  return window.innerWidth < 1024 // lg breakpoint
+}
+
+// --- Swipe Detection --------------------------------------------------------
+interface SwipeHandler {
+  onSwipeUp: () => void
+}
+
+function setupSwipeDetection(element: HTMLElement, handler: SwipeHandler) {
+  let touchStartY = 0
+  let touchStartTime = 0
+
+  element.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY
+    touchStartTime = Date.now()
+  })
+
+  element.addEventListener('touchend', (e) => {
+    const touchEndY = e.changedTouches[0].clientY
+    const touchEndTime = Date.now()
+
+    const deltaY = touchStartY - touchEndY
+    const deltaTime = touchEndTime - touchStartTime
+    const velocity = deltaY / deltaTime
+
+    // Swipe up: positive deltaY, sufficient distance and velocity
+    if (deltaY > 50 && velocity > 0.3) {
+      handler.onSwipeUp()
+    }
+  })
+}
+
 // --- Main ------------------------------------------------------------------
 window.addEventListener('DOMContentLoaded', async () => {
   const appRoot = document.getElementById('app') as HTMLDivElement
+  const mobile = isMobile()
 
+  if (mobile) {
+    // Mobile layout - full screen simulation only
+    await setupMobileLayout(appRoot)
+  } else {
+    // Desktop layout - full UI
+    await setupDesktopLayout(appRoot)
+  }
+})
+
+// --- Desktop Layout ---------------------------------------------------------
+async function setupDesktopLayout(appRoot: HTMLDivElement) {
   // Create header with theme toggle and GitHub link
   const header = createHeader()
   appRoot.appendChild(header.root)
@@ -261,7 +307,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Create progress bar
   const progressBar = createProgressBar(0)
   const progressContainer = document.createElement('div')
-  progressContainer.className = 'w-full px-6 py-4 border-b border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900'
+  progressContainer.className =
+    'w-full px-6 py-4 border-b border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900'
   const progressWrapper = document.createElement('div')
   progressWrapper.className = 'max-w-7xl mx-auto'
   progressWrapper.appendChild(progressBar.root)
@@ -359,7 +406,11 @@ window.addEventListener('DOMContentLoaded', async () => {
       cellularAutomata.randomSeed(percentage)
     }
     cellularAutomata.render()
-    updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
+    updateStatisticsDisplay(
+      cellularAutomata,
+      summaryPanel.elements,
+      progressBar,
+    )
 
     // Initialize simulation metadata
     initializeSimulationMetadata()
@@ -409,7 +460,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   setupTheme(header.elements.themeToggle, () => {
     // Re-render canvases when theme changes
     cellularAutomata.render()
-    updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
+    updateStatisticsDisplay(
+      cellularAutomata,
+      summaryPanel.elements,
+      progressBar,
+    )
     renderRule(
       currentRuleset,
       orbitLookup,
@@ -588,7 +643,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   btnStep.addEventListener('click', () => {
     const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
     cellularAutomata.step(expanded)
-    updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
+    updateStatisticsDisplay(
+      cellularAutomata,
+      summaryPanel.elements,
+      progressBar,
+    )
   })
 
   btnReset.addEventListener('click', () => {
@@ -621,7 +680,11 @@ window.addEventListener('DOMContentLoaded', async () => {
 
       // Update statistics display periodically
       statsUpdateInterval = window.setInterval(() => {
-        updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
+        updateStatisticsDisplay(
+          cellularAutomata,
+          summaryPanel.elements,
+          progressBar,
+        )
       }, 100)
     }
   })
@@ -645,7 +708,11 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
 
       statsUpdateInterval = window.setInterval(() => {
-        updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
+        updateStatisticsDisplay(
+          cellularAutomata,
+          summaryPanel.elements,
+          progressBar,
+        )
       }, 100)
     }
   })
@@ -658,4 +725,127 @@ window.addEventListener('DOMContentLoaded', async () => {
       applyInitialCondition()
     }
   })
-})
+}
+
+// --- Mobile Layout ----------------------------------------------------------
+async function setupMobileLayout(appRoot: HTMLDivElement) {
+  // Create full-screen container
+  const container = document.createElement('div')
+  container.className =
+    'fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900'
+
+  // Create canvas that fills the screen
+  const canvas = document.createElement('canvas')
+  canvas.className = 'touch-none'
+
+  // Size canvas to fill screen
+  const size = Math.min(window.innerWidth, window.innerHeight)
+  canvas.width = size
+  canvas.height = size
+  canvas.style.width = `${size}px`
+  canvas.style.height = `${size}px`
+
+  container.appendChild(canvas)
+
+  // Add swipe instruction overlay
+  const instruction = document.createElement('div')
+  instruction.className =
+    'fixed bottom-8 left-0 right-0 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none'
+  instruction.style.opacity = '0.7'
+  instruction.innerHTML = `
+    <div class="flex flex-col items-center gap-2">
+      <svg class="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+      </svg>
+      <span>Swipe up for new rule</span>
+    </div>
+  `
+  container.appendChild(instruction)
+
+  appRoot.appendChild(container)
+
+  // Load orbit data
+  const response = await fetch('./resources/c4-orbits.json')
+  const orbitsData: C4OrbitsData = await response.json()
+  const orbitLookup = buildOrbitLookup(orbitsData)
+
+  // Initialize cellular automata
+  const cellularAutomata = new CellularAutomata(canvas)
+
+  // Start with Conway
+  let currentRuleset = makeC4Ruleset(conwayRule, orbitLookup)
+  let currentRuleName = "Conway's Game of Life"
+
+  // Auto-play at 10 steps per second
+  const stepsPerSecond = 10
+  const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+  cellularAutomata.play(stepsPerSecond, expanded)
+
+  // Initialize simulation metadata
+  const stats = cellularAutomata.getStatistics()
+  stats.initializeSimulation({
+    name: `Mobile - ${currentRuleName}`,
+    seedType: 'patch',
+    seedPercentage: 50,
+    rulesetName: currentRuleName,
+    rulesetHex: c4RulesetToHex(currentRuleset),
+    startTime: Date.now(),
+    requestedStepsPerSecond: stepsPerSecond,
+  })
+
+  // Setup swipe detection
+  setupSwipeDetection(container, {
+    onSwipeUp: () => {
+      // Generate new random rule
+      const density = Math.random() * 0.6 + 0.2 // 20-80% density
+      currentRuleset = randomC4RulesetByDensity(density)
+      currentRuleName = `Random (${Math.round(density * 100)}%)`
+
+      // Stop current simulation
+      cellularAutomata.pause()
+
+      // Reset with new rule
+      cellularAutomata.patchSeed(50)
+
+      // Start playing with new rule
+      const newExpanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, newExpanded)
+
+      // Update metadata
+      stats.initializeSimulation({
+        name: `Mobile - ${currentRuleName}`,
+        seedType: 'patch',
+        seedPercentage: 50,
+        rulesetName: currentRuleName,
+        rulesetHex: c4RulesetToHex(currentRuleset),
+        startTime: Date.now(),
+        requestedStepsPerSecond: stepsPerSecond,
+      })
+
+      // Brief flash to indicate new rule
+      instruction.style.opacity = '1'
+      setTimeout(() => {
+        instruction.style.opacity = '0.7'
+      }, 200)
+
+      console.log(`New rule: ${currentRuleName}`)
+    },
+  })
+
+  // Handle window resize
+  window.addEventListener('resize', () => {
+    const newSize = Math.min(window.innerWidth, window.innerHeight)
+    canvas.style.width = `${newSize}px`
+    canvas.style.height = `${newSize}px`
+  })
+
+  // Setup theme (dark mode support)
+  const savedTheme =
+    (localStorage.getItem('theme') as 'light' | 'dark' | 'system') || 'system'
+  if (savedTheme === 'system') {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    document.documentElement.classList.toggle('dark', isDark)
+  } else {
+    document.documentElement.classList.toggle('dark', savedTheme === 'dark')
+  }
+}

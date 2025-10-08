@@ -2,3 +2,8 @@ name = "rulehunt"
 compatibility_date = "2025-10-06"
 
 pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rulehunt-db"
+database_id = "fbfd8db7-77cb-46c2-b9e4-4d314ba1ab6a"
