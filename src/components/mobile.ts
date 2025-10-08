@@ -10,6 +10,10 @@ import {
   makeC4Ruleset,
   randomC4RulesetByDensity,
 } from '../utils.ts'
+import {
+  createMobileHeader,
+  setupMobileHeader,
+} from './components/mobileHeader'
 
 // --- Types -----------------------------------------------------------------
 export type CleanupFunction = () => void
@@ -56,12 +60,14 @@ function setupSwipeDetection(
   let touchStartTime = 0
 
   const handleTouchStart = (e: TouchEvent) => {
+    if (e.touches.length !== 1) return // Only respond to single finger
     touchStartY = e.touches[0].clientY
     touchStartTime = Date.now()
     handler.onSwipeStart() // Pause simulation when touch starts
   }
 
   const handleTouchEnd = (e: TouchEvent) => {
+    if (e.touches.length !== 1) return // Only respond to single finger
     const touchEndY = e.changedTouches[0].clientY
     const touchEndTime = Date.now()
 
@@ -167,6 +173,11 @@ export async function setupMobileLayout(
   const container = document.createElement('div')
   container.className =
     'fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 overflow-hidden'
+
+  // Add mobile header
+  const { root: headerRoot, elements: headerElements } = createMobileHeader()
+  const cleanupHeader = setupMobileHeader(headerElements)
+  container.appendChild(headerRoot)
 
   // Canvas wrapper for swipe animation
   const canvasWrapper = document.createElement('div')
@@ -415,6 +426,7 @@ export async function setupMobileLayout(
     }
     cleanupSwipe()
     cleanupZoom()
+    cleanupHeader() // Add this line
     for (const { element, event, handler } of eventListeners) {
       element.removeEventListener(event, handler)
     }

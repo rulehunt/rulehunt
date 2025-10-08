@@ -13,7 +13,7 @@ import {
   randomC4RulesetByDensity,
 } from '../utils.ts'
 
-import { createHeader, setupTheme } from './header.ts'
+import { createHeader, setupTheme } from './desktopHeader.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
