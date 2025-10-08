@@ -69,6 +69,9 @@ interface SwipeDebugInfo {
   committed: boolean
   reason: string
   timestamp: string
+  dragging: boolean
+  directionLocked: string
+  animationExecuted: boolean
 }
 
 // --- Helpers ----------------------------------------------------------------
@@ -177,7 +180,28 @@ function setupDualCanvasSwipe(
   }
 
   const handleTouchEnd = (_: TouchEvent) => {
-    if (!dragging) return
+    const wasDragging = dragging
+    const lockedDirection = directionLocked
+
+    if (!dragging) {
+      // Early return - log this
+      if (debugCallback) {
+        const debugInfo: SwipeDebugInfo = {
+          dragDistance: 0,
+          velocity: 0,
+          direction: lockedDirection || 'none',
+          committed: false,
+          reason: 'not dragging',
+          timestamp: new Date().toLocaleTimeString(),
+          dragging: wasDragging,
+          directionLocked: lockedDirection || 'none',
+          animationExecuted: false,
+        }
+        debugCallback(debugInfo)
+      }
+      return
+    }
+
     dragging = false
     lastSwipeTime = performance.now()
 
@@ -224,6 +248,9 @@ function setupDualCanvasSwipe(
             ? 'pulled back'
             : 'threshold not met',
       timestamp: new Date().toLocaleTimeString(),
+      dragging: wasDragging,
+      directionLocked: lockedDirection || 'none',
+      animationExecuted: true,
     }
 
     if (debugCallback) {
@@ -564,6 +591,7 @@ export async function setupMobileLayout(
     ENABLE_DEBUG && debugFooter
       ? (info: SwipeDebugInfo) => {
           const debugText = `${info.timestamp} | ${info.direction.toUpperCase()} | dist:${info.dragDistance}px vel:${info.velocity}px/s
+locked:${info.directionLocked} dragging:${info.dragging} anim:${info.animationExecuted}
 → ${info.committed ? '✅ COMMIT' : '❌ CANCEL'} (${info.reason})`
           updateDebugText(debugFooter, debugText)
         }
