@@ -18,6 +18,8 @@ const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 10
 const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.25
 const SWIPE_COMMIT_MIN_DISTANCE = 80
+const GRID_ROWS = 300
+const GRID_COLS = 300
 
 const LIGHT_FG_COLORS = [
   '#2563eb', // blue-600
@@ -344,6 +346,7 @@ export async function setupMobileLayout(
 
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   const palette = isDark ? DARK_FG_COLORS : LIGHT_FG_COLORS
+  const bgColor = isDark ? '#1e1e1e' : '#ffffff'
   let colorIndex = Math.floor(Math.random() * palette.length)
 
   const size = Math.min(window.innerWidth, window.innerHeight)
@@ -371,16 +374,6 @@ export async function setupMobileLayout(
 
   container.appendChild(wrapper)
 
-  // Set initial colors for both canvases
-  document.documentElement.style.setProperty(
-    '--canvas-a-fg',
-    palette[colorIndex],
-  )
-  document.documentElement.style.setProperty(
-    '--canvas-b-fg',
-    palette[(colorIndex + 1) % palette.length],
-  )
-
   // Instruction
   const instruction = document.createElement('div')
   instruction.className =
@@ -397,8 +390,18 @@ export async function setupMobileLayout(
   const orbits: C4OrbitsData = await res.json()
   const lookup = buildOrbitLookup(orbits)
 
-  let currentCA = new CellularAutomata(canvasA)
-  let nextCA = new CellularAutomata(canvasB)
+  let currentCA = new CellularAutomata(canvasA, {
+    gridRows: GRID_ROWS,
+    gridCols: GRID_COLS,
+    fgColor: palette[colorIndex],
+    bgColor,
+  })
+  let nextCA = new CellularAutomata(canvasB, {
+    gridRows: GRID_ROWS,
+    gridCols: GRID_COLS,
+    fgColor: palette[(colorIndex + 1) % palette.length],
+    bgColor,
+  })
 
   const conway = makeC4Ruleset(conwayRule, lookup)
   let currentRule: RuleData = {
@@ -462,6 +465,10 @@ export async function setupMobileLayout(
       colorIndex = (colorIndex + 1) % palette.length
       const col = palette[colorIndex]
       const nextCol = palette[(colorIndex + 1) % palette.length]
+
+      // Update colors for both canvases
+      currentCA.setColors(col, bgColor)
+      nextCA.setColors(nextCol, bgColor)
 
       document.documentElement.style.setProperty('--canvas-a-fg', col)
       document.documentElement.style.setProperty('--canvas-b-fg', nextCol)

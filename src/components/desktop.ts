@@ -21,10 +21,21 @@ import { createSimulationPanel } from './simulation.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
 
 const PROGRESS_BAR_STEPS = 500
+const GRID_ROWS = 300
+const GRID_COLS = 300
 
 // --- Types -----------------------------------------------------------------
 export type CleanupFunction = () => void
 type DisplayMode = 'orbits' | 'full'
+
+// --- Color Management ------------------------------------------------------
+function getCurrentColors(): { fgColor: string; bgColor: string } {
+  const isDark = document.documentElement.classList.contains('dark')
+  return {
+    fgColor: isDark ? '#a78bfa' : '#9333ea', // violet-400 : violet-600
+    bgColor: isDark ? '#1e1e1e' : '#ffffff',
+  }
+}
 
 // --- Desktop-Specific Rendering --------------------------------------------
 function renderRule(
@@ -36,16 +47,14 @@ function renderRule(
   ruleIdDisplay: HTMLElement,
   ruleLabel: string,
   displayMode: DisplayMode,
+  fgColor: string,
+  bgColor: string,
 ) {
   if (displayMode === 'orbits') {
     const cols = 10
     const rows = 14
     const cellW = canvas.width / cols
     const cellH = canvas.height / rows
-
-    const styles = getComputedStyle(document.documentElement)
-    const bgColor = styles.getPropertyValue('--canvas-bg').trim()
-    const fgColor = styles.getPropertyValue('--canvas-fg').trim()
 
     ctx.fillStyle = bgColor
     ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -62,10 +71,6 @@ function renderRule(
     const rows = 16
     const cellW = canvas.width / cols
     const cellH = canvas.height / rows
-
-    const styles = getComputedStyle(document.documentElement)
-    const bgColor = styles.getPropertyValue('--canvas-bg').trim()
-    const fgColor = styles.getPropertyValue('--canvas-fg').trim()
 
     ctx.fillStyle = bgColor
     ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -366,8 +371,14 @@ export async function setupDesktopLayout(
 
   console.log(`Loaded ${orbitsData.orbits.length} C4 orbits`)
 
-  // Initialize cellular automata
-  const cellularAutomata = new CellularAutomata(simCanvas)
+  // Initialize cellular automata with colors
+  const colors = getCurrentColors()
+  const cellularAutomata = new CellularAutomata(simCanvas, {
+    gridRows: GRID_ROWS,
+    gridCols: GRID_COLS,
+    fgColor: colors.fgColor,
+    bgColor: colors.bgColor,
+  })
   updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
 
   // State
@@ -423,6 +434,7 @@ export async function setupDesktopLayout(
     const density = percentage / 100
     const ruleset = randomC4RulesetByDensity(density)
     currentRuleset = ruleset
+    const colors = getCurrentColors()
     renderRule(
       ruleset,
       orbitLookup,
@@ -432,6 +444,8 @@ export async function setupDesktopLayout(
       ruleIdDisplay,
       `Random Pattern (${percentage}% orbits)`,
       displayMode,
+      colors.fgColor,
+      colors.bgColor,
     )
     applyInitialCondition()
     if (cellularAutomata.isCurrentlyPlaying()) {
@@ -455,10 +469,14 @@ export async function setupDesktopLayout(
     ruleIdDisplay,
     'Conway',
     displayMode,
+    colors.fgColor,
+    colors.bgColor,
   )
 
   // Setup theme with re-render callback
   const cleanupTheme = setupTheme(header.elements.themeToggle, () => {
+    const newColors = getCurrentColors()
+    cellularAutomata.setColors(newColors.fgColor, newColors.bgColor)
     cellularAutomata.render()
     updateStatisticsDisplay(
       cellularAutomata,
@@ -474,6 +492,8 @@ export async function setupDesktopLayout(
       ruleIdDisplay,
       ruleLabelDisplay.textContent || 'Loading...',
       displayMode,
+      newColors.fgColor,
+      newColors.bgColor,
     )
   })
 
@@ -495,6 +515,7 @@ export async function setupDesktopLayout(
   addEventListener(btnConway, 'click', () => {
     const ruleset = makeC4Ruleset(conwayRule, orbitLookup)
     currentRuleset = ruleset
+    const colors = getCurrentColors()
     renderRule(
       ruleset,
       orbitLookup,
@@ -504,6 +525,8 @@ export async function setupDesktopLayout(
       ruleIdDisplay,
       'Conway',
       displayMode,
+      colors.fgColor,
+      colors.bgColor,
     )
     applyInitialCondition()
     if (cellularAutomata.isCurrentlyPlaying()) {
@@ -517,6 +540,7 @@ export async function setupDesktopLayout(
   addEventListener(btnOutlier, 'click', () => {
     const ruleset = makeC4Ruleset(outlierRule, orbitLookup)
     currentRuleset = ruleset
+    const colors = getCurrentColors()
     renderRule(
       ruleset,
       orbitLookup,
@@ -526,6 +550,8 @@ export async function setupDesktopLayout(
       ruleIdDisplay,
       'Outlier',
       displayMode,
+      colors.fgColor,
+      colors.bgColor,
     )
     applyInitialCondition()
     if (cellularAutomata.isCurrentlyPlaying()) {
@@ -549,6 +575,7 @@ export async function setupDesktopLayout(
   addEventListener(radioDisplayOrbits, 'change', () => {
     if (radioDisplayOrbits.checked) {
       displayMode = 'orbits'
+      const colors = getCurrentColors()
       renderRule(
         currentRuleset,
         orbitLookup,
@@ -558,6 +585,8 @@ export async function setupDesktopLayout(
         ruleIdDisplay,
         ruleLabelDisplay.textContent || 'Loading...',
         displayMode,
+        colors.fgColor,
+        colors.bgColor,
       )
     }
   })
@@ -565,6 +594,7 @@ export async function setupDesktopLayout(
   addEventListener(radioDisplayFull, 'change', () => {
     if (radioDisplayFull.checked) {
       displayMode = 'full'
+      const colors = getCurrentColors()
       renderRule(
         currentRuleset,
         orbitLookup,
@@ -574,6 +604,8 @@ export async function setupDesktopLayout(
         ruleIdDisplay,
         ruleLabelDisplay.textContent || 'Loading...',
         displayMode,
+        colors.fgColor,
+        colors.bgColor,
       )
     }
   })
@@ -683,8 +715,6 @@ export async function setupDesktopLayout(
       applyInitialCondition()
     }
   })
-
-  // Save button click handler// In the desktop layout file, replace the save button click handler with this:
 
   // Save button click handler
   if (progressBar.elements.saveButton) {

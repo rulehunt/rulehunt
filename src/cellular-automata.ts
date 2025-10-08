@@ -1,10 +1,6 @@
 import type { Ruleset } from './schema.ts'
 import { StatisticsTracker } from './statistics.ts'
 
-const GRID_ROWS = 300
-const GRID_COLS = 300
-const GRID_AREA = GRID_ROWS * GRID_COLS
-
 // --- Deterministic RNG ------------------------------------------------------
 function makeRng(initialSeed: number) {
   let state = initialSeed | 0
@@ -25,6 +21,11 @@ export class CellularAutomata {
   private isPlaying = false
   private playInterval: number | null = null
   private statistics: StatisticsTracker
+  private gridRows: number
+  private gridCols: number
+  private gridArea: number
+  private fgColor: string
+  private bgColor: string
 
   private seed = Math.floor(Math.random() * 0xffffffff)
   private rng = makeRng(this.seed)
@@ -36,18 +37,37 @@ export class CellularAutomata {
   private panX = 0
   private panY = 0
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    options: {
+      gridRows: number
+      gridCols: number
+      fgColor: string
+      bgColor: string
+    },
+  ) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d') as CanvasRenderingContext2D
-    this.cellSize = canvas.width / GRID_COLS
+    this.gridRows = options.gridRows
+    this.gridCols = options.gridCols
+    this.gridArea = this.gridRows * this.gridCols
+    this.cellSize = canvas.width / this.gridCols
+    this.fgColor = options.fgColor
+    this.bgColor = options.bgColor
 
-    this.grid = new Uint8Array(GRID_AREA)
-    this.nextGrid = new Uint8Array(GRID_AREA)
-    this.statistics = new StatisticsTracker(GRID_COLS)
+    this.grid = new Uint8Array(this.gridArea)
+    this.nextGrid = new Uint8Array(this.gridArea)
+    this.statistics = new StatisticsTracker(this.gridCols * this.gridRows)
 
     this.randomSeed()
     this.render()
     this.statistics.recordStep(this.grid)
+  }
+
+  setColors(fgColor: string, bgColor: string) {
+    this.fgColor = fgColor
+    this.bgColor = bgColor
+    this.render()
   }
 
   centerSeed() {
@@ -57,9 +77,9 @@ export class CellularAutomata {
     }
 
     // Set only the center cell to alive
-    const centerX = Math.floor(GRID_COLS / 2)
-    const centerY = Math.floor(GRID_ROWS / 2)
-    this.grid[centerY * GRID_COLS + centerX] = 1
+    const centerX = Math.floor(this.gridCols / 2)
+    const centerY = Math.floor(this.gridRows / 2)
+    this.grid[centerY * this.gridCols + centerX] = 1
 
     this.statistics.reset()
     this.statistics.recordStep(this.grid)
@@ -77,12 +97,13 @@ export class CellularAutomata {
     this.statistics.reset()
     this.statistics.recordStep(this.grid)
   }
+
   patchSeed(alivePercentage = 50) {
     this.rng = makeRng(this.seed) // reset PRNG to same starting point
     for (let i = 0; i < this.grid.length; i++) this.grid[i] = 0
     const threshold = alivePercentage / 100
-    const centerX = Math.floor(GRID_COLS / 2)
-    const centerY = Math.floor(GRID_ROWS / 2)
+    const centerX = Math.floor(this.gridCols / 2)
+    const centerY = Math.floor(this.gridRows / 2)
     const patchSize = 10
     const startX = centerX - Math.floor(patchSize / 2)
     const startY = centerY - Math.floor(patchSize / 2)
@@ -90,8 +111,8 @@ export class CellularAutomata {
       for (let dx = 0; dx < patchSize; dx++) {
         const x = startX + dx
         const y = startY + dy
-        if (x >= 0 && x < GRID_COLS && y >= 0 && y < GRID_ROWS) {
-          this.grid[y * GRID_COLS + x] = this.rng() < threshold ? 1 : 0
+        if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows) {
+          this.grid[y * this.gridCols + x] = this.rng() < threshold ? 1 : 0
         }
       }
     }
@@ -103,11 +124,11 @@ export class CellularAutomata {
   }
 
   step(ruleset: Ruleset) {
-    for (let y = 0; y < GRID_ROWS; y++) {
-      for (let x = 0; x < GRID_COLS; x++) {
+    for (let y = 0; y < this.gridRows; y++) {
+      for (let x = 0; x < this.gridCols; x++) {
         const pattern = this.get3x3Pattern(x, y)
         const index = this.patternToIndex(pattern)
-        this.nextGrid[y * GRID_COLS + x] = ruleset[index]
+        this.nextGrid[y * this.gridCols + x] = ruleset[index]
       }
     }
 
@@ -127,9 +148,9 @@ export class CellularAutomata {
       const row: number[] = []
       for (let dx = -1; dx <= 1; dx++) {
         // Torus topology: wrap around edges
-        const x = (centerX + dx + GRID_COLS) % GRID_COLS
-        const y = (centerY + dy + GRID_ROWS) % GRID_ROWS
-        row.push(this.grid[y * GRID_COLS + x])
+        const x = (centerX + dx + this.gridCols) % this.gridCols
+        const y = (centerY + dy + this.gridRows) % this.gridRows
+        row.push(this.grid[y * this.gridCols + x])
       }
       pattern.push(row)
     }
@@ -239,13 +260,8 @@ export class CellularAutomata {
     // Save the context state
     ctx.save()
 
-    // Get colors from CSS variables
-    const styles = getComputedStyle(document.documentElement)
-    const bgColor = styles.getPropertyValue('--canvas-bg').trim()
-    const fgColor = styles.getPropertyValue('--canvas-fg').trim()
-
     // Clear the canvas
-    ctx.fillStyle = bgColor
+    ctx.fillStyle = this.bgColor
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
 
     // Apply zoom and pan transformations
@@ -253,11 +269,11 @@ export class CellularAutomata {
     ctx.scale(this.zoom, this.zoom)
 
     // Draw cells
-    ctx.fillStyle = fgColor
+    ctx.fillStyle = this.fgColor
 
-    for (let y = 0; y < GRID_ROWS; y++) {
-      for (let x = 0; x < GRID_COLS; x++) {
-        if (this.grid[y * GRID_COLS + x]) {
+    for (let y = 0; y < this.gridRows; y++) {
+      for (let x = 0; x < this.gridCols; x++) {
+        if (this.grid[y * this.gridCols + x]) {
           ctx.fillRect(
             x * this.cellSize,
             y * this.cellSize,
@@ -303,9 +319,9 @@ export class CellularAutomata {
     switch (this.lastSeedMethod) {
       case 'center': {
         for (let i = 0; i < this.grid.length; i++) this.grid[i] = 0
-        const cx = Math.floor(GRID_COLS / 2)
-        const cy = Math.floor(GRID_ROWS / 2)
-        this.grid[cy * GRID_COLS + cx] = 1
+        const cx = Math.floor(this.gridCols / 2)
+        const cy = Math.floor(this.gridRows / 2)
+        this.grid[cy * this.gridCols + cx] = 1
         break
       }
       case 'patch':
@@ -329,8 +345,8 @@ export class CellularAutomata {
   private applyPatchSeed(alivePercentage: number) {
     for (let i = 0; i < this.grid.length; i++) this.grid[i] = 0
     const threshold = alivePercentage / 100
-    const centerX = Math.floor(GRID_COLS / 2)
-    const centerY = Math.floor(GRID_ROWS / 2)
+    const centerX = Math.floor(this.gridCols / 2)
+    const centerY = Math.floor(this.gridRows / 2)
     const patchSize = 10
     const startX = centerX - Math.floor(patchSize / 2)
     const startY = centerY - Math.floor(patchSize / 2)
@@ -338,8 +354,8 @@ export class CellularAutomata {
       for (let dx = 0; dx < patchSize; dx++) {
         const x = startX + dx
         const y = startY + dy
-        if (x >= 0 && x < GRID_COLS && y >= 0 && y < GRID_ROWS) {
-          this.grid[y * GRID_COLS + x] = this.rng() < threshold ? 1 : 0
+        if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows) {
+          this.grid[y * this.gridCols + x] = this.rng() < threshold ? 1 : 0
         }
       }
     }
