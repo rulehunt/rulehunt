@@ -1,11 +1,4 @@
 name = "rulehunt"
-main = "index.ts"
 compatibility_date = "2025-10-06"
 
-[site]
-bucket = "src"              # serve static files from ./src
-
-# Optional: custom domain mapping
-# routes = [
-#   { pattern = "rulehunt.com/*", custom_domain = true }
-# ]
+pages_build_output_dir = "dist"

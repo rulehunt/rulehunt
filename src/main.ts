@@ -14,6 +14,7 @@ import {
 
 // Import components
 import { createHeader, setupTheme } from './components/header.ts'
+import { createProgressBar } from './components/progressBar.ts'
 import { createRulesetPanel } from './components/ruleset.ts'
 import { createSimulationPanel } from './components/simulation.ts'
 import {
@@ -92,6 +93,7 @@ function renderRule(
 function updateStatisticsDisplay(
   cellularAutomata: CellularAutomata,
   elements: SummaryPanelElements,
+  progressBar: ReturnType<typeof createProgressBar>,
 ) {
   const stats = cellularAutomata.getStatistics()
   const recentStats = stats.getRecentStats(1)
@@ -101,6 +103,13 @@ function updateStatisticsDisplay(
 
   const current = recentStats[0]
   const interestScore = stats.calculateInterestScore()
+
+  // Update progress bar (0 to 10,000 steps)
+  if (metadata) {
+    const stepCount = metadata.stepCount
+    const progressPercent = Math.min((stepCount / 10000) * 100, 100)
+    progressBar.set(Math.round(progressPercent))
+  }
 
   // Update simulation info
   if (metadata) {
@@ -249,6 +258,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   const header = createHeader()
   appRoot.appendChild(header.root)
 
+  // Create progress bar
+  const progressBar = createProgressBar(0)
+  const progressContainer = document.createElement('div')
+  progressContainer.className = 'w-full px-6 py-4 border-b border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900'
+  const progressWrapper = document.createElement('div')
+  progressWrapper.className = 'max-w-7xl mx-auto'
+  progressWrapper.appendChild(progressBar.root)
+  progressContainer.appendChild(progressWrapper)
+  appRoot.appendChild(progressContainer)
+
   // Create main content container
   const mainContent = document.createElement('main')
   mainContent.className =
@@ -317,7 +336,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const cellularAutomata = new CellularAutomata(simCanvas)
 
   // Initialize statistics display
-  updateStatisticsDisplay(cellularAutomata, summaryPanel.elements)
+  updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
 
   // Track current ruleset for click handler
   let currentRuleset: C4Ruleset
@@ -340,7 +359,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       cellularAutomata.randomSeed(percentage)
     }
     cellularAutomata.render()
-    updateStatisticsDisplay(cellularAutomata, summaryPanel.elements)
+    updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
 
     // Initialize simulation metadata
     initializeSimulationMetadata()
@@ -390,7 +409,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   setupTheme(header.elements.themeToggle, () => {
     // Re-render canvases when theme changes
     cellularAutomata.render()
-    updateStatisticsDisplay(cellularAutomata, summaryPanel.elements)
+    updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
     renderRule(
       currentRuleset,
       orbitLookup,
@@ -569,7 +588,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   btnStep.addEventListener('click', () => {
     const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
     cellularAutomata.step(expanded)
-    updateStatisticsDisplay(cellularAutomata, summaryPanel.elements)
+    updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
   })
 
   btnReset.addEventListener('click', () => {
@@ -602,7 +621,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
       // Update statistics display periodically
       statsUpdateInterval = window.setInterval(() => {
-        updateStatisticsDisplay(cellularAutomata, summaryPanel.elements)
+        updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
       }, 100)
     }
   })
@@ -626,7 +645,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
 
       statsUpdateInterval = window.setInterval(() => {
-        updateStatisticsDisplay(cellularAutomata, summaryPanel.elements)
+        updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
       }, 100)
     }
   })

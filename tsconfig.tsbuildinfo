@@ -1,1 +1,1 @@
-{"root":["./src/main.ts","./src/vite-env.d.ts","./src/schemas/cellular-automata.ts"],"version":"5.9.3"}
+{"root":["./src/cellular-automata.ts","./src/main.ts","./src/outlier-rule.ts","./src/schema.ts","./src/statistics.ts","./src/utils.ts","./src/vite-env.d.ts","./src/components/header.ts","./src/components/progressbar.ts","./src/components/ruleset.ts","./src/components/simulation.ts","./src/components/summary.ts","./src/components/theme.ts"],"version":"5.9.3"}

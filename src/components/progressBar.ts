@@ -17,19 +17,19 @@ export function createProgressBar(initialValue = 0): {
   root.className = 'w-full max-w-md flex flex-col gap-2'
 
   root.innerHTML = `
-    <div class="flex justify-between text-sm text-gray-600">
-      <span>Progress</span>
+    <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+      <span>Progress to 10,000 steps</span>
       <span id="progress-label">${initialValue}%</span>
     </div>
     <div
       id="progress-root"
-      class="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden"
+      class="relative w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"
       role="progressbar"
       aria-valuemin="0"
       aria-valuemax="100"
       aria-valuenow="${initialValue}"
     >
-      <div id="progress-bar" class="h-full bg-blue-600 transition-[width] duration-300 ease-out" style="width: ${initialValue}%"></div>
+      <div id="progress-bar" class="h-full bg-blue-600 dark:bg-blue-500 transition-[width] duration-300 ease-out" style="width: ${initialValue}%"></div>
     </div>
   `
 

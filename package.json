@@ -3,18 +3,21 @@
   "type": "module",
   "version": "0.1.0",
   "private": true,
+
   "scripts": {
     "dev": "vite",
     "dev:worker": "wrangler dev",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "deploy": "wrangler publish",
+    "build": "tsc -b && vite build && pnpm run copy:resources",
+    "copy:resources": "mkdir -p dist/resources && cp resources/c4-orbits.json dist/resources/",
+    "preview": "pnpm run build && vite preview",
+    "deploy": "wrangler pages deploy dist --project-name=rulehunt",
     "check": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "generate:c4-orbits": "tsx scripts/generate-c4-orbits.ts && pnpm run format"
   },
+
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@cloudflare/workers-types": "^4.20241022.0",
@@ -22,7 +25,7 @@
     "tsx": "^4.20.6",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
-    "wrangler": "^3.75.0",
+    "wrangler": "^4.42.1",
     "zod": "^4.1.12"
   }
 }
