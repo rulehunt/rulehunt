@@ -1,5 +1,6 @@
 import { saveRun } from '../api/save'
 import { CellularAutomata } from '../cellular-automata.ts'
+import { getUserIdentity } from '../identity.ts'
 import type { C4OrbitsData, RunSubmission } from '../schema.ts'
 import {
   buildOrbitLookup,
@@ -16,6 +17,33 @@ export type CleanupFunction = () => void
 interface SwipeHandler {
   onSwipeUp: () => void
 }
+
+// --- Color Palettes --------------------------------------------------------
+const LIGHT_FG_COLORS = [
+  '#2563eb', // blue-600
+  '#dc2626', // red-600
+  '#16a34a', // green-600
+  '#9333ea', // purple-600
+  '#ea580c', // orange-600
+  '#0891b2', // cyan-600
+  '#db2777', // pink-600
+  '#65a30d', // lime-600
+  '#7c3aed', // violet-600
+  '#0d9488', // teal-600
+]
+
+const DARK_FG_COLORS = [
+  '#60a5fa', // blue-400
+  '#f87171', // red-400
+  '#4ade80', // green-400
+  '#c084fc', // purple-400
+  '#fb923c', // orange-400
+  '#22d3ee', // cyan-400
+  '#f472b6', // pink-400
+  '#a3e635', // lime-400
+  '#a78bfa', // violet-400
+  '#2dd4bf', // teal-400
+]
 
 // --- Swipe Detection --------------------------------------------------------
 function setupSwipeDetection(
@@ -53,6 +81,68 @@ function setupSwipeDetection(
   }
 }
 
+// --- Pinch-to-Zoom ----------------------------------------------------------
+function setupPinchZoom(
+  canvas: HTMLCanvasElement,
+  onZoom: (scale: number, centerX: number, centerY: number) => void,
+): CleanupFunction {
+  let initialDistance = 0
+  let currentScale = 1
+  let lastCenter = { x: 0, y: 0 }
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      const [t1, t2] = e.touches
+      const dx = t1.clientX - t2.clientX
+      const dy = t1.clientY - t2.clientY
+      const distance = Math.sqrt(dx * dx + dy * dy)
+
+      // Midpoint between fingers
+      const centerX = (t1.clientX + t2.clientX) / 2
+      const centerY = (t1.clientY + t2.clientY) / 2
+      lastCenter = { x: centerX, y: centerY }
+
+      if (!initialDistance) {
+        initialDistance = distance
+        return
+      }
+
+      const scaleChange = distance / initialDistance
+      const newScale = Math.min(Math.max(currentScale * scaleChange, 0.5), 3)
+      onZoom(newScale, centerX, centerY)
+    }
+  }
+
+  const handleTouchEnd = (e: TouchEvent) => {
+    if (e.touches.length < 2) {
+      currentScale = Math.min(Math.max(currentScale, 0.5), 3)
+      initialDistance = 0
+    }
+  }
+
+  const handleTouchStart = (e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      const [t1, t2] = e.touches
+      lastCenter = {
+        x: (t1.clientX + t2.clientX) / 2,
+        y: (t1.clientY + t2.clientY) / 2,
+      }
+    }
+  }
+
+  canvas.addEventListener('touchstart', handleTouchStart)
+  canvas.addEventListener('touchmove', handleTouchMove)
+  canvas.addEventListener('touchend', handleTouchEnd)
+  canvas.addEventListener('touchcancel', handleTouchEnd)
+
+  return () => {
+    canvas.removeEventListener('touchstart', handleTouchStart)
+    canvas.removeEventListener('touchmove', handleTouchMove)
+    canvas.removeEventListener('touchend', handleTouchEnd)
+    canvas.removeEventListener('touchcancel', handleTouchEnd)
+  }
+}
+
 // --- Mobile Layout ----------------------------------------------------------
 export async function setupMobileLayout(
   appRoot: HTMLDivElement,
@@ -84,23 +174,37 @@ export async function setupMobileLayout(
   // --- UI Setup -------------------------------------------------------------
   const container = document.createElement('div')
   container.className =
-    'fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900'
+    'fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 overflow-hidden'
+
+  // Canvas wrapper for swipe animation
+  const canvasWrapper = document.createElement('div')
+  canvasWrapper.className = 'relative'
+  canvasWrapper.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
 
   const canvas = document.createElement('canvas')
-  canvas.className = 'touch-none'
+  canvas.className = 'touch-none transition-transform duration-75 ease-out'
 
   const size = Math.min(window.innerWidth, window.innerHeight)
   canvas.width = size
   canvas.height = size
   canvas.style.width = `${size}px`
   canvas.style.height = `${size}px`
+  canvas.style.transformOrigin = 'center center'
 
-  container.appendChild(canvas)
+  // Detect theme and set initial color
+  const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+  const colorPalette = isDarkMode ? DARK_FG_COLORS : LIGHT_FG_COLORS
+  let currentColorIndex = Math.floor(Math.random() * colorPalette.length)
+  canvas.style.border = `4px solid ${colorPalette[currentColorIndex]}`
+  canvas.style.borderRadius = '8px'
+
+  canvasWrapper.appendChild(canvas)
+  container.appendChild(canvasWrapper)
 
   // Instruction overlay
   const instruction = document.createElement('div')
   instruction.className =
-    'fixed bottom-8 left-0 right-0 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none'
+    'fixed bottom-8 left-0 right-0 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none transition-opacity duration-300'
   instruction.style.opacity = '0.7'
   instruction.innerHTML = `
     <div class="flex flex-col items-center gap-2">
@@ -113,6 +217,9 @@ export async function setupMobileLayout(
   container.appendChild(instruction)
   appRoot.appendChild(container)
 
+  // Track if user has swiped
+  let hasSwipedOnce = false
+
   // --- Simulation Setup -----------------------------------------------------
   const response = await fetch('./resources/c4-orbits.json')
   const orbitsData: C4OrbitsData = await response.json()
@@ -122,7 +229,6 @@ export async function setupMobileLayout(
   const cellularAutomata = new CellularAutomata(canvas)
   const stepsPerSecond = 10
 
-  // Start with Conway
   let currentRuleset = makeC4Ruleset(conwayRule, orbitLookup)
   let currentRuleName = "Conway's Game of Life"
 
@@ -144,6 +250,15 @@ export async function setupMobileLayout(
   // --- Swipe Handler --------------------------------------------------------
   const cleanupSwipe = setupSwipeDetection(container, {
     onSwipeUp: () => {
+      // Hide instruction after first swipe
+      if (!hasSwipedOnce) {
+        hasSwipedOnce = true
+        instruction.style.opacity = '0'
+        setTimeout(() => {
+          instruction.style.display = 'none'
+        }, 300)
+      }
+
       // --- Gather statistics before switching rule ---
       const metadata = stats.getMetadata()
       const recent = stats.getRecentStats(1)[0] ?? {
@@ -160,7 +275,10 @@ export async function setupMobileLayout(
       const actualSps = stats.getActualStepsPerSecond()
       const stepCount = metadata?.stepCount ?? 0
 
-      const runPayload: Omit<RunSubmission, 'userId' | 'userLabel'> = {
+      const identity = getUserIdentity()
+      const runPayload: RunSubmission = {
+        userId: identity.userId,
+        userLabel: identity.userLabel,
         rulesetName: metadata?.rulesetName ?? currentRuleName,
         rulesetHex: metadata?.rulesetHex ?? c4RulesetToHex(currentRuleset),
         seed: 0,
@@ -199,33 +317,68 @@ export async function setupMobileLayout(
         })
       }, 0)
 
-      // --- Switch to new random rule ---
-      const density = Math.random() * 0.6 + 0.2
-      currentRuleset = randomC4RulesetByDensity(density)
-      currentRuleName = `Random (${Math.round(density * 100)}%)`
+      // --- Swipe animation ---
+      // Slide current canvas up
+      canvasWrapper.style.transform = 'translateY(-100%)'
 
-      cellularAutomata.pause()
-      cellularAutomata.patchSeed(50)
-      const newExpanded = expandC4Ruleset(currentRuleset, orbitLookup)
-      cellularAutomata.play(stepsPerSecond, newExpanded)
-
-      stats.initializeSimulation({
-        name: `Mobile - ${currentRuleName}`,
-        seedType: 'patch',
-        seedPercentage: 50,
-        rulesetName: currentRuleName,
-        rulesetHex: c4RulesetToHex(currentRuleset),
-        startTime: Date.now(),
-        requestedStepsPerSecond: stepsPerSecond,
-      })
-
-      instruction.style.opacity = '1'
       setTimeout(() => {
-        instruction.style.opacity = '0.7'
-      }, 200)
+        // --- Switch to new random rule ---
+        const density = Math.random() * 0.6 + 0.2
+        currentRuleset = randomC4RulesetByDensity(density)
+        currentRuleName = `Random (${Math.round(density * 100)}%)`
 
-      console.log(`New rule: ${currentRuleName}`)
+        cellularAutomata.pause()
+        cellularAutomata.patchSeed(50)
+        const newExpanded = expandC4Ruleset(currentRuleset, orbitLookup)
+        cellularAutomata.play(stepsPerSecond, newExpanded)
+
+        stats.initializeSimulation({
+          name: `Mobile - ${currentRuleName}`,
+          seedType: 'patch',
+          seedPercentage: 50,
+          rulesetName: currentRuleName,
+          rulesetHex: c4RulesetToHex(currentRuleset),
+          startTime: Date.now(),
+          requestedStepsPerSecond: stepsPerSecond,
+        })
+
+        // Change to new color
+        currentColorIndex = (currentColorIndex + 1) % colorPalette.length
+        canvas.style.border = `4px solid ${colorPalette[currentColorIndex]}`
+
+        // Reset zoom when switching rules
+        zoomScale = 1
+        canvas.style.transform = 'scale(1)'
+        canvas.style.transformOrigin = 'center center'
+
+        // Reset position (slide in from bottom)
+        canvasWrapper.style.transition = 'none'
+        canvasWrapper.style.transform = 'translateY(100%)'
+
+        // Force a reflow
+        canvasWrapper.offsetHeight
+
+        // Slide to center
+        canvasWrapper.style.transition =
+          'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+        canvasWrapper.style.transform = 'translateY(0)'
+
+        console.log(`New rule: ${currentRuleName}`)
+      }, 400) // Match the transition duration
     },
+  })
+
+  // --- Pinch Zoom Handler ---------------------------------------------------
+  let zoomScale = 1
+  const cleanupZoom = setupPinchZoom(canvas, (scale, cx, cy) => {
+    zoomScale = scale
+    const rect = canvas.getBoundingClientRect()
+    const offsetX = cx - rect.left - rect.width / 2
+    const offsetY = cy - rect.top - rect.height / 2
+    canvas.style.transformOrigin = `${50 + (offsetX / rect.width) * 100}% ${
+      50 + (offsetY / rect.height) * 100
+    }%`
+    canvas.style.transform = `scale(${zoomScale})`
   })
 
   // --- Resize Handling ------------------------------------------------------
@@ -242,6 +395,7 @@ export async function setupMobileLayout(
       cellularAutomata.pause()
     }
     cleanupSwipe()
+    cleanupZoom()
     for (const { element, event, handler } of eventListeners) {
       element.removeEventListener(event, handler)
     }
