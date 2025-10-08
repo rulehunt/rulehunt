@@ -95,12 +95,15 @@ function waitForTransitionEnd(el: HTMLElement): Promise<void> {
 }
 
 // --- Dual-Canvas Swipe Handler ----------------------------------------------
-// Swipe Flow:
+// Swipe Flow (timing carefully orchestrated to prevent flashing):
 // 1. Touch start → pause onScreen CA (both canvases now static)
 // 2. Touch move → animate both static canvases (TikTok-style scroll)
 // 3. Commit decision → run transition animation (incoming canvas already has next rule)
-// 4. After animation → onCommit swaps references, starts playing new onScreen CA
-// 5. onCommit also prepares the now-offScreen canvas with a fresh rule for NEXT swap
+// 4. After animation → wait one frame, then onCommit swaps references
+// 5. onCommit defers CA operations by 16ms to let browser finish compositing:
+//    - Starts playing new onScreen CA
+//    - Prepares offScreen canvas with fresh rule for NEXT swap
+// This timing eliminates race conditions and prevents visible flashes
 let isTransitioning = false
 function setupDualCanvasSwipe(
   wrapper: HTMLElement,
@@ -266,11 +269,19 @@ function setupDualCanvasSwipe(
         waitForTransitionEnd(incomingCanvas),
       ])
 
+      // Reset transitions and ensure transforms are set before swapping
       outgoingCanvas.style.transition = 'none'
       incomingCanvas.style.transition = 'none'
+      outgoingCanvas.style.transform = `translateY(-${height}px)`
+      incomingCanvas.style.transform = 'translateY(0)'
+      outgoingCanvas.style.opacity = '0'
+      incomingCanvas.style.opacity = '1'
 
-      // Swap references and prepare for next swap
-      onCommit()
+      // Ensure incoming canvas is visible
+      incomingCanvas.style.visibility = 'visible'
+
+      // Delay onCommit by one frame to let browser finish compositing
+      requestAnimationFrame(() => onCommit())
     } else {
       await doCancel()
     }
@@ -546,9 +557,12 @@ export async function setupMobileLayout(
 
   onScreenCanvas.style.zIndex = '2'
   onScreenCanvas.style.pointerEvents = 'auto'
+  onScreenCanvas.style.visibility = 'visible'
+
   offScreenCanvas.style.zIndex = '1'
   offScreenCanvas.style.pointerEvents = 'none'
   offScreenCanvas.style.transform = `translateY(${size}px)`
+  offScreenCanvas.style.visibility = 'visible'
 
   wrapper.appendChild(onScreenCanvas)
   wrapper.appendChild(offScreenCanvas)
@@ -660,6 +674,12 @@ export async function setupMobileLayout(
       ;[onScreenCA, offScreenCA] = [offScreenCA, onScreenCA]
       ;[onScreenRule, offScreenRule] = [offScreenRule, onScreenRule]
 
+      // Hide offScreen canvas immediately, then restore visibility
+      offScreenCanvas.style.visibility = 'hidden'
+      requestAnimationFrame(() => {
+        offScreenCanvas.style.visibility = 'visible'
+      })
+
       // Update z-index and positioning explicitly
       const h = onScreenCanvas.height
       onScreenCanvas.style.zIndex = '2'
@@ -672,22 +692,24 @@ export async function setupMobileLayout(
       offScreenCanvas.style.transform = `translateY(${h}px)`
       offScreenCanvas.style.opacity = '1'
 
-      // Start playing the new onScreen CA (it already has the next rule loaded from previous swap)
-      onScreenCA.play(STEPS_PER_SECOND, onScreenRule.ruleset)
-
-      // NOW prepare the offScreen canvas for the NEXT swap
-      // This is the old onScreen canvas that just went offScreen
-      offScreenCA.pause()
-      offScreenCA.resetZoom()
-      offScreenRule = generateRandomRule()
-      loadRule(offScreenCA, offScreenRule, lookup, 50, false)
-
       // Update colors
       colorIndex = (colorIndex + 1) % palette.length
       const col = palette[colorIndex]
       const nextCol = palette[(colorIndex + 1) % palette.length]
       onScreenCA.setColors(col, bgColor)
       offScreenCA.setColors(nextCol, bgColor)
+
+      // Defer CA operations by one frame to let layout settle
+      setTimeout(() => {
+        // Start playing the new onScreen CA
+        onScreenCA.play(STEPS_PER_SECOND, onScreenRule.ruleset)
+
+        // Prepare offScreen canvas for NEXT swap
+        offScreenCA.pause()
+        offScreenCA.resetZoom()
+        offScreenRule = generateRandomRule()
+        loadRule(offScreenCA, offScreenRule, lookup, 50, false)
+      }, 16)
 
       // Recreate reload button with updated canvas references
       reload.remove()
