@@ -57,9 +57,10 @@ export function createLeaderboardPanel(): {
       const res = await fetch('/api/leaderboard')
       const data: LeaderboardResponse = await res.json()
 
-      data.results.forEach((row) => {
+      // Fixed: Use for...of instead of forEach
+      for (const row of data.results) {
         console.log(row.ruleset_name, row.watched_wall_ms)
-      })
+      }
 
       elements.tableBody.innerHTML = ''
 
@@ -74,7 +75,8 @@ export function createLeaderboardPanel(): {
         return
       }
 
-      data.results.forEach((row: any, idx: number) => {
+      // Fixed: Use for...of with entries() instead of forEach with any
+      for (const [idx, row] of data.results.entries()) {
         const tr = document.createElement('tr')
         tr.className =
           idx < 3
@@ -98,7 +100,7 @@ export function createLeaderboardPanel(): {
           <td class="px-2 py-1 text-right">${entropy}</td>
         `
         elements.tableBody.appendChild(tr)
-      })
+      }
     } catch (err) {
       console.error('Leaderboard fetch failed:', err)
       elements.tableBody.innerHTML = `

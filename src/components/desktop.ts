@@ -22,7 +22,7 @@ import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
 export type CleanupFunction = () => void
 type DisplayMode = 'orbits' | 'full'
 
-// --- Helpers ----------------------------------------------------------------
+// --- Desktop-Specific Rendering --------------------------------------------
 function renderRule(
   ruleset: C4Ruleset,
   orbitLookup: Uint8Array,
@@ -676,10 +676,12 @@ export async function setupDesktopLayout(
     if (statsUpdateInterval !== null) {
       clearInterval(statsUpdateInterval)
     }
-    intervals.forEach((id) => window.clearInterval(id))
-    eventListeners.forEach(({ element, event, handler }) => {
+    for (const id of intervals) {
+      window.clearInterval(id)
+    }
+    for (const { element, event, handler } of eventListeners) {
       element.removeEventListener(event, handler)
-    })
+    }
     cleanupTheme()
     console.log('Desktop layout cleaned up')
   }

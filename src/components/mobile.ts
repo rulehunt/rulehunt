@@ -60,16 +60,25 @@ export async function setupMobileLayout(
   const eventListeners: Array<{
     element: EventTarget
     event: string
-    handler: EventListener
+    handler: EventListenerOrEventListenerObject
   }> = []
 
-  const addEventListener = (
+  const addEventListener = <K extends keyof HTMLElementEventMap>(
     element: EventTarget,
-    event: string,
-    handler: EventListener,
+    event: K | string,
+    handler:
+      | EventListenerOrEventListenerObject
+      | ((evt: HTMLElementEventMap[K]) => void),
   ) => {
-    element.addEventListener(event, handler)
-    eventListeners.push({ element, event, handler })
+    element.addEventListener(
+      event as string,
+      handler as EventListenerOrEventListenerObject,
+    )
+    eventListeners.push({
+      element,
+      event: event as string,
+      handler: handler as EventListenerOrEventListenerObject,
+    })
   }
 
   // Create full-screen container
@@ -109,6 +118,8 @@ export async function setupMobileLayout(
   const response = await fetch('./resources/c4-orbits.json')
   const orbitsData: C4OrbitsData = await response.json()
   const orbitLookup = buildOrbitLookup(orbitsData)
+
+  console.log(`Loaded ${orbitsData.orbits.length} C4 orbits`)
 
   // Initialize cellular automata
   const cellularAutomata = new CellularAutomata(canvas)
@@ -200,9 +211,9 @@ export async function setupMobileLayout(
       cellularAutomata.pause()
     }
     cleanupSwipe()
-    eventListeners.forEach(({ element, event, handler }) => {
+    for (const { element, event, handler } of eventListeners) {
       element.removeEventListener(event, handler)
-    })
+    }
     console.log('Mobile layout cleaned up')
   }
 }
