@@ -30,7 +30,7 @@ In a 2D cellular automaton with binary states (alive/dead), each cell's next sta
 
 ```
 □ □ □
-□ ■ □  →  ?
+□ □ □  →  ?
 □ □ □
 ```
 
@@ -44,11 +44,11 @@ To put this in perspective:
 - There are ~10^80 atoms in the observable universe
 - Even if we tested a billion rules per second, we'd need 10^137 years to check them all
 
-... but then we thought to ourselves "People spend an awful lot of time on TikTok... they would probably rather want cellular automata simulations!"
+... but then we thought to ourselves "People spend an awful lot of time on TikTok... they would probably rather watch cellular automata evolve!"
 
-### Reducing the Space with D4 Symmetry
+### Reducing the Space with C4 Symmetry
 
-Many of these 2^512 rules are fundamentally identical – they just differ by rotation or reflection. For example, these four neighborhoods should arguably produce the same result if we don't care about the relative orientation of the game grid:
+Many of these 2^512 rules are fundamentally identical – they just differ by a rotation. For example, these four neighborhoods should arguably produce the same result if we don't care about the relative orientation of the game grid:
 
 ```
 □ □ □     □ □ □     □ ■ □     □ ■ □
@@ -66,10 +66,10 @@ Note: We could also explore other symmetry groups like **D4** (rotations + refle
 
 ### Visual Representation
 
-In RuleHunt, you can view the rules that define a particular Game of Life in two ways:
+In RuleHunt on a desktop browser, you can view the rules that define a particular Game of Life in two ways:
 
-- **Orbit View (10×14)**: Shows only the 140 C4 orbits
-- **Full View (32×16)**: Shows the expanded set all 512 patterns
+- **Orbit View (10×14)**: Shows only the 140 C4 equivalence classes (orbits)
+- **Full View (32×16)**: Shows the expanded set of all 512 patterns
 
 The orbit view is our primary interface – each cell represents an entire equivalence class of rotationally identical patterns. 
 
@@ -80,7 +80,7 @@ On the desktop site you can click on this canvas to view each individual rule (c
 ### Interest Scoring (WIP)
 
 Our algorithm evaluates simulations based on:
-- **Population dynamics** (avoiding die-out and uniform expansion)
+- **Population dynamics** (avoid die-out and uniform expansion)
 - **Multi-scale entropy** (2×2, 4×4, 8×8 block patterns)
 - **Activity levels** (ongoing changes vs. static patterns)
 - **The Goldilocks zone** (population density between 10-70%)
@@ -89,16 +89,16 @@ Pattern scores are stored in the database automatically.
 
 ## ✨ Current Features
 
-- **Interactive Simulation**: 300×300 grid with real-time visualization
+- **Interactive Simulation**: real-time visualization of ~1M grid cells
 - **Rule Explorer**: 
   - Conway's Game of Life
   - Outlier rule (a known interesting alternative)
   - Random rule generation with density control
 - **Multiple Seeding Options**:
   - Center seed (single cell)
-  - Random patch (10×10 noise)
+  - Random patch (10×10 structured noise)
   - Full random grid
-- **Dark/Light Theme**: Beautiful UI that respects your preferences
+- **Dark/Light Theme**
 - **Real-time Statistics**:
   - Population tracking
   - Activity monitoring
@@ -106,7 +106,7 @@ Pattern scores are stored in the database automatically.
   - Interest score calculation
   - Steps-per-second performance metrics
 - **Dual Visualization Modes**:
-  - D4 orbit view (10×14)
+  - C4 orbit view (10×14)
   - Full pattern table (32×16)
 
 ## 🚀 Future Improvements
@@ -125,19 +125,19 @@ Pattern scores are stored in the database automatically.
 - [ ] Social sharing of discoveries
 
 ### Phase 3: Performance
-- [ ] WebAssembly implementation for 10-100x speedup
+- [ ] WebAssembly implementations
 - [ ] Multi-core support with Web Workers
-- [ ] WebGPU acceleration for massive parallelism
+- [ ] More WebGPU acceleration
 - [ ] Optimized hash lookups for rule comparison
 - [ ] Distributed batch processing
 
 ### Phase 4: Advanced Features
-- [ ] Pattern detection (oscillators, spaceships, still lifes)
+- [ ] Better entity detection (oscillators, spaceships, replicators, etc)
 - [ ] Rule mutation and evolution
 - [ ] Interactive rule editing
 - [ ] Export/import rule libraries
-- [ ] 3D visualization of pattern evolution
-- [ ] Exploration of other symmetry groups (C4 only, C2, no symmetry, etc.)
+- [ ] 3D visualizations of pattern evolution
+- [ ] Exploration of other symmetry groups (D4, C6 on hex grids, etc.)
 
 ## 🛠️ Getting Started
 
@@ -179,4 +179,4 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ---
 
-**Join the hunt for hidden computational universes!** 🌌
+**Join the hunt for hidden computational universes!** 
