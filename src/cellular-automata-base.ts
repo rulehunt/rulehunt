@@ -157,6 +157,8 @@ export abstract class CellularAutomataBase {
     const patch = 10
     const startX = cx - Math.floor(patch / 2)
     const startY = cy - Math.floor(patch / 2)
+
+    // Generate initial random noise
     for (let dy = 0; dy < patch; dy++) {
       for (let dx = 0; dx < patch; dx++) {
         const x = startX + dx
@@ -166,6 +168,52 @@ export abstract class CellularAutomataBase {
         }
       }
     }
+
+    // Smoothing pass: keep alive cells that have at least 2 alive neighbors
+    const smoothed = new Array(this.grid.length).fill(0)
+    for (let dy = 0; dy < patch; dy++) {
+      for (let dx = 0; dx < patch; dx++) {
+        const x = startX + dx
+        const y = startY + dy
+        if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows) {
+          const idx = y * this.gridCols + x
+
+          // Count neighbors
+          let neighbors = 0
+          for (let ny = -1; ny <= 1; ny++) {
+            for (let nx = -1; nx <= 1; nx++) {
+              if (nx === 0 && ny === 0) continue
+              const checkX = x + nx
+              const checkY = y + ny
+              if (
+                checkX >= 0 &&
+                checkX < this.gridCols &&
+                checkY >= 0 &&
+                checkY < this.gridRows
+              ) {
+                neighbors += this.grid[checkY * this.gridCols + checkX]
+              }
+            }
+          }
+
+          // Keep alive if it has 2+ neighbors, or convert dead to alive if 4+ neighbors
+          smoothed[idx] =
+            (this.grid[idx] === 1 && neighbors >= 2) || neighbors >= 4 ? 1 : 0
+        }
+      }
+    }
+
+    // Copy smoothed result back
+    for (let dy = 0; dy < patch; dy++) {
+      for (let dx = 0; dx < patch; dx++) {
+        const x = startX + dx
+        const y = startY + dy
+        if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows) {
+          this.grid[y * this.gridCols + x] = smoothed[y * this.gridCols + x]
+        }
+      }
+    }
+
     this.lastSeedMethod = 'patch'
     this.lastAlivePercentage = alivePercentage
     this.onGridChanged()
