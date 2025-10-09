@@ -560,6 +560,7 @@ function saveRunStatistics(
   cellularAutomata: ICellularAutomata,
   ruleName: string,
   ruleHex: string,
+  isStarred = false,
 ): void {
   const stats = cellularAutomata.getStatistics()
   const metadata = stats.getMetadata()
@@ -609,6 +610,7 @@ function saveRunStatistics(
     simVersion: 'v0.1.0',
     engineCommit: undefined,
     extraScores: undefined,
+    isStarred,
   }
 
   // --- Fire and forget background save ---
@@ -648,6 +650,56 @@ function createStatsButton(
     e.stopPropagation()
     if (isTransitioning) return
     onShowStats()
+  })
+
+  parent.appendChild(btn)
+  return btn
+}
+
+// --- Star Button (toggle favorite) ------------------------------------------
+function createStarButton(
+  parent: HTMLElement,
+  getIsStarred: () => boolean,
+  onToggle: (newValue: boolean) => void,
+): HTMLButtonElement {
+  const btn = document.createElement('button')
+  btn.setAttribute('data-swipe-ignore', 'true')
+  btn.style.touchAction = 'manipulation' // avoids 300ms delay on iOS
+
+  const updateIcon = () => {
+    const isStarred = getIsStarred()
+    btn.innerHTML = isStarred
+      ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+         </svg>`
+      : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-6 h-6">
+           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+         </svg>`
+    btn.className = isStarred
+      ? 'absolute bottom-4 right-36 p-3 rounded-full bg-yellow-500 text-white shadow-md hover:bg-yellow-600 transition z-10'
+      : 'absolute bottom-4 right-36 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition z-10'
+    btn.title = isStarred ? 'Remove from favorites' : 'Add to favorites'
+  }
+
+  updateIcon()
+
+  // Swallow events so they don't reach the wrapper
+  const swallow = (e: Event) => e.stopPropagation()
+  btn.addEventListener('pointerdown', swallow)
+  btn.addEventListener('pointerup', swallow)
+  btn.addEventListener('mousedown', swallow)
+  btn.addEventListener('mouseup', swallow)
+  btn.addEventListener('touchstart', swallow, { passive: true })
+  btn.addEventListener('touchmove', swallow, { passive: true })
+  btn.addEventListener('touchend', swallow, { passive: true })
+  btn.addEventListener('touchcancel', swallow, { passive: true })
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (isTransitioning) return
+    const newValue = !getIsStarred()
+    onToggle(newValue)
+    updateIcon()
   })
 
   parent.appendChild(btn)
@@ -840,6 +892,9 @@ export async function setupMobileLayout(
 
   initializeRunStats(onScreenCA, onScreenRule)
 
+  // Track star state for current pattern
+  let currentIsStarred = false
+
   // Create stats overlay
   const {
     elements: statsElements,
@@ -911,6 +966,14 @@ export async function setupMobileLayout(
   }
 
   // Create buttons
+  let starBtn = createStarButton(
+    wrapper,
+    () => currentIsStarred,
+    (newValue) => {
+      currentIsStarred = newValue
+    },
+  )
+
   let statsBtn = createStatsButton(wrapper, () =>
     showStats(getCurrentRunData()),
   )
@@ -939,7 +1002,15 @@ export async function setupMobileLayout(
         instruction.style.opacity = '0'
         setTimeout(() => instruction.remove(), 300)
       }
-      saveRunStatistics(onScreenCA, onScreenRule.name, onScreenRule.hex)
+      saveRunStatistics(
+        onScreenCA,
+        onScreenRule.name,
+        onScreenRule.hex,
+        currentIsStarred,
+      )
+
+      // Reset star state for next pattern
+      currentIsStarred = false
 
       // Swap references: incoming becomes onScreen, outgoing becomes offScreen
       ;[onScreenCanvas, offScreenCanvas] = [offScreenCanvas, onScreenCanvas]
@@ -976,8 +1047,17 @@ export async function setupMobileLayout(
         offscreenReady = true
       }, 16)
 
+      starBtn.remove()
       softResetButton.remove()
       statsBtn.remove()
+
+      starBtn = createStarButton(
+        wrapper,
+        () => currentIsStarred,
+        (newValue) => {
+          currentIsStarred = newValue
+        },
+      )
 
       statsBtn = createStatsButton(wrapper, () =>
         showStats(getCurrentRunData()),
