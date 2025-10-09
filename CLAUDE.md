@@ -206,7 +206,11 @@ scripts/
 **PRs:** Title matches commit convention, link issues with `Resolves #N`
 **TypeScript:** Strict mode, no `any` types, explicit return types on exported functions
 **Formatting:** Biome with single quotes, semicolons optional, 80 char line width, 2-space indent
-**Styling:** Tailwind CSS with dark mode support - ALWAYS use `dark:` variants for all UI elements (backgrounds, text, borders, etc.)
+**Styling:**
+- Tailwind CSS for static styles with dark mode support - ALWAYS use `dark:` variants
+- Inline styles (`element.style.property`) for dynamic state changes (show/hide, animations)
+- Tailwind's JIT compiler only includes classes present in source code at build time
+- Never dynamically add/remove Tailwind utility classes at runtime (won't work reliably)
 **Testing:** Minimal (vitest for `entityDetection.test.ts` only) - more tests needed (issue #13)
 
 ## Common Patterns from Codebase
@@ -222,12 +226,25 @@ btn.style.touchAction = 'manipulation' // avoids 300ms delay
 const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
 ```
 
-**Tailwind dark mode styling**
+**Tailwind CSS styling patterns**
 ```typescript
-// Good: Tailwind classes with dark mode variants
+// Good: Tailwind for static styles, inline for dynamic state
+const overlay = document.createElement('div')
+overlay.className = 'fixed inset-0 bg-black/80 flex justify-center items-center'
+overlay.style.display = 'none' // Dynamic state
+
+function show() {
+  overlay.style.display = 'flex' // Toggle dynamic state
+}
+
+// Bad: Dynamically adding/removing Tailwind classes (unreliable)
+overlay.classList.add('hidden') // Won't work if 'hidden' not in source at build time
+overlay.classList.remove('hidden')
+
+// Good: Static Tailwind with dark mode
 element.className = 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
 
-// Bad: Inline styles without dark mode support
+// Bad: Inline styles for static styling (no dark mode support)
 element.style.cssText = 'background: white; color: black;'
 ```
 

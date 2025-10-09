@@ -212,7 +212,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   // Create modal overlay
   const overlay = document.createElement('div')
   overlay.className =
-    'fixed inset-0 bg-black/80 hidden justify-center items-center z-[10000]'
+    'fixed inset-0 bg-black/80 flex justify-center items-center z-[10000]'
+  overlay.style.display = 'none' // Use inline style for dynamic show/hide
 
   // Create modal content
   const modal = document.createElement('div')
@@ -232,8 +233,7 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   closeBtn.className =
     'border-none bg-transparent text-4xl cursor-pointer p-0 w-8 h-8 leading-8 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100'
   closeBtn.onclick = () => {
-    overlay.classList.add('hidden')
-    overlay.classList.remove('flex')
+    overlay.style.display = 'none'
   }
 
   header.appendChild(title)
@@ -257,7 +257,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   const stopBtn = document.createElement('button')
   stopBtn.textContent = 'Stop'
   stopBtn.className =
-    'bg-red-600 hover:bg-red-700 text-white border-none px-6 py-3 text-base rounded cursor-pointer hidden'
+    'bg-red-600 hover:bg-red-700 text-white border-none px-6 py-3 text-base rounded cursor-pointer'
+  stopBtn.style.display = 'none' // Use inline style for dynamic show/hide
 
   // Continuous mode checkbox
   const continuousLabel = document.createElement('label')
@@ -281,7 +282,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 
   const progressBar = document.createElement('div')
   progressBar.className =
-    'w-full h-6 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden mb-2 hidden'
+    'w-full h-6 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden mb-2'
+  progressBar.style.display = 'none' // Use inline style for dynamic show/hide
 
   const progressFill = document.createElement('div')
   progressFill.className = 'h-full bg-green-600 transition-all duration-300'
@@ -296,7 +298,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 
   // Chart area
   const chartContainer = document.createElement('div')
-  chartContainer.className = 'mb-6 hidden'
+  chartContainer.className = 'mb-6'
+  chartContainer.style.display = 'none' // Use inline style for dynamic show/hide
   const chartCanvas = document.createElement('canvas')
   chartCanvas.id = 'benchmark-chart'
   chartCanvas.className = 'max-h-[400px]'
@@ -319,8 +322,7 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   // Click outside to close
   overlay.onclick = (e) => {
     if (e.target === overlay) {
-      overlay.classList.add('hidden')
-      overlay.classList.remove('flex')
+      overlay.style.display = 'none'
     }
   }
 
@@ -333,7 +335,7 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   // Helper to render results table
   function renderResults(results: BenchmarkResult[], roundNumber: number) {
     resultsArea.innerHTML = ''
-    chartContainer.classList.remove('hidden')
+    chartContainer.style.display = 'block'
 
     // Round info
     const roundInfo = document.createElement('div')
@@ -505,9 +507,9 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   // Main benchmark runner
   async function runBenchmark() {
     shouldStop = false
-    startBtn.classList.add('hidden')
-    stopBtn.classList.remove('hidden')
-    progressBar.classList.remove('hidden')
+    startBtn.style.display = 'none'
+    stopBtn.style.display = 'block'
+    progressBar.style.display = 'block'
     continuousCheckbox.disabled = true
 
     const isContinuous = continuousCheckbox.checked
@@ -585,8 +587,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 				</div>
 			`
     } finally {
-      startBtn.classList.remove('hidden')
-      stopBtn.classList.add('hidden')
+      startBtn.style.display = 'block'
+      stopBtn.style.display = 'none'
       continuousCheckbox.disabled = false
     }
   }
@@ -604,8 +606,7 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 
   return {
     show: () => {
-      overlay.classList.remove('hidden')
-      overlay.classList.add('flex')
+      overlay.style.display = 'flex'
     },
     cleanup: () => {
       overlay.remove()
