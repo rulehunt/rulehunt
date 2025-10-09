@@ -24,6 +24,7 @@ import {
 } from '../utils.ts'
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 
+import { buildShareURL } from '../urlState.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
 // --- Constants --------------------------------------------------------------
@@ -716,6 +717,70 @@ function createSoftResetButton(
   return btn
 }
 
+// --- Share Button (copy shareable link to clipboard) -----------------------
+function createShareButton(
+  parent: HTMLElement,
+  getShareState: () => { rulesetHex: string; seed: number },
+): HTMLButtonElement {
+  const btn = document.createElement('button')
+  btn.setAttribute('data-swipe-ignore', 'true')
+  btn.style.touchAction = 'manipulation' // avoids 300ms delay on iOS
+
+  btn.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+         fill="currentColor" class="w-6 h-6">
+      <path d="M13.544 10.456a4.368 4.368 0 0 0-6.176 0l-3.089 3.088a4.367 4.367 0 1 0 6.177 6.177L12 18.177a1 1 0 0 1 1.414 1.414l-1.544 1.544a6.368 6.368 0 0 1-9.005-9.005l3.089-3.088a6.367 6.367 0 0 1 9.005 0 1 1 0 1 1-1.415 1.414zm6.911-6.911a6.367 6.367 0 0 1 0 9.005l-3.089 3.088a6.367 6.367 0 0 1-9.005 0 1 1 0 1 1 1.415-1.414 4.368 4.368 0 0 0 6.176 0l3.089-3.088a4.367 4.367 0 1 0-6.177-6.177L12 6.503a1 1 0 0 1-1.414-1.414l1.544-1.544a6.367 6.367 0 0 1 9.005 0z"/>
+    </svg>`
+  btn.className =
+    'absolute bottom-4 right-36 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition z-10'
+  btn.title = 'Copy shareable link'
+
+  // Swallow events so they don't reach the wrapper
+  const swallow = (e: Event) => e.stopPropagation()
+  btn.addEventListener('pointerdown', swallow)
+  btn.addEventListener('pointerup', swallow)
+  btn.addEventListener('mousedown', swallow)
+  btn.addEventListener('mouseup', swallow)
+  btn.addEventListener('touchstart', swallow, { passive: true })
+  btn.addEventListener('touchmove', swallow, { passive: true })
+  btn.addEventListener('touchend', swallow, { passive: true })
+  btn.addEventListener('touchcancel', swallow, { passive: true })
+
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation()
+    if (isTransitioning) return
+
+    const { rulesetHex, seed } = getShareState()
+    const shareURL = buildShareURL({
+      rulesetHex,
+      seed,
+      seedType: 'patch', // Mobile always uses patch seed
+      seedPercentage: 50,
+    })
+
+    try {
+      await navigator.clipboard.writeText(shareURL)
+      console.log('[share] Copied link to clipboard:', shareURL)
+
+      // Visual feedback - briefly change the button appearance
+      const originalHTML = btn.innerHTML
+      btn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+             fill="currentColor" class="w-6 h-6">
+          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+        </svg>`
+      setTimeout(() => {
+        btn.innerHTML = originalHTML
+      }, 1500)
+    } catch (err) {
+      console.error('[share] Failed to copy link:', err)
+    }
+  })
+
+  parent.appendChild(btn)
+  return btn
+}
+
 // --- Main -------------------------------------------------------------------
 export async function setupMobileLayout(
   appRoot: HTMLDivElement,
@@ -921,6 +986,11 @@ export async function setupMobileLayout(
   }
 
   // Create buttons
+  let shareBtn = createShareButton(wrapper, () => ({
+    rulesetHex: onScreenRule.hex,
+    seed: onScreenCA.getSeed(),
+  }))
+
   let statsBtn = createStatsButton(wrapper, () =>
     showStats(getCurrentRunData()),
   )
@@ -989,8 +1059,14 @@ export async function setupMobileLayout(
         offscreenReady = true
       }, 16)
 
+      shareBtn.remove()
       softResetButton.remove()
       statsBtn.remove()
+
+      shareBtn = createShareButton(wrapper, () => ({
+        rulesetHex: onScreenRule.hex,
+        seed: onScreenCA.getSeed(),
+      }))
 
       statsBtn = createStatsButton(wrapper, () =>
         showStats(getCurrentRunData()),
