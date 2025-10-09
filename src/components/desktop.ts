@@ -14,6 +14,7 @@ import {
 } from '../utils.ts'
 
 import { parseURLRuleset, parseURLState } from '../urlState.ts'
+import { setupBenchmarkModal } from './benchmark.ts'
 import { createHeader, setupTheme } from './desktopHeader.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import { createProgressBar } from './progressBar.ts'
@@ -315,6 +316,7 @@ export async function setupDesktopLayout(
     btnStep,
     btnReset,
     btnPlay,
+    btnBenchmark,
     stepsPerSecondInput,
     aliveSlider,
     aliveValue,
@@ -528,6 +530,12 @@ export async function setupDesktopLayout(
       newColors.fgColor,
       newColors.bgColor,
     )
+  })
+
+  // Setup benchmark modal
+  const benchmarkModal = setupBenchmarkModal(orbitLookup)
+  addEventListener(btnBenchmark, 'click', () => {
+    benchmarkModal.show()
   })
 
   // Canvas click handler
@@ -836,6 +844,7 @@ export async function setupDesktopLayout(
       element.removeEventListener(event, handler)
     }
     cleanupTheme()
+    benchmarkModal.cleanup()
     console.log('Desktop layout cleaned up')
   }
 }
