@@ -21,8 +21,8 @@ import { createSimulationPanel } from './simulation.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
 
 const PROGRESS_BAR_STEPS = 500
-const GRID_ROWS = 300
-const GRID_COLS = 300
+const GRID_ROWS = 400
+const GRID_COLS = 400
 
 // --- Types -----------------------------------------------------------------
 export type CleanupFunction = () => void
