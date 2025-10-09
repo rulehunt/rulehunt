@@ -358,10 +358,40 @@ export async function setupDesktopLayout(
   const urlState = parseURLState()
   const urlRuleset = parseURLRuleset()
 
+  // State - declare before using in URL parameter processing
+  let currentRuleset: C4Ruleset
+  let initialConditionType: 'center' | 'random' | 'patch' = 'patch'
+  let displayMode: DisplayMode = 'orbits'
+  let statsUpdateInterval: number | null = null
+
   // Apply URL seed if provided
   if (urlState.seed !== undefined) {
     cellularAutomata.setSeed(urlState.seed)
     console.log('[desktop] Using seed from URL:', urlState.seed)
+  }
+
+  // Apply seedType from URL if provided (affects initial condition later)
+  if (urlState.seedType) {
+    initialConditionType = urlState.seedType
+    console.log('[desktop] Using seed type from URL:', urlState.seedType)
+    // Update radio button selection
+    if (urlState.seedType === 'center') {
+      radioCenterSeed.checked = true
+    } else if (urlState.seedType === 'random') {
+      radioRandomSeed.checked = true
+    } else if (urlState.seedType === 'patch') {
+      radioPatchSeed.checked = true
+    }
+  }
+
+  // Apply seedPercentage from URL if provided (set slider value)
+  if (urlState.seedPercentage !== undefined) {
+    aliveSlider.value = urlState.seedPercentage.toString()
+    aliveValue.textContent = `${urlState.seedPercentage}%`
+    console.log(
+      '[desktop] Using seed percentage from URL:',
+      urlState.seedPercentage,
+    )
   }
 
   // Initial render after construction (constructor no longer auto-renders)
@@ -369,12 +399,6 @@ export async function setupDesktopLayout(
 
   ctx.fillStyle = colors.bgColor
   ctx.fillRect(0, 0, ruleCanvas.width, ruleCanvas.height)
-
-  // State
-  let currentRuleset: C4Ruleset
-  let initialConditionType: 'center' | 'random' | 'patch' = 'patch'
-  let displayMode: DisplayMode = 'orbits'
-  let statsUpdateInterval: number | null = null
 
   // Functions
   function applyInitialCondition() {
