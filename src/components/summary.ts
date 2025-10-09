@@ -31,10 +31,14 @@ export function createSummaryPanel(): {
       <div id="stats-container"></div>
     </div>
   `
-  
-  const metricsContainer = root.querySelector('#metrics-container') as HTMLDivElement
-  const statsContainer = root.querySelector('#stats-container') as HTMLDivElement
-  
+
+  const metricsContainer = root.querySelector(
+    '#metrics-container',
+  ) as HTMLDivElement
+  const statsContainer = root.querySelector(
+    '#stats-container',
+  ) as HTMLDivElement
+
   const elements: SummaryPanelElements = {
     metricsContainer,
     statsContainer,

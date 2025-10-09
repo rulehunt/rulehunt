@@ -2,14 +2,14 @@
 
 import type { RunSubmission } from '../schema.ts'
 import {
+  generateSimulationMetricsHTML,
+  updateSimulationMetricsFields,
+} from './shared/simulationInfo.ts'
+import {
   copyToClipboard,
   generateStatsHTML,
   updateStatsFields,
 } from './shared/stats.ts'
-import {
-  generateSimulationMetricsHTML,
-  updateSimulationMetricsFields,
-} from './shared/simulationInfo.ts'
 
 export interface StatsOverlayElements {
   overlay: HTMLDivElement
@@ -183,7 +183,7 @@ export function createStatsOverlay(): {
   const update = (data: RunSubmission) => {
     // Update simulation metrics using shared function
     updateSimulationMetricsFields(content, data)
-    
+
     // Update all stats fields using shared function
     updateStatsFields(content, data)
   }

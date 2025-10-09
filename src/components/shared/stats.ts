@@ -6,8 +6,14 @@ export interface StatsData extends GridStatistics {
 }
 
 export function generateStatsHTML(data: StatsData | RunSubmission): string {
-  const entityCount = 'entityCount' in data && data.entityCount !== undefined ? data.entityCount : 0
-  const entityChange = 'entityChange' in data && data.entityChange !== undefined ? data.entityChange : 0
+  const entityCount =
+    'entityCount' in data && data.entityCount !== undefined
+      ? data.entityCount
+      : 0
+  const entityChange =
+    'entityChange' in data && data.entityChange !== undefined
+      ? data.entityChange
+      : 0
   const entityChangeStr =
     entityChange > 0 ? `+${entityChange}` : entityChange.toString()
 
@@ -125,13 +131,22 @@ export function updateStatsFields(
   updateField('[data-field="entropy4x4"]', data.entropy4x4.toFixed(4))
   updateField('[data-field="entropy8x8"]', data.entropy8x8.toFixed(4))
 
-  const entityCount = 'entityCount' in data && data.entityCount !== undefined ? data.entityCount : 0
-  const entityChange = 'entityChange' in data && data.entityChange !== undefined ? data.entityChange : 0
+  const entityCount =
+    'entityCount' in data && data.entityCount !== undefined
+      ? data.entityCount
+      : 0
+  const entityChange =
+    'entityChange' in data && data.entityChange !== undefined
+      ? data.entityChange
+      : 0
   updateField('[data-field="entityCount"]', entityCount.toString())
   updateField(
     '[data-field="entityChange"]',
     `${entityChange > 0 ? '+' : ''}${entityChange}`,
   )
 
-  updateField('[data-field="interest"]', `${(data.interestScore * 100).toFixed(1)}%`)
+  updateField(
+    '[data-field="interest"]',
+    `${(data.interestScore * 100).toFixed(1)}%`,
+  )
 }

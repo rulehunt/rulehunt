@@ -17,8 +17,8 @@ import { createHeader, setupTheme } from './desktopHeader.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
-import { generateStatsHTML, getInterestColorClass } from './shared/stats.ts'
 import { generateSimulationMetricsHTML } from './shared/simulationInfo.ts'
+import { generateStatsHTML, getInterestColorClass } from './shared/stats.ts'
 import { createSimulationPanel } from './simulation.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
 
@@ -129,15 +129,18 @@ function updateStatisticsDisplay(
       requestedSps: metadata.requestedStepsPerSecond,
       gridSize: cellularAutomata.getGridSize(),
     }
-    elements.metricsContainer.innerHTML = generateSimulationMetricsHTML(metricsData)
+    elements.metricsContainer.innerHTML =
+      generateSimulationMetricsHTML(metricsData)
   }
 
   // Generate stats HTML and update the container
   const statsData = { ...current, interestScore }
   elements.statsContainer.innerHTML = generateStatsHTML(statsData)
-  
+
   // Apply interest score color to the interest field
-  const interestField = elements.statsContainer.querySelector('[data-field="interest"]')
+  const interestField = elements.statsContainer.querySelector(
+    '[data-field="interest"]',
+  )
   if (interestField) {
     interestField.className = `text-gray-900 dark:text-white font-semibold text-lg ${getInterestColorClass(interestScore)}`
   }
@@ -447,7 +450,7 @@ export async function setupDesktopLayout(
     colors.fgColor,
     colors.bgColor,
   )
-  
+
   // Now apply initial condition which will also initialize simulation metadata
   applyInitialCondition()
 

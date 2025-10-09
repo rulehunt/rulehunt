@@ -12,16 +12,23 @@ export interface SimulationMetrics {
   gridSize?: number
 }
 
-export function generateSimulationMetricsHTML(data: SimulationMetrics | RunSubmission): string {
+export function generateSimulationMetricsHTML(
+  data: SimulationMetrics | RunSubmission,
+): string {
   const gridSize = 'gridSize' in data && data.gridSize ? data.gridSize : 0
   const actualSps = 'actualSps' in data && data.actualSps ? data.actualSps : 0
-  const requestedSps = 'requestedSps' in data && data.requestedSps ? data.requestedSps : 0
-  
+  const requestedSps =
+    'requestedSps' in data && data.requestedSps ? data.requestedSps : 0
+
   // Handle different time fields
-  const elapsedTimeMs = 'watchedWallMs' in data ? data.watchedWallMs : 
-                        'elapsedTime' in data ? data.elapsedTime : 0
+  const elapsedTimeMs =
+    'watchedWallMs' in data
+      ? data.watchedWallMs
+      : 'elapsedTime' in data
+        ? data.elapsedTime
+        : 0
   const stepCount = 'stepCount' in data ? data.stepCount : 0
-  
+
   return `
     <div class="space-y-2 font-mono text-sm">
       <div class="flex justify-between items-center">
@@ -51,12 +58,16 @@ export function generateSimulationMetricsHTML(data: SimulationMetrics | RunSubmi
         <span data-field="elapsed-time" class="text-gray-900 dark:text-gray-100">${(elapsedTimeMs / 1000).toFixed(1)}s</span>
       </div>
       
-      ${gridSize > 0 ? `
+      ${
+        gridSize > 0
+          ? `
       <div class="flex justify-between items-center">
         <span class="text-gray-600 dark:text-gray-400 text-xs">Grid Size:</span>
         <span data-field="grid-size" class="text-gray-900 dark:text-gray-100">${gridSize.toLocaleString()}</span>
       </div>
-      ` : ''}
+      `
+          : ''
+      }
       
       <div class="flex justify-between items-center">
         <span class="text-gray-600 dark:text-gray-400 text-xs">Steps/Second:</span>
@@ -79,24 +90,34 @@ export function updateSimulationMetricsFields(
 
   updateField('[data-field="ruleset-name"]', data.rulesetName)
   updateField('[data-field="ruleset-hex"]', data.rulesetHex)
-  
-  const seedText = data.seedType + (data.seedPercentage !== undefined ? ` (${data.seedPercentage}%)` : '')
+
+  const seedText =
+    data.seedType +
+    (data.seedPercentage !== undefined ? ` (${data.seedPercentage}%)` : '')
   updateField('[data-field="seed-type"]', seedText)
-  
+
   const stepCount = 'stepCount' in data ? data.stepCount : 0
   updateField('[data-field="step-count"]', stepCount.toLocaleString())
-  
-  const elapsedTimeMs = 'watchedWallMs' in data ? data.watchedWallMs : 
-                        'elapsedTime' in data ? data.elapsedTime : 0
-  updateField('[data-field="elapsed-time"]', `${(elapsedTimeMs / 1000).toFixed(1)}s`)
-  
+
+  const elapsedTimeMs =
+    'watchedWallMs' in data
+      ? data.watchedWallMs
+      : 'elapsedTime' in data
+        ? data.elapsedTime
+        : 0
+  updateField(
+    '[data-field="elapsed-time"]',
+    `${(elapsedTimeMs / 1000).toFixed(1)}s`,
+  )
+
   const gridSize = 'gridSize' in data && data.gridSize ? data.gridSize : 0
   if (gridSize > 0) {
     updateField('[data-field="grid-size"]', gridSize.toLocaleString())
   }
-  
+
   const actualSps = 'actualSps' in data && data.actualSps ? data.actualSps : 0
-  const requestedSps = 'requestedSps' in data && data.requestedSps ? data.requestedSps : 0
+  const requestedSps =
+    'requestedSps' in data && data.requestedSps ? data.requestedSps : 0
   const spsText = `${actualSps > 0 ? actualSps.toFixed(1) : '—'}${requestedSps > 0 ? ` / ${requestedSps}` : ''}`
   updateField('[data-field="sps"]', spsText)
 }
