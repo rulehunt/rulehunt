@@ -475,4 +475,28 @@ export abstract class CellularAutomataBase {
   isRunning() {
     return this.isPlaying
   }
+
+  // --- Grid access for testing ----------------------------------------------
+  /**
+   * Get a copy of the current grid state.
+   * Primarily for testing and debugging.
+   */
+  getGrid(): Uint8Array {
+    return new Uint8Array(this.grid)
+  }
+
+  /**
+   * Set the grid state directly.
+   * Primarily for testing - allows setting up specific patterns.
+   * @param newGrid - Grid data to copy (must match grid dimensions)
+   */
+  setGrid(newGrid: Uint8Array): void {
+    if (newGrid.length !== this.gridArea) {
+      throw new Error(
+        `Grid size mismatch: expected ${this.gridArea}, got ${newGrid.length}`,
+      )
+    }
+    this.grid.set(newGrid)
+    this.onGridChanged()
+  }
 }
