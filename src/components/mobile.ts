@@ -120,7 +120,6 @@ function computeAdaptiveGrid(maxCells = TARGET_GRID_SIZE) {
   return { gridCols, gridRows, cellSize, totalCells, screenWidth, screenHeight }
 }
 
-// --- Promise helper ---------------------------------------------------------
 function waitForTransitionEnd(el: HTMLElement): Promise<void> {
   return new Promise((resolve) => {
     const done = (ev: TransitionEvent) => {
@@ -165,8 +164,6 @@ function setupDualCanvasSwipe(
   const resetTransforms = (h: number) => {
     outgoingCanvas.style.transform = 'translateY(0)'
     incomingCanvas.style.transform = `translateY(${h}px)`
-    outgoingCanvas.style.opacity = '1'
-    incomingCanvas.style.opacity = '1'
   }
 
   const handleTouchStart = (e: TouchEvent) => {
@@ -225,25 +222,20 @@ function setupDualCanvasSwipe(
 
     const delta = Math.min(0, dy)
     const height = getHeight()
-    const progress = Math.abs(delta) / height
 
     outgoingCanvas.style.transform = `translateY(${delta}px)`
     incomingCanvas.style.transform = `translateY(${height + delta}px)`
-    outgoingCanvas.style.opacity = `${Math.max(0.3, 1 - progress * 0.7)}`
-    incomingCanvas.style.opacity = `${Math.min(1, 0.3 + progress * 0.7)}`
   }
 
   const doCancel = async () => {
     const height = getHeight()
     const duration = 0.25
-    const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1), opacity ${duration}s ease`
+    const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1)`
     outgoingCanvas.style.transition = transition
     incomingCanvas.style.transition = transition
 
     outgoingCanvas.style.transform = 'translateY(0)'
     incomingCanvas.style.transform = `translateY(${height}px)`
-    outgoingCanvas.style.opacity = '1'
-    incomingCanvas.style.opacity = '1'
 
     await Promise.all([
       waitForTransitionEnd(outgoingCanvas),
@@ -289,7 +281,7 @@ function setupDualCanvasSwipe(
       !tinyAccidentalMove && !slowPullback && (fastFlick || normalFlick)
 
     const duration = shouldCommit ? 0.35 : 0.25
-    const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1), opacity ${duration}s ease`
+    const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1)`
     outgoingCanvas.style.transition = transition
     incomingCanvas.style.transition = transition
     void outgoingCanvas.offsetWidth
@@ -297,32 +289,33 @@ function setupDualCanvasSwipe(
     isTransitioning = true
 
     if (shouldCommit) {
-      // Ensure outgoing CA is paused
-      onCancel()
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      const bgColor = isDark ? '#1e1e1e' : '#ffffff'
 
-      // Animate both canvases (both already showing their correct content)
+      requestAnimationFrame(() => {
+        // Explicitly fill background before rendering to prevent black flash
+        const ctx = incomingCanvas.getContext('2d')
+        if (ctx) {
+          ctx.save()
+          ctx.fillStyle = bgColor
+          ctx.fillRect(0, 0, incomingCanvas.width, incomingCanvas.height)
+          ctx.restore()
+        }
+      })
+      // Normal upward slide
       outgoingCanvas.style.transform = `translateY(-${height}px)`
       incomingCanvas.style.transform = 'translateY(0)'
-      outgoingCanvas.style.opacity = '0'
-      incomingCanvas.style.opacity = '1'
 
       await Promise.all([
         waitForTransitionEnd(outgoingCanvas),
         waitForTransitionEnd(incomingCanvas),
       ])
 
-      // Reset transitions and ensure transforms are set before swapping
       outgoingCanvas.style.transition = 'none'
       incomingCanvas.style.transition = 'none'
       outgoingCanvas.style.transform = `translateY(-${height}px)`
       incomingCanvas.style.transform = 'translateY(0)'
-      outgoingCanvas.style.opacity = '0'
-      incomingCanvas.style.opacity = '1'
 
-      // Ensure incoming canvas is visible
-      incomingCanvas.style.visibility = 'visible'
-
-      // Delay onCommit by one frame to let browser finish compositing
       requestAnimationFrame(() => onCommit())
     } else {
       await doCancel()
@@ -440,13 +433,12 @@ function prepareRule(
 ): void {
   cellularAutomata.pause()
   cellularAutomata.clearGrid()
-  cellularAutomata.render()
-
   cellularAutomata.patchSeed(seedPercentage)
 
   if (!rule.expanded && (rule.ruleset as number[]).length === 140) {
     rule.expanded = expandC4Ruleset(rule.ruleset as C4Ruleset, orbitLookup)
   }
+  cellularAutomata.render()
 }
 
 /**
@@ -641,10 +633,10 @@ export async function setupMobileLayout(
     const c = document.createElement('canvas')
     c.width = size
     c.height = size
-    c.className = 'absolute inset-0 rounded-lg touch-none'
+    c.className = 'absolute inset-0 touch-none'
     c.style.width = `${size}px`
     c.style.height = `${size}px`
-    c.style.willChange = 'transform, opacity'
+    c.style.willChange = 'transform'
     return c
   }
 
@@ -838,12 +830,10 @@ export async function setupMobileLayout(
       onScreenCanvas.style.zIndex = '2'
       onScreenCanvas.style.pointerEvents = 'auto'
       onScreenCanvas.style.transform = 'translateY(0)'
-      onScreenCanvas.style.opacity = '1'
 
       offScreenCanvas.style.zIndex = '1'
       offScreenCanvas.style.pointerEvents = 'none'
       offScreenCanvas.style.transform = `translateY(${h}px)`
-      offScreenCanvas.style.opacity = '1'
 
       // Update colors (no auto-render with refactored CA)
       colorIndex = (colorIndex + 1) % palette.length
