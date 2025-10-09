@@ -17,7 +17,8 @@
     "generate:c4-orbits": "tsx scripts/generate-c4-orbits.ts && pnpm run format",
     "test": "vitest",
     "db:migrate": "wrangler d1 migrations apply rulehunt-db --remote",
-    "db:verify": "wrangler d1 execute rulehunt-db --remote --command 'PRAGMA table_info(runs);'"
+    "db:verify": "wrangler d1 execute rulehunt-db --remote --command 'PRAGMA table_info(runs);'",
+    "db:download": "./scripts/db-download.js"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
