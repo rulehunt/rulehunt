@@ -5,6 +5,8 @@ export interface GridStatistics {
   entropy2x2: number
   entropy4x4: number
   entropy8x8: number
+  entityCount: number
+  entityChange: number
 }
 
 export interface SimulationMetadata {
@@ -19,6 +21,9 @@ export interface SimulationMetadata {
   lastStepTime: number
 }
 
+import { detectEntities } from './entityDetection'
+import type { Grid } from './schema'
+
 export class StatisticsTracker {
   private history: GridStatistics[] = []
   private maxHistory = 100
@@ -28,6 +33,7 @@ export class StatisticsTracker {
   private metadata: SimulationMetadata | null = null
   private stepTimes: number[] = [] // Track last 20 step times for SPS calculation
   private maxStepTimes = 20
+  private previousEntityCount = 0
 
   constructor(gridRows: number, gridCols: number) {
     this.gridRows = gridRows
@@ -106,6 +112,13 @@ export class StatisticsTracker {
       ? population - this.calculatePopulation(this.previousGrid)
       : 0
 
+    // Convert to 2D grid for entity detection
+    const grid2D = this.convertTo2DGrid(grid)
+    const entities = detectEntities(grid2D)
+    const entityCount = entities.length
+    const entityChange = entityCount - this.previousEntityCount
+    this.previousEntityCount = entityCount
+
     return {
       population,
       activity,
@@ -113,6 +126,8 @@ export class StatisticsTracker {
       entropy2x2: this.calculateBlockEntropy(grid, 2),
       entropy4x4: this.calculateBlockEntropy(grid, 4),
       entropy8x8: this.calculateBlockEntropy(grid, 8),
+      entityCount,
+      entityChange,
     }
   }
 
@@ -203,6 +218,22 @@ export class StatisticsTracker {
       recent.reduce((sum, s) => sum + s.entropy4x4, 0) / recent.length
     const avgEntropy8x8 =
       recent.reduce((sum, s) => sum + s.entropy8x8, 0) / recent.length
+    const avgEntityCount =
+      recent.reduce((sum, s) => sum + s.entityCount, 0) / recent.length
+
+    // Calculate entity dynamics
+    const entityChanges = recent.map((s) => Math.abs(s.entityChange))
+    const avgEntityChange =
+      entityChanges.reduce((a, b) => a + b, 0) / entityChanges.length
+    const maxEntityChange = Math.max(...entityChanges)
+
+    // Entity stability score - reward systems that maintain entities
+    const entityStability =
+      avgEntityCount > 0 ? Math.min(avgEntityCount / 10, 1) : 0 // Cap at 10 entities
+
+    // Entity dynamics score - reward fluctuating entity counts
+    const entityDynamics =
+      maxEntityChange > 0 ? Math.min(avgEntityChange / 5, 1) : 0 // Cap at average change of 5
 
     const populationRatio = avgPopulation / totalCells
     const activityRatio = avgActivity / totalCells
@@ -245,11 +276,15 @@ export class StatisticsTracker {
     const goldilocksPop =
       populationRatio > 0.1 && populationRatio < 0.7 ? 1 : 0.5
 
-    // Final interest score
+    // Entity score combines stability and dynamics
+    const entityScore = entityStability * 0.6 + entityDynamics * 0.4
+
+    // Final interest score with entity dynamics
     const interestScore =
-      (entropyScore * 0.5 + // High entropy is key
-        activityScore * 0.3 + // Activity matters
-        goldilocksPop * 0.2) * // Population in good range
+      (entropyScore * 0.35 + // High entropy is important
+        activityScore * 0.2 + // Activity matters
+        entityScore * 0.3 + // Entity dynamics are key
+        goldilocksPop * 0.15) * // Population in good range
       dieOutPenalty *
       expansionPenalty
 
@@ -260,10 +295,30 @@ export class StatisticsTracker {
     return this.history.slice(-count)
   }
 
+  private convertTo2DGrid(grid: Uint8Array): Grid {
+    if (this.gridRows !== 10 || this.gridCols !== 10) {
+      // Entity detection only works on 10x10 grids, return empty grid for others
+      return Array(10)
+        .fill(null)
+        .map(() => Array(10).fill(0))
+    }
+
+    const grid2D: Grid = []
+    for (let y = 0; y < this.gridRows; y++) {
+      const row: (0 | 1)[] = []
+      for (let x = 0; x < this.gridCols; x++) {
+        row.push(grid[y * this.gridCols + x] ? 1 : 0)
+      }
+      grid2D.push(row)
+    }
+    return grid2D
+  }
+
   reset() {
     this.history = []
     this.previousGrid = null
     this.metadata = null
     this.stepTimes = []
+    this.previousEntityCount = 0
   }
 }

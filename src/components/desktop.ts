@@ -17,6 +17,8 @@ import { createHeader, setupTheme } from './desktopHeader.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
+import { generateStatsHTML, getInterestColorClass } from './shared/stats.ts'
+import { generateSimulationMetricsHTML } from './shared/simulationInfo.ts'
 import { createSimulationPanel } from './simulation.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
 
@@ -114,62 +116,30 @@ function updateStatisticsDisplay(
     progressBar.set(Math.round(progressPercent))
   }
 
+  // Update simulation metrics
   if (metadata) {
-    elements.simName.textContent = metadata.name
-    elements.simRule.textContent = `${metadata.rulesetName} (${metadata.rulesetHex})`
-    elements.simRule.title = `${metadata.rulesetName} (${metadata.rulesetHex})`
-
-    let seedText = metadata.seedType
-    if (metadata.seedPercentage !== undefined) {
-      seedText += ` (${metadata.seedPercentage}%)`
+    const metricsData = {
+      rulesetName: metadata.rulesetName,
+      rulesetHex: metadata.rulesetHex,
+      seedType: metadata.seedType,
+      seedPercentage: metadata.seedPercentage,
+      stepCount: metadata.stepCount,
+      elapsedTime: stats.getElapsedTime(),
+      actualSps: stats.getActualStepsPerSecond(),
+      requestedSps: metadata.requestedStepsPerSecond,
+      gridSize: cellularAutomata.getGridSize(),
     }
-    elements.simSeed.textContent = seedText
-    elements.simSteps.textContent = metadata.stepCount.toString()
-
-    const elapsed = stats.getElapsedTime()
-    const seconds = Math.floor(elapsed / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const hours = Math.floor(minutes / 60)
-
-    if (hours > 0) {
-      elements.simTime.textContent = `${hours}h ${minutes % 60}m ${seconds % 60}s`
-    } else if (minutes > 0) {
-      elements.simTime.textContent = `${minutes}m ${seconds % 60}s`
-    } else {
-      elements.simTime.textContent = `${seconds}s`
-    }
-
-    const actualSps = stats.getActualStepsPerSecond()
-    const requestedSps = metadata.requestedStepsPerSecond
-    if (actualSps > 0) {
-      let spsText = actualSps.toFixed(1)
-      if (requestedSps) {
-        spsText += ` / ${requestedSps}`
-      }
-      elements.simSps.textContent = spsText
-    } else {
-      elements.simSps.textContent = requestedSps
-        ? `${requestedSps} (target)`
-        : '—'
-    }
+    elements.metricsContainer.innerHTML = generateSimulationMetricsHTML(metricsData)
   }
 
-  elements.statPopulation.textContent = current.population.toFixed(0)
-  elements.statActivity.textContent = current.activity.toFixed(0)
-  elements.statEntropy2x2.textContent = current.entropy2x2.toFixed(2)
-  elements.statEntropy4x4.textContent = current.entropy4x4.toFixed(2)
-  elements.statEntropy8x8.textContent = current.entropy8x8.toFixed(2)
-  elements.statInterest.textContent = `${(interestScore * 100).toFixed(1)}%`
-
-  if (interestScore > 0.7) {
-    elements.statInterest.className =
-      'font-mono text-lg font-bold text-green-600 dark:text-green-400'
-  } else if (interestScore > 0.4) {
-    elements.statInterest.className =
-      'font-mono text-lg font-bold text-yellow-600 dark:text-yellow-400'
-  } else {
-    elements.statInterest.className =
-      'font-mono text-lg font-bold text-red-600 dark:text-red-400'
+  // Generate stats HTML and update the container
+  const statsData = { ...current, interestScore }
+  elements.statsContainer.innerHTML = generateStatsHTML(statsData)
+  
+  // Apply interest score color to the interest field
+  const interestField = elements.statsContainer.querySelector('[data-field="interest"]')
+  if (interestField) {
+    interestField.className = `text-gray-900 dark:text-white font-semibold text-lg ${getInterestColorClass(interestScore)}`
   }
 }
 
@@ -386,8 +356,6 @@ export async function setupDesktopLayout(
   ctx.fillStyle = colors.bgColor
   ctx.fillRect(0, 0, ruleCanvas.width, ruleCanvas.height)
 
-  updateStatisticsDisplay(cellularAutomata, summaryPanel.elements, progressBar)
-
   // State
   let currentRuleset: C4Ruleset
   let initialConditionType: 'center' | 'random' | 'patch' = 'patch'
@@ -465,7 +433,6 @@ export async function setupDesktopLayout(
   }
 
   // Initialize with Conway
-  applyInitialCondition()
   const conwayRuleset = makeC4Ruleset(conwayRule, orbitLookup)
   currentRuleset = conwayRuleset
   renderRule(
@@ -480,6 +447,9 @@ export async function setupDesktopLayout(
     colors.fgColor,
     colors.bgColor,
   )
+  
+  // Now apply initial condition which will also initialize simulation metadata
+  applyInitialCondition()
 
   // Setup theme with re-render callback
   const cleanupTheme = setupTheme(header.elements.themeToggle, () => {
@@ -771,6 +741,8 @@ export async function setupDesktopLayout(
         entropy2x2: recent.entropy2x2,
         entropy4x4: recent.entropy4x4,
         entropy8x8: recent.entropy8x8,
+        entityCount: recent.entityCount,
+        entityChange: recent.entityChange,
         interestScore,
         simVersion: 'v0.1.0',
         engineCommit: undefined,
