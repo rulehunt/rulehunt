@@ -1,5 +1,17 @@
 // tests/test-utils.ts
-import type { Ruleset } from '../src/schema'
+import type { Pattern, Ruleset } from '../src/schema'
+import { conwayRule as conwayRuleFunction } from '../src/utils'
+
+/**
+ * Create a full 512-entry ruleset from Conway's Game of Life rule function
+ */
+export function createConwayRuleset(): Ruleset {
+  const ruleset = new Array(512) as (0 | 1)[]
+  for (let i = 0; i < 512; i++) {
+    ruleset[i] = conwayRuleFunction(i as Pattern)
+  }
+  return ruleset as Ruleset
+}
 
 /**
  * Create a test canvas element for CA testing

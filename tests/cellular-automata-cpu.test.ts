@@ -1,9 +1,9 @@
 // tests/cellular-automata-cpu.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
 import { CellularAutomata } from '../src/cellular-automata-cpu'
-import { conwayRule } from '../src/utils'
 import {
   createTestCanvas,
+  createConwayRuleset,
   parseGrid,
   formatGrid,
   compareGrids,
@@ -12,18 +12,20 @@ import {
 } from './test-utils'
 
 describe('CellularAutomata (CPU)', () => {
-  let canvas: HTMLCanvasElement
   let ca: CellularAutomata
+  let conwayRuleset: ReturnType<typeof createConwayRuleset>
 
   beforeEach(() => {
-    // Create canvas and CA instance before each test
-    canvas = createTestCanvas(400, 400)
-    ca = new CellularAutomata(canvas, {
+    // Create CA instance in headless mode (no canvas) for testing
+    ca = new CellularAutomata(null, {
       gridRows: 10,
       gridCols: 10,
       fgColor: '#000000',
       bgColor: '#ffffff',
     })
+
+    // Create Conway ruleset for testing
+    conwayRuleset = createConwayRuleset()
   })
 
   describe('Basic Functionality', () => {
@@ -55,14 +57,14 @@ describe('CellularAutomata (CPU)', () => {
 
   describe('Seeding Determinism', () => {
     it('should produce identical random seeds with same seed value', () => {
-      const ca1 = new CellularAutomata(createTestCanvas(400, 400), {
+      const ca1 = new CellularAutomata(null, {
         gridRows: 10,
         gridCols: 10,
         fgColor: '#000000',
         bgColor: '#ffffff',
       })
 
-      const ca2 = new CellularAutomata(createTestCanvas(400, 400), {
+      const ca2 = new CellularAutomata(null, {
         gridRows: 10,
         gridCols: 10,
         fgColor: '#000000',
@@ -92,7 +94,7 @@ describe('CellularAutomata (CPU)', () => {
 
   describe("Conway's Game of Life Patterns", () => {
     it('should keep block pattern stable', () => {
-      const ca = new CellularAutomata(createTestCanvas(400, 400), {
+      const ca = new CellularAutomata(null, {
         gridRows: 4,
         gridCols: 4,
         fgColor: '#000000',
@@ -106,7 +108,7 @@ describe('CellularAutomata (CPU)', () => {
       const initialGrid = ca.getGrid()
 
       // Step once
-      ca.step(conwayRule)
+      ca.step(conwayRuleset)
 
       const afterStepGrid = ca.getGrid()
 
@@ -115,7 +117,7 @@ describe('CellularAutomata (CPU)', () => {
     })
 
     it('should oscillate blinker pattern with period 2', () => {
-      const ca = new CellularAutomata(createTestCanvas(400, 400), {
+      const ca = new CellularAutomata(null, {
         gridRows: 5,
         gridCols: 5,
         fgColor: '#000000',
@@ -129,14 +131,14 @@ describe('CellularAutomata (CPU)', () => {
       const initialGrid = ca.getGrid()
 
       // Step once - should become horizontal
-      ca.step(conwayRule)
+      ca.step(conwayRuleset)
       const afterStep1 = ca.getGrid()
 
       // Should be different from initial (oscillated)
       expect(afterStep1).not.toEqual(initialGrid)
 
       // Step again - should return to vertical
-      ca.step(conwayRule)
+      ca.step(conwayRuleset)
       const afterStep2 = ca.getGrid()
 
       // Should match initial state (period 2)
@@ -144,7 +146,7 @@ describe('CellularAutomata (CPU)', () => {
     })
 
     it('should move glider diagonally', () => {
-      const ca = new CellularAutomata(createTestCanvas(400, 400), {
+      const ca = new CellularAutomata(null, {
         gridRows: 8,
         gridCols: 8,
         fgColor: '#000000',
@@ -159,7 +161,7 @@ describe('CellularAutomata (CPU)', () => {
 
       // Step 4 times (glider has period 4)
       for (let i = 0; i < 4; i++) {
-        ca.step(conwayRule)
+        ca.step(conwayRuleset)
       }
 
       const afterCycleGrid = ca.getGrid()
@@ -181,7 +183,7 @@ describe('CellularAutomata (CPU)', () => {
       const initialGrid = ca.getGrid()
 
       // Step with Conway's rule
-      ca.step(conwayRule)
+      ca.step(conwayRuleset)
 
       const afterStepGrid = ca.getGrid()
 
@@ -191,7 +193,7 @@ describe('CellularAutomata (CPU)', () => {
     })
 
     it('should handle single corner cell with toroidal wrapping', () => {
-      const ca = new CellularAutomata(createTestCanvas(400, 400), {
+      const ca = new CellularAutomata(null, {
         gridRows: 5,
         gridCols: 5,
         fgColor: '#000000',
@@ -206,7 +208,7 @@ describe('CellularAutomata (CPU)', () => {
       ca.setGrid(grid)
 
       // Step once
-      ca.step(conwayRule)
+      ca.step(conwayRuleset)
 
       const afterStep = ca.getGrid()
 
@@ -222,7 +224,7 @@ describe('CellularAutomata (CPU)', () => {
       ca.centerSeed()
 
       const initialSize = ca.getGridSize()
-      ca.step(conwayRule)
+      ca.step(conwayRuleset)
 
       // Grid size shouldn't change
       expect(ca.getGridSize()).toBe(initialSize)
@@ -237,7 +239,7 @@ describe('CellularAutomata (CPU)', () => {
       ca.centerSeed()
 
       for (let i = 0; i < 10; i++) {
-        ca.step(conwayRule)
+        ca.step(conwayRuleset)
       }
 
       expect(ca.getGridSize()).toBe(100)
@@ -245,7 +247,7 @@ describe('CellularAutomata (CPU)', () => {
 
     it('should apply ruleset correctly for known pattern', () => {
       // Toad oscillator test
-      const ca = new CellularAutomata(createTestCanvas(400, 400), {
+      const ca = new CellularAutomata(null, {
         gridRows: 6,
         gridCols: 6,
         fgColor: '#000000',
@@ -258,14 +260,14 @@ describe('CellularAutomata (CPU)', () => {
       const initialGrid = ca.getGrid()
 
       // Step once
-      ca.step(conwayRule)
+      ca.step(conwayRuleset)
       const afterStep1 = ca.getGrid()
 
       // Should oscillate
       expect(afterStep1).not.toEqual(initialGrid)
 
       // Step again - should return to original
-      ca.step(conwayRule)
+      ca.step(conwayRuleset)
       const afterStep2 = ca.getGrid()
 
       expect(afterStep2).toEqual(initialGrid)
