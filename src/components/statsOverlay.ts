@@ -1,6 +1,15 @@
 // src/components/statsOverlay.ts
 
 import type { RunSubmission } from '../schema.ts'
+import {
+  copyToClipboard,
+  generateStatsHTML,
+  updateStatsFields,
+} from './shared/stats.ts'
+import {
+  generateSimulationMetricsHTML,
+  updateSimulationMetricsFields,
+} from './shared/simulationInfo.ts'
 
 export interface StatsOverlayElements {
   overlay: HTMLDivElement
@@ -10,31 +19,6 @@ export interface StatsOverlayElements {
 }
 
 export type CleanupFunction = () => void
-
-// Helper function to copy text to clipboard
-async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text)
-      return true
-    }
-    // Fallback for older browsers
-    const textArea = document.createElement('textarea')
-    textArea.value = text
-    textArea.style.position = 'fixed'
-    textArea.style.left = '-999999px'
-    textArea.style.top = '-999999px'
-    document.body.appendChild(textArea)
-    textArea.focus()
-    textArea.select()
-    const success = document.execCommand('copy')
-    document.body.removeChild(textArea)
-    return success
-  } catch (err) {
-    console.error('Failed to copy:', err)
-    return false
-  }
-}
 
 export function createStatsOverlay(): {
   elements: StatsOverlayElements
@@ -110,86 +94,12 @@ export function createStatsOverlay(): {
 
         <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
           <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">Simulation Metrics</h3>
-          <div class="grid grid-cols-2 gap-x-4 gap-y-2 font-mono text-sm">
-            <div>
-              <div class="text-gray-500 dark:text-gray-400 text-xs">Steps</div>
-              <div data-field="steps" class="text-gray-900 dark:text-white font-semibold">
-                ${data.stepCount.toLocaleString()}
-              </div>
-            </div>
-            <div>
-              <div class="text-gray-500 dark:text-gray-400 text-xs">Watched Time</div>
-              <div data-field="watchedTime" class="text-gray-900 dark:text-white font-semibold">
-                ${(data.watchedWallMs / 1000).toFixed(1)}s
-              </div>
-            </div>
-            <div>
-              <div class="text-gray-500 dark:text-gray-400 text-xs">Grid Size</div>
-              <div class="text-gray-900 dark:text-white font-semibold">
-                ${gridSize.toLocaleString()}
-              </div>
-            </div>
-            <div>
-              <div class="text-gray-500 dark:text-gray-400 text-xs">Steps/Second</div>
-              <div data-field="sps" class="text-gray-900 dark:text-white font-semibold">
-                ${actualSps.toFixed(1)} / ${data.requestedSps}
-              </div>
-            </div>
-            <div>
-              <div class="text-gray-500 dark:text-gray-400 text-xs">Seed Type</div>
-              <div class="text-gray-900 dark:text-white font-semibold">
-                ${data.seedType} (${data.seedPercentage}%)
-              </div>
-            </div>
-            <div>
-              <div class="text-gray-500 dark:text-gray-400 text-xs">Interest Score</div>
-              <div data-field="interest" class="text-gray-900 dark:text-white font-semibold text-lg">
-                ${data.interestScore.toFixed(4)}
-              </div>
-            </div>
-          </div>
+          ${generateSimulationMetricsHTML(data)}
         </div>
         
         <div class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
           <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">Pattern Analysis</h3>
-          <div class="grid grid-cols-2 gap-x-4 gap-y-2 font-mono text-sm">
-            <div>
-              <div class="text-gray-500 dark:text-gray-400 text-xs">Population</div>
-              <div data-field="population" class="text-gray-900 dark:text-white">
-                ${data.population.toLocaleString()}
-              </div>
-            </div>
-            <div>
-              <div class="text-gray-500 dark:text-gray-400 text-xs">Activity</div>
-              <div data-field="activity" class="text-gray-900 dark:text-white">
-                ${data.activity.toLocaleString()}
-              </div>
-            </div>
-            <div>
-              <div class="text-gray-500 dark:text-gray-400 text-xs">Pop. Change</div>
-              <div data-field="popChange" class="text-gray-900 dark:text-white">
-                ${data.populationChange.toLocaleString()}
-              </div>
-            </div>
-            <div>
-              <div class="text-gray-500 dark:text-gray-400 text-xs">Entropy 2×2</div>
-              <div data-field="entropy2x2" class="text-gray-900 dark:text-white">
-                ${data.entropy2x2.toFixed(4)}
-              </div>
-            </div>
-            <div>
-              <div class="text-gray-500 dark:text-gray-400 text-xs">Entropy 4×4</div>
-              <div data-field="entropy4x4" class="text-gray-900 dark:text-white">
-                ${data.entropy4x4.toFixed(4)}
-              </div>
-            </div>
-            <div>
-              <div class="text-gray-500 dark:text-gray-400 text-xs">Entropy 8×8</div>
-              <div data-field="entropy8x8" class="text-gray-900 dark:text-white">
-                ${data.entropy8x8.toFixed(4)}
-              </div>
-            </div>
-          </div>
+          ${generateStatsHTML(data)}
         </div>
 
 
@@ -271,30 +181,11 @@ export function createStatsOverlay(): {
   }
 
   const update = (data: RunSubmission) => {
-    const updateField = (selector: string, value: string) => {
-      const el = content.querySelector(selector)
-      if (el) el.textContent = value
-    }
-
-    updateField('[data-field="steps"]', data.stepCount.toLocaleString())
-    updateField(
-      '[data-field="watchedTime"]',
-      `${(data.watchedWallMs / 1000).toFixed(1)}s`,
-    )
-    updateField(
-      '[data-field="sps"]',
-      `${(data.actualSps ?? 0).toFixed(1)} / ${data.requestedSps}`,
-    )
-    updateField('[data-field="interest"]', data.interestScore.toFixed(4))
-    updateField('[data-field="population"]', data.population.toLocaleString())
-    updateField('[data-field="activity"]', data.activity.toLocaleString())
-    updateField(
-      '[data-field="popChange"]',
-      data.populationChange.toLocaleString(),
-    )
-    updateField('[data-field="entropy2x2"]', data.entropy2x2.toFixed(4))
-    updateField('[data-field="entropy4x4"]', data.entropy4x4.toFixed(4))
-    updateField('[data-field="entropy8x8"]', data.entropy8x8.toFixed(4))
+    // Update simulation metrics using shared function
+    updateSimulationMetricsFields(content, data)
+    
+    // Update all stats fields using shared function
+    updateStatsFields(content, data)
   }
 
   return { elements, show, hide, update }

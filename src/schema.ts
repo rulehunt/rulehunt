@@ -143,6 +143,8 @@ export const Scores = z.object({
   entropy2x2: z.number(),
   entropy4x4: z.number(),
   entropy8x8: z.number(),
+  entityCount: z.number().optional(),
+  entityChange: z.number().optional(),
   interestScore: z.number(),
 })
 
