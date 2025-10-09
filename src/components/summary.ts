@@ -1,7 +1,7 @@
 // src/components/summary.ts
 
-import { generateSimulationMetricsHTML } from './shared/simulationInfo.ts'
-import { generateStatsHTML } from './shared/stats.ts'
+// import { generateSimulationMetricsHTML } from './shared/simulationInfo.ts'
+// import { generateStatsHTML } from './shared/stats.ts'
 
 export interface SummaryPanelElements {
   metricsContainer: HTMLDivElement

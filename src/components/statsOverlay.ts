@@ -72,8 +72,8 @@ export function createStatsOverlay(): {
     const jsonString = JSON.stringify(data, null, 2)
 
     // Safe accessors with defaults
-    const gridSize = data.gridSize ?? 0
-    const actualSps = data.actualSps ?? 0
+    // const gridSize = data.gridSize ?? 0
+    // const actualSps = data.actualSps ?? 0
 
     content.innerHTML = `
       <div class="space-y-4">
