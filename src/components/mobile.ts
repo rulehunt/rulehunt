@@ -507,15 +507,8 @@ function saveRunStatistics(
     extraScores: undefined,
   }
 
-  setTimeout(
-    () =>
-      saveRun(payload).then((r) =>
-        r.ok
-          ? console.log(`[saveRun] ✅ ${r.runHash}`)
-          : console.warn('[saveRun] ❌ failed'),
-      ),
-    0,
-  )
+  // --- Fire and forget background save ---
+  setTimeout(() => saveRun(payload))
 }
 
 // --- Stats Button -----------------------------------------------------------

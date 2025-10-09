@@ -753,15 +753,7 @@ export async function setupDesktopLayout(
       }
 
       // --- Fire and forget background save ---
-      setTimeout(() => {
-        saveRun(runPayload).then((res) => {
-          if (res.ok) {
-            console.log(`[saveRun] ✅ recorded run ${res.runHash}`)
-          } else {
-            console.warn('[saveRun] ❌ failed to record run')
-          }
-        })
-      }, 0)
+      setTimeout(() => saveRun(runPayload))
     })
   }
 
