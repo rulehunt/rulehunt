@@ -15,7 +15,9 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "generate:c4-orbits": "tsx scripts/generate-c4-orbits.ts && pnpm run format",
-    "test": "vitest"
+    "test": "vitest",
+    "db:migrate": "wrangler d1 migrations apply rulehunt-db --remote",
+    "db:verify": "wrangler d1 execute rulehunt-db --remote --command 'PRAGMA table_info(runs);'"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
