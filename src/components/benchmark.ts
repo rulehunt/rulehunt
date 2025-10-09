@@ -211,60 +211,29 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 } {
   // Create modal overlay
   const overlay = document.createElement('div')
-  overlay.className = 'benchmark-modal-overlay'
-  overlay.style.cssText = `
-		position: fixed;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		background: rgba(0, 0, 0, 0.8);
-		display: none;
-		justify-content: center;
-		align-items: center;
-		z-index: 10000;
-	`
+  overlay.className =
+    'fixed inset-0 bg-black/80 hidden justify-center items-center z-[10000]'
 
   // Create modal content
   const modal = document.createElement('div')
-  modal.className = 'benchmark-modal'
-  modal.style.cssText = `
-		background: white;
-		border-radius: 8px;
-		padding: 24px;
-		max-width: 800px;
-		max-height: 80vh;
-		overflow-y: auto;
-		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-	`
+  modal.className =
+    'bg-white dark:bg-gray-800 rounded-lg p-6 max-w-[800px] max-h-[80vh] overflow-y-auto shadow-2xl'
 
   // Modal header
   const header = document.createElement('div')
-  header.style.cssText = `
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 16px;
-	`
+  header.className = 'flex justify-between items-center mb-4'
 
   const title = document.createElement('h2')
   title.textContent = 'GPU vs CPU Benchmark'
-  title.style.cssText = 'margin: 0; font-size: 24px;'
+  title.className = 'm-0 text-2xl text-gray-900 dark:text-gray-100'
 
   const closeBtn = document.createElement('button')
   closeBtn.textContent = '×'
-  closeBtn.style.cssText = `
-		border: none;
-		background: none;
-		font-size: 32px;
-		cursor: pointer;
-		padding: 0;
-		width: 32px;
-		height: 32px;
-		line-height: 32px;
-	`
+  closeBtn.className =
+    'border-none bg-transparent text-4xl cursor-pointer p-0 w-8 h-8 leading-8 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100'
   closeBtn.onclick = () => {
-    overlay.style.display = 'none'
+    overlay.classList.add('hidden')
+    overlay.classList.remove('flex')
   }
 
   header.appendChild(title)
@@ -276,40 +245,24 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 
   // Button container
   const buttonContainer = document.createElement('div')
-  buttonContainer.style.cssText =
-    'display: flex; gap: 12px; margin-bottom: 16px;'
+  buttonContainer.className = 'flex gap-3 mb-4'
 
   // Start button
   const startBtn = document.createElement('button')
   startBtn.textContent = 'Run Benchmark'
-  startBtn.style.cssText = `
-		background: #4CAF50;
-		color: white;
-		border: none;
-		padding: 12px 24px;
-		font-size: 16px;
-		border-radius: 4px;
-		cursor: pointer;
-	`
+  startBtn.className =
+    'bg-green-600 hover:bg-green-700 text-white border-none px-6 py-3 text-base rounded cursor-pointer'
 
   // Stop button
   const stopBtn = document.createElement('button')
   stopBtn.textContent = 'Stop'
-  stopBtn.style.cssText = `
-		background: #f44336;
-		color: white;
-		border: none;
-		padding: 12px 24px;
-		font-size: 16px;
-		border-radius: 4px;
-		cursor: pointer;
-		display: none;
-	`
+  stopBtn.className =
+    'bg-red-600 hover:bg-red-700 text-white border-none px-6 py-3 text-base rounded cursor-pointer hidden'
 
   // Continuous mode checkbox
   const continuousLabel = document.createElement('label')
-  continuousLabel.style.cssText =
-    'display: flex; align-items: center; gap: 8px; font-size: 14px;'
+  continuousLabel.className =
+    'flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300'
   const continuousCheckbox = document.createElement('input')
   continuousCheckbox.type = 'checkbox'
   continuousCheckbox.id = 'continuous-mode'
@@ -324,40 +277,29 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 
   // Progress area
   const progressArea = document.createElement('div')
-  progressArea.style.cssText = 'margin-bottom: 16px;'
+  progressArea.className = 'mb-4'
 
   const progressBar = document.createElement('div')
-  progressBar.style.cssText = `
-		width: 100%;
-		height: 24px;
-		background: #f0f0f0;
-		border-radius: 4px;
-		overflow: hidden;
-		margin-bottom: 8px;
-		display: none;
-	`
+  progressBar.className =
+    'w-full h-6 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden mb-2 hidden'
 
   const progressFill = document.createElement('div')
-  progressFill.style.cssText = `
-		height: 100%;
-		background: #4CAF50;
-		width: 0%;
-		transition: width 0.3s;
-	`
+  progressFill.className = 'h-full bg-green-600 transition-all duration-300'
+  progressFill.style.width = '0%'
   progressBar.appendChild(progressFill)
 
   const progressText = document.createElement('div')
-  progressText.style.cssText = 'font-size: 14px; color: #666;'
+  progressText.className = 'text-sm text-gray-600 dark:text-gray-400'
 
   progressArea.appendChild(progressBar)
   progressArea.appendChild(progressText)
 
   // Chart area
   const chartContainer = document.createElement('div')
-  chartContainer.style.cssText = 'margin-bottom: 24px; display: none;'
+  chartContainer.className = 'mb-6 hidden'
   const chartCanvas = document.createElement('canvas')
   chartCanvas.id = 'benchmark-chart'
-  chartCanvas.style.cssText = 'max-height: 400px;'
+  chartCanvas.className = 'max-h-[400px]'
   chartContainer.appendChild(chartCanvas)
 
   // Results area
@@ -377,7 +319,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   // Click outside to close
   overlay.onclick = (e) => {
     if (e.target === overlay) {
-      overlay.style.display = 'none'
+      overlay.classList.add('hidden')
+      overlay.classList.remove('flex')
     }
   }
 
@@ -390,37 +333,32 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   // Helper to render results table
   function renderResults(results: BenchmarkResult[], roundNumber: number) {
     resultsArea.innerHTML = ''
-    chartContainer.style.display = 'block'
+    chartContainer.classList.remove('hidden')
 
     // Round info
     const roundInfo = document.createElement('div')
-    roundInfo.style.cssText =
-      'margin-bottom: 12px; font-size: 14px; color: #666;'
+    roundInfo.className = 'mb-3 text-sm text-gray-600 dark:text-gray-400'
     roundInfo.textContent = `Round ${roundNumber} complete${continuousCheckbox.checked ? ' (continuous mode active)' : ''}`
     resultsArea.appendChild(roundInfo)
 
     const table = document.createElement('table')
-    table.style.cssText = `
-			width: 100%;
-			border-collapse: collapse;
-			margin-top: 8px;
-		`
+    table.className = 'w-full border-collapse mt-2'
 
     // Add iteration count column for accumulated results
     const showIterations = continuousCheckbox.checked && roundNumber > 1
     const iterationHeader = showIterations
-      ? '<th style="padding: 8px; text-align: right;">Iterations</th>'
+      ? '<th class="p-2 text-right text-gray-900 dark:text-gray-100">Iterations</th>'
       : ''
 
     table.innerHTML = `
 			<thead>
-				<tr style="border-bottom: 2px solid #ddd;">
-					<th style="padding: 8px; text-align: left;">Grid Size</th>
-					<th style="padding: 8px; text-align: right;">Cells</th>
-					<th style="padding: 8px; text-align: right;">CPU (ms)</th>
-					<th style="padding: 8px; text-align: right;">GPU (ms)</th>
-					<th style="padding: 8px; text-align: center;">Winner</th>
-					<th style="padding: 8px; text-align: right;">Speedup</th>
+				<tr class="border-b-2 border-gray-300 dark:border-gray-600">
+					<th class="p-2 text-left text-gray-900 dark:text-gray-100">Grid Size</th>
+					<th class="p-2 text-right text-gray-900 dark:text-gray-100">Cells</th>
+					<th class="p-2 text-right text-gray-900 dark:text-gray-100">CPU (ms)</th>
+					<th class="p-2 text-right text-gray-900 dark:text-gray-100">GPU (ms)</th>
+					<th class="p-2 text-center text-gray-900 dark:text-gray-100">Winner</th>
+					<th class="p-2 text-right text-gray-900 dark:text-gray-100">Speedup</th>
 					${iterationHeader}
 				</tr>
 			</thead>
@@ -432,17 +370,26 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
               | undefined
             const iterationCell =
               showIterations && accResult
-                ? `<td style="padding: 8px; text-align: right;">${accResult.iterationCount}</td>`
+                ? `<td class="p-2 text-right text-gray-700 dark:text-gray-300">${accResult.iterationCount}</td>`
                 : ''
 
+            const cpuWinnerClass =
+              r.winner === 'cpu'
+                ? 'font-bold text-green-600 dark:text-green-500'
+                : 'text-gray-700 dark:text-gray-300'
+            const gpuWinnerClass =
+              r.winner === 'gpu'
+                ? 'font-bold text-green-600 dark:text-green-500'
+                : 'text-gray-700 dark:text-gray-300'
+
             return `
-							<tr style="border-bottom: 1px solid #eee;">
-								<td style="padding: 8px;">${r.gridSize}</td>
-								<td style="padding: 8px; text-align: right;">${r.cells.toLocaleString()}</td>
-								<td style="padding: 8px; text-align: right; ${r.winner === 'cpu' ? 'font-weight: bold; color: #4CAF50;' : ''}">${r.cpuTime.toFixed(2)}</td>
-								<td style="padding: 8px; text-align: right; ${r.winner === 'gpu' ? 'font-weight: bold; color: #4CAF50;' : ''}">${r.gpuTime.toFixed(2)}</td>
-								<td style="padding: 8px; text-align: center; text-transform: uppercase; font-weight: bold;">${r.winner}</td>
-								<td style="padding: 8px; text-align: right;">${r.speedup.toFixed(2)}x</td>
+							<tr class="border-b border-gray-200 dark:border-gray-700">
+								<td class="p-2 text-gray-700 dark:text-gray-300">${r.gridSize}</td>
+								<td class="p-2 text-right text-gray-700 dark:text-gray-300">${r.cells.toLocaleString()}</td>
+								<td class="p-2 text-right ${cpuWinnerClass}">${r.cpuTime.toFixed(2)}</td>
+								<td class="p-2 text-right ${gpuWinnerClass}">${r.gpuTime.toFixed(2)}</td>
+								<td class="p-2 text-center uppercase font-bold text-gray-900 dark:text-gray-100">${r.winner}</td>
+								<td class="p-2 text-right text-gray-700 dark:text-gray-300">${r.speedup.toFixed(2)}x</td>
 								${iterationCell}
 							</tr>
 						`
@@ -535,13 +482,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
     const crossoverIndex = results.findIndex((r) => r.winner === 'gpu')
     if (crossoverIndex > 0) {
       const crossoverInfo = document.createElement('div')
-      crossoverInfo.style.cssText = `
-				margin-top: 16px;
-				padding: 12px;
-				background: #f0f8ff;
-				border-left: 4px solid #2196F3;
-				border-radius: 4px;
-			`
+      crossoverInfo.className =
+        'mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 rounded text-gray-900 dark:text-gray-100'
       crossoverInfo.innerHTML = `
 				<strong>Crossover Point:</strong> GPU becomes faster at approximately
 				<strong>${results[crossoverIndex].gridSize}</strong>
@@ -550,13 +492,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
       resultsArea.appendChild(crossoverInfo)
     } else if (results[results.length - 1].winner === 'cpu') {
       const noGpuInfo = document.createElement('div')
-      noGpuInfo.style.cssText = `
-				margin-top: 16px;
-				padding: 12px;
-				background: #fff3cd;
-				border-left: 4px solid #ffc107;
-				border-radius: 4px;
-			`
+      noGpuInfo.className =
+        'mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-500 rounded text-gray-900 dark:text-gray-100'
       noGpuInfo.innerHTML = `
 				<strong>Note:</strong> CPU outperformed GPU across all tested grid sizes on your hardware.
 				GPU acceleration may provide benefits at larger grid sizes (>800x800).
@@ -568,9 +505,9 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   // Main benchmark runner
   async function runBenchmark() {
     shouldStop = false
-    startBtn.style.display = 'none'
-    stopBtn.style.display = 'block'
-    progressBar.style.display = 'block'
+    startBtn.classList.add('hidden')
+    stopBtn.classList.remove('hidden')
+    progressBar.classList.remove('hidden')
     continuousCheckbox.disabled = true
 
     const isContinuous = continuousCheckbox.checked
@@ -643,13 +580,13 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
       } while (isContinuous && !shouldStop)
     } catch (error) {
       resultsArea.innerHTML = `
-				<div style="color: #d32f2f; padding: 12px; background: #ffebee; border-radius: 4px;">
+				<div class="text-red-700 dark:text-red-400 p-3 bg-red-50 dark:bg-red-900/30 rounded">
 					<strong>Error:</strong> ${error instanceof Error ? error.message : 'Unknown error occurred'}
 				</div>
 			`
     } finally {
-      startBtn.style.display = 'block'
-      stopBtn.style.display = 'none'
+      startBtn.classList.remove('hidden')
+      stopBtn.classList.add('hidden')
       continuousCheckbox.disabled = false
     }
   }
@@ -667,7 +604,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 
   return {
     show: () => {
-      overlay.style.display = 'flex'
+      overlay.classList.remove('hidden')
+      overlay.classList.add('flex')
     },
     cleanup: () => {
       overlay.remove()

@@ -206,6 +206,7 @@ scripts/
 **PRs:** Title matches commit convention, link issues with `Resolves #N`
 **TypeScript:** Strict mode, no `any` types, explicit return types on exported functions
 **Formatting:** Biome with single quotes, semicolons optional, 80 char line width, 2-space indent
+**Styling:** Tailwind CSS with dark mode support - ALWAYS use `dark:` variants for all UI elements (backgrounds, text, borders, etc.)
 **Testing:** Minimal (vitest for `entityDetection.test.ts` only) - more tests needed (issue #13)
 
 ## Common Patterns from Codebase
@@ -219,6 +220,15 @@ btn.style.touchAction = 'manipulation' // avoids 300ms delay
 **Theme detection**
 ```typescript
 const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+```
+
+**Tailwind dark mode styling**
+```typescript
+// Good: Tailwind classes with dark mode variants
+element.className = 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+
+// Bad: Inline styles without dark mode support
+element.style.cssText = 'background: white; color: black;'
 ```
 
 **Resize debouncing**
