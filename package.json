@@ -18,7 +18,8 @@
     "test": "vitest",
     "db:migrate": "wrangler d1 migrations apply rulehunt-db --remote",
     "db:verify": "wrangler d1 execute rulehunt-db --remote --command 'PRAGMA table_info(runs);'",
-    "db:download": "./scripts/db-download.js"
+    "db:download": "./scripts/db-download.js",
+    "cloc": "cloc . --exclude-dir=node_modules,dist,build,.next,out"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
