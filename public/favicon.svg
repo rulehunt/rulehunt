@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background -->
+  <rect width="32" height="32" fill="white"/>
+
+  <!-- 3x3 grid with 1px gaps between cells -->
+  <!-- Each cell is 10x10 with 1px spacing -->
+
+  <!-- Pattern:
+       ■ ■ □
+       □ ■ □
+       □ □ □
+  -->
+
+  <!-- Top row -->
+  <rect x="1" y="1" width="9" height="9" fill="black"/>   <!-- Top-left: filled -->
+  <rect x="11" y="1" width="9" height="9" fill="black"/>  <!-- Top-center: filled -->
+  <!-- Top-right: empty -->
+
+  <!-- Middle row -->
+  <!-- Middle-left: empty -->
+  <rect x="11" y="11" width="9" height="9" fill="black"/> <!-- Middle-center: filled -->
+  <!-- Middle-right: empty -->
+
+  <!-- Bottom row -->
+  <!-- All empty -->
+</svg>
