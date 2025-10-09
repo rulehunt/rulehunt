@@ -6,7 +6,6 @@ import { RunSubmission } from '../../src/schema'
 export const onRequestPost = async (
   ctx: EventContext<{ DB: D1Database }, string, Record<string, unknown>>,
 ): Promise<Response> => {
-  // --- Helper: standardized JSON response ---
   const json = (data: unknown, status = 200) =>
     new Response(JSON.stringify(data, null, 2), {
       status,
@@ -14,18 +13,14 @@ export const onRequestPost = async (
     })
 
   try {
-    // --- Parse request body safely ---
-    let body: unknown
-    try {
-      body = await ctx.request.json()
-    } catch {
+    // --- Parse & validate request ---
+    const body = await ctx.request.json().catch(() => null)
+    if (!body)
       return json({ ok: false, error: 'Invalid JSON in request body' }, 400)
-    }
 
-    // --- Validate input against schema ---
     const data = RunSubmission.parse(body)
 
-    // --- Compute deterministic run hash ---
+    // --- Deterministic run hash ---
     const hashInput = `${data.rulesetHex}:${data.seed}:${data.simVersion}:${data.userId}`
     const digest = await crypto.subtle.digest(
       'SHA-256',
@@ -35,7 +30,7 @@ export const onRequestPost = async (
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('')
 
-    // --- Insert into D1 (deduplicated) ---
+    // --- Insert into D1 ---
     const stmt = ctx.env.DB.prepare(`
       INSERT OR IGNORE INTO runs (
         run_hash,
@@ -59,12 +54,14 @@ export const onRequestPost = async (
         entropy2x2,
         entropy4x4,
         entropy8x8,
+        entity_count,
+        entity_change,
         interest_score,
         sim_version,
         engine_commit,
         extra_scores
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
     await stmt
@@ -90,6 +87,8 @@ export const onRequestPost = async (
         data.entropy2x2,
         data.entropy4x4,
         data.entropy8x8,
+        data.entityCount ?? null,
+        data.entityChange ?? null,
         data.interestScore,
         data.simVersion,
         data.engineCommit ?? null,
@@ -97,31 +96,17 @@ export const onRequestPost = async (
       )
       .run()
 
-    // --- Return success ---
     return json({ ok: true, runHash })
   } catch (error) {
-    // --- Zod validation errors ---
     if (error instanceof z.ZodError) {
       console.warn('Run submission validation error:', error.issues)
-      // NOTE: Consider removing 'details' in production to avoid leaking schema info
       return json(
-        {
-          ok: false,
-          error: 'Invalid run data format',
-          details: error.issues,
-        },
+        { ok: false, error: 'Invalid run data format', details: error.issues },
         400,
       )
     }
 
-    // --- D1 or SQL-related errors ---
-    if (error instanceof Error && /D1|SQL|prepare|bind/i.test(error.message)) {
-      console.error('Database error saving run:', error)
-      return json({ ok: false, error: 'Failed to save run to database' }, 500)
-    }
-
-    // --- Unknown unexpected errors ---
-    console.error('Unexpected error saving run:', error)
+    console.error('Error saving run:', error)
     return json({ ok: false, error: 'Internal server error' }, 500)
   }
 }
