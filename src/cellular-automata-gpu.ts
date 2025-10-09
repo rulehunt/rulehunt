@@ -45,7 +45,6 @@ export class GPUCellularAutomata
       `[GPU] Batch: ${this.batchSize}, Grid: ${this.gridCols} x ${this.gridRows}`,
     )
   }
-
   private createStepKernel(): IKernelRunShortcut {
     return this.gpu
       .createKernel(function (grid: number[][], ruleset: number[]) {
@@ -59,19 +58,22 @@ export class GPUCellularAutomata
         const ym1 = (y - 1 + rows) % rows
         const yp1 = (y + 1) % rows
 
-        // ✅ FIX: Build index differently to avoid precision issues
-        let index = 0
+        // --- Helper: numeric-safe "alive" indicator ---
+        function alive(v: number): number {
+          return v > 0.5 ? 1 : 0
+        }
 
-        // Use conditional addition instead of bitwise OR
-        if (grid[ym1][xm1] > 0) index = index + 1
-        if (grid[ym1][x] > 0) index = index + 2
-        if (grid[ym1][xp1] > 0) index = index + 4
-        if (grid[y][xm1] > 0) index = index + 8
-        if (grid[y][x] > 0) index = index + 16
-        if (grid[y][xp1] > 0) index = index + 32
-        if (grid[yp1][xm1] > 0) index = index + 64
-        if (grid[yp1][x] > 0) index = index + 128
-        if (grid[yp1][xp1] > 0) index = index + 256
+        // --- Compute orbit index deterministically ---
+        const index =
+          alive(grid[ym1][xm1]) +
+          alive(grid[ym1][x]) * 2 +
+          alive(grid[ym1][xp1]) * 4 +
+          alive(grid[y][xm1]) * 8 +
+          alive(grid[y][x]) * 16 +
+          alive(grid[y][xp1]) * 32 +
+          alive(grid[yp1][xm1]) * 64 +
+          alive(grid[yp1][x]) * 128 +
+          alive(grid[yp1][xp1]) * 256
 
         return ruleset[index]
       })
@@ -79,7 +81,7 @@ export class GPUCellularAutomata
       .setConstants({ cols: this.gridCols, rows: this.gridRows })
       .setPipeline(true)
       .setImmutable(true)
-      .setPrecision('single') // ✅ ADD THIS: Force single precision
+      .setPrecision('single') // keep: avoids float16 issues on Safari
   }
 
   private syncFrom2D(output: number[][]) {
