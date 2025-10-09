@@ -1,6 +1,7 @@
 // src/components/mobileHeader.ts
 
 export interface MobileHeaderElements {
+  titleElement: HTMLHeadingElement
   infoButton: HTMLButtonElement
   infoOverlay: HTMLDivElement
   closeButton: HTMLButtonElement
@@ -20,7 +21,7 @@ export function createMobileHeader(): {
   root.innerHTML = `
     <div class="px-6 py-3 flex items-center justify-between">
       <!-- Left: Logo/Title -->
-      <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">
+      <h1 id="rulehunt-title" class="text-xl font-bold text-gray-900 dark:text-gray-100 transition-colors duration-500">
         RuleHunt
       </h1>
 
@@ -148,6 +149,7 @@ export function createMobileHeader(): {
   document.body.appendChild(infoOverlay)
 
   const elements: MobileHeaderElements = {
+    titleElement: root.querySelector('#rulehunt-title') as HTMLHeadingElement,
     infoButton: root.querySelector('#info-button') as HTMLButtonElement,
     infoOverlay: infoOverlay,
     closeButton: infoOverlay.querySelector('#close-info') as HTMLButtonElement,
@@ -159,7 +161,7 @@ export function createMobileHeader(): {
 export function setupMobileHeader(
   elements: MobileHeaderElements,
   headerRoot: HTMLElement,
-): CleanupFunction {
+): { cleanup: CleanupFunction; resetFade: () => void } {
   const { infoButton, infoOverlay, closeButton } = elements
 
   let fadeTimer: number | null = null
@@ -209,19 +211,22 @@ export function setupMobileHeader(
   // Start the initial fade timer
   resetFade()
 
-  // Return cleanup function
-  return () => {
-    if (fadeTimer) clearTimeout(fadeTimer)
-    infoButton.removeEventListener('click', infoHandler)
-    closeButton.removeEventListener('click', closeHandler)
-    infoOverlay.removeEventListener('click', overlayClickHandler)
+  // Return cleanup function and resetFade function
+  return {
+    cleanup: () => {
+      if (fadeTimer) clearTimeout(fadeTimer)
+      infoButton.removeEventListener('click', infoHandler)
+      closeButton.removeEventListener('click', closeHandler)
+      infoOverlay.removeEventListener('click', overlayClickHandler)
 
-    // Clean up overlay from DOM
-    if (infoOverlay.parentNode) {
-      infoOverlay.parentNode.removeChild(infoOverlay)
-    }
+      // Clean up overlay from DOM
+      if (infoOverlay.parentNode) {
+        infoOverlay.parentNode.removeChild(infoOverlay)
+      }
 
-    // Restore body scroll in case it was locked
-    document.body.style.overflow = ''
+      // Restore body scroll in case it was locked
+      document.body.style.overflow = ''
+    },
+    resetFade,
   }
 }
