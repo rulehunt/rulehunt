@@ -242,7 +242,7 @@ export abstract class CellularAutomataBase {
     const [br, bg, bb] = this.bgRGB
     const ctx = this.ctx
 
-    this.displayZoom += (this.zoomLevel - this.displayZoom) * 0.15
+    this.displayZoom += (this.zoomLevel - this.displayZoom) * 0.5
     const zoom = this.displayZoom
 
     // Visible window centered around grid midpoint

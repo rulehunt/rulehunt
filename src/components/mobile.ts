@@ -26,9 +26,6 @@ import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
-// --- Feature Flags ----------------------------------------------------------
-const ENABLE_ZOOM = false
-
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 60
@@ -442,77 +439,65 @@ function setupDualCanvasSwipe(
   }
 }
 
-// --- Pinch Zoom (centered on midpoint) -------------------------------// --- Pinch Zoom (centered on grid midpoint) ---------------------------------
-function setupPinchZoom(
-  canvas: HTMLCanvasElement,
-  cellularAutomata: ICellularAutomata,
+// Zoom Buttons (pinch gesture is hard!)
+
+function createZoomButtons(
+  parent: HTMLElement,
+  getCAs: () => [ICellularAutomata, ICellularAutomata],
 ): CleanupFunction {
-  let initialDistance = 0
-  let initialZoom = 1
+  const zoomFactor = 3
+  const zoomContainer = document.createElement('div')
+  zoomContainer.className =
+    'absolute bottom-4 left-4 flex flex-col space-y-2 z-10 transition-opacity duration-500'
+  zoomContainer.style.opacity = '1'
 
-  const handleTouchStart = (e: TouchEvent) => {
-    if (e.touches.length === 2) {
-      const [t1, t2] = e.touches
-      const dx = t1.clientX - t2.clientX
-      const dy = t1.clientY - t2.clientY
-      initialDistance = Math.sqrt(dx * dx + dy * dy)
-      initialZoom = cellularAutomata.getZoom()
-    }
+  let fadeTimer: number | null = null
+  const resetFade = () => {
+    if (fadeTimer) clearTimeout(fadeTimer)
+    zoomContainer.style.opacity = '1'
+    fadeTimer = window.setTimeout(() => {
+      zoomContainer.style.opacity = '0.3'
+    }, 3000)
   }
 
-  const handleTouchMove = (e: TouchEvent) => {
-    if (e.touches.length === 2 && initialDistance > 0) {
-      e.preventDefault()
-      const [t1, t2] = e.touches
-      const dx = t1.clientX - t2.clientX
-      const dy = t1.clientY - t2.clientY
-      const distance = Math.sqrt(dx * dx + dy * dy)
-      const scale = distance / initialDistance
-      const newZoom = Math.min(100, Math.max(1, initialZoom * scale))
-
-      // Fixed-center zoom (handled internally)
-      cellularAutomata.setZoom(newZoom)
-    }
+  const makeBtn = (label: string, title: string, onClick: () => void) => {
+    const btn = document.createElement('button')
+    btn.setAttribute('data-swipe-ignore', 'true')
+    btn.style.touchAction = 'manipulation'
+    btn.textContent = label
+    btn.title = title
+    btn.className =
+      'w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white text-lg shadow-md hover:bg-gray-700 active:scale-95 transition'
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      onClick()
+      resetFade()
+    })
+    zoomContainer.appendChild(btn)
   }
 
-  const handleTouchEnd = (e: TouchEvent) => {
-    if (e.touches.length < 2) initialDistance = 0
-  }
+  makeBtn('+', 'Zoom in', () => {
+    const [ca1, ca2] = getCAs()
+    const current = ca1.getZoom?.() ?? 1
+    const newZoom = Math.min(100, current * zoomFactor)
+    ca1.setZoom(newZoom)
+    ca2.setZoom(newZoom)
+  })
 
-  let lastTap = 0
-  canvas.addEventListener(
-    'touchend',
-    (e) => {
-      if (e.touches.length > 0 || e.changedTouches.length > 1) return
+  makeBtn('–', 'Zoom out', () => {
+    const [ca1, ca2] = getCAs()
+    const current = ca1.getZoom?.() ?? 1
+    const newZoom = Math.max(1, current / zoomFactor)
+    ca1.setZoom(newZoom)
+    ca2.setZoom(newZoom)
+  })
 
-      const now = Date.now()
-      if (now - lastTap < 300) {
-        e.stopPropagation()
-
-        // ✅ Safely reset zoom: pause → reset → render → resume
-        const wasPlaying = cellularAutomata.isRunning?.() ?? false
-        cellularAutomata.pause()
-        cellularAutomata.setZoom(1)
-        cellularAutomata.render?.()
-        if (wasPlaying) {
-          cellularAutomata.play(STEPS_PER_SECOND)
-        }
-      }
-      lastTap = now
-    },
-    { passive: true },
-  )
-
-  canvas.addEventListener('touchstart', handleTouchStart, { passive: true })
-  canvas.addEventListener('touchmove', handleTouchMove, { passive: false })
-  canvas.addEventListener('touchend', handleTouchEnd, { passive: true })
-  canvas.addEventListener('touchcancel', handleTouchEnd, { passive: true })
+  parent.appendChild(zoomContainer)
+  resetFade()
 
   return () => {
-    canvas.removeEventListener('touchstart', handleTouchStart)
-    canvas.removeEventListener('touchmove', handleTouchMove)
-    canvas.removeEventListener('touchend', handleTouchEnd)
-    canvas.removeEventListener('touchcancel', handleTouchEnd)
+    if (fadeTimer) clearTimeout(fadeTimer)
+    zoomContainer.remove()
   }
 }
 
@@ -1003,15 +988,6 @@ export async function setupMobileLayout(
     () => onScreenCA.pause(),
   )
 
-  // Conditionally setup zoom and pan based on feature flag
-  let cleanupZoomOnScreen: CleanupFunction = () => {}
-  let cleanupZoomOffScreen: CleanupFunction = () => {}
-
-  if (ENABLE_ZOOM) {
-    cleanupZoomOnScreen = setupPinchZoom(onScreenCanvas, onScreenCA)
-    cleanupZoomOffScreen = setupPinchZoom(offScreenCanvas, offScreenCA)
-  }
-
   const handleResize = () => {
     if (isTransitioning) return
 
@@ -1047,12 +1023,16 @@ export async function setupMobileLayout(
     resizeTimer = window.setTimeout(handleResize, 120)
   })
 
+  const cleanupZoomButtons = createZoomButtons(wrapper, () => [
+    onScreenCA,
+    offScreenCA,
+  ])
+
   return () => {
     onScreenCA.pause()
     offScreenCA.pause()
     cleanupSwipe()
-    cleanupZoomOnScreen()
-    cleanupZoomOffScreen()
+    cleanupZoomButtons()
     cleanupHeader()
     cleanupStatsOverlay()
     window.removeEventListener('resize', handleResize)
