@@ -518,7 +518,7 @@ function generateRandomRule(): RuleData {
  * Prepare a CA with the given rule and seed, paused and rendered.
  * All operations are explicit - no hidden side effects.
  */
-function prepareRule(
+function prepareAutomata(
   cellularAutomata: ICellularAutomata,
   rule: RuleData,
   orbitLookup: Uint8Array,
@@ -535,9 +535,22 @@ function prepareRule(
 }
 
 /**
+ * Soft reset the CA.
+ */
+function softResetAutomata(cellularAutomata: ICellularAutomata): void {
+  cellularAutomata.pause()
+  cellularAutomata.clearGrid()
+  cellularAutomata.softReset()
+  cellularAutomata.render()
+}
+
+/**
  * Start or resume the CA with its expanded rule.
  */
-function startRule(cellularAutomata: ICellularAutomata, rule: RuleData): void {
+function startAutomata(
+  cellularAutomata: ICellularAutomata,
+  rule: RuleData,
+): void {
   const expanded = rule.expanded ?? rule.ruleset
   cellularAutomata.play(STEPS_PER_SECOND, expanded)
 }
@@ -641,10 +654,10 @@ function createStatsButton(
   return btn
 }
 
-// --- Reload Button ----------------------------------------------------------
-function createReloadButton(
+// --- Soft Reset Button (new random initial conditions) -------------------------------------------------
+function createSoftResetButton(
   parent: HTMLElement,
-  onReload: () => void,
+  onSoftReset: () => void,
   visibleCanvas: HTMLCanvasElement,
   hiddenCanvas: HTMLCanvasElement,
 ) {
@@ -677,7 +690,7 @@ function createReloadButton(
     if (isTransitioning) return
     isTransitioning = true
 
-    onReload()
+    onSoftReset()
 
     // Hide the off-screen canvas during animation to prevent visual glitches
     const prevVis = hiddenCanvas.style.visibility
@@ -819,10 +832,10 @@ export async function setupMobileLayout(
   let offScreenRule = generateRandomRule()
 
   // Initial setup with explicit renders
-  prepareRule(onScreenCA, onScreenRule, lookup)
-  startRule(onScreenCA, onScreenRule)
+  prepareAutomata(onScreenCA, onScreenRule, lookup)
+  startAutomata(onScreenCA, onScreenRule)
 
-  prepareRule(offScreenCA, offScreenRule, lookup)
+  prepareAutomata(offScreenCA, offScreenRule, lookup)
   offscreenReady = true
 
   initializeRunStats(onScreenCA, onScreenRule)
@@ -902,11 +915,11 @@ export async function setupMobileLayout(
     showStats(getCurrentRunData()),
   )
 
-  let reload = createReloadButton(
+  let softResetButton = createSoftResetButton(
     wrapper,
     () => {
-      prepareRule(onScreenCA, onScreenRule, lookup)
-      startRule(onScreenCA, onScreenRule)
+      softResetAutomata(onScreenCA)
+      startAutomata(onScreenCA, onScreenRule)
     },
     onScreenCanvas,
     offScreenCanvas,
@@ -955,26 +968,26 @@ export async function setupMobileLayout(
         initializeRunStats(onScreenCA, onScreenRule)
 
         // Start the newly visible CA and render
-        startRule(onScreenCA, onScreenRule)
+        startAutomata(onScreenCA, onScreenRule)
 
         // Prepare offscreen CA for the next swipe with explicit render
         offScreenRule = generateRandomRule()
-        prepareRule(offScreenCA, offScreenRule, lookup, 50)
+        prepareAutomata(offScreenCA, offScreenRule, lookup, 50)
         offscreenReady = true
       }, 16)
 
-      reload.remove()
+      softResetButton.remove()
       statsBtn.remove()
 
       statsBtn = createStatsButton(wrapper, () =>
         showStats(getCurrentRunData()),
       )
 
-      reload = createReloadButton(
+      softResetButton = createSoftResetButton(
         wrapper,
         () => {
-          prepareRule(onScreenCA, onScreenRule, lookup)
-          startRule(onScreenCA, onScreenRule)
+          softResetAutomata(onScreenCA)
+          startAutomata(onScreenCA, onScreenRule)
         },
         onScreenCanvas,
         offScreenCanvas,

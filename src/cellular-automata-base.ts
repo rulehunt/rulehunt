@@ -147,67 +147,136 @@ export abstract class CellularAutomataBase {
     this.onGridChanged()
   }
 
-  patchSeed(alivePercentage = 50) {
+  patchSeed() {
     this.rng = makeRng(this.seed)
     this.clearGrid()
-    const threshold = alivePercentage / 100
+
+    // Draw between ~10% and ~70% alive fraction
+    const alivePercentage = 10 + Math.floor(this.rng() * 60)
+
     const cx = Math.floor(this.gridCols / 2)
     const cy = Math.floor(this.gridRows / 2)
-    const patch = 10
+    const patch = 100
     const startX = cx - Math.floor(patch / 2)
     const startY = cy - Math.floor(patch / 2)
+    const threshold = alivePercentage / 100
 
-    // Generate initial random noise
-    for (let dy = 0; dy < patch; dy++) {
-      for (let dx = 0; dx < patch; dx++) {
-        const x = startX + dx
-        const y = startY + dy
-        if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows) {
-          this.grid[y * this.gridCols + x] = this.rng() < threshold ? 1 : 0
+    // --- 1️⃣ Deterministic parameter generation ---
+    const noiseScale = 4 + Math.floor(this.rng() * 12)
+    const motifOptions = ['ring', 'plus', 'cross', 'checker', 'blob']
+    const motif = motifOptions[Math.floor(this.rng() * motifOptions.length)]
+    const doSmooth = this.rng() < 0.8 // 80% chance to smooth
+    const invert = this.rng() < 0.2 // 20% chance to invert pattern
+    const secondaryMotifChance = this.rng() * 0.6 // up to 60% chance of 2nd motif
+
+    // --- 2️⃣ Base low-frequency noise ---
+    for (let y = 0; y < patch; y++) {
+      for (let x = 0; x < patch; x++) {
+        const gx = startX + x
+        const gy = startY + y
+        const val =
+          (Math.sin(x / noiseScale + this.rng() * Math.PI) +
+            Math.sin(y / noiseScale + this.rng() * Math.PI)) /
+          2
+        const alive = val + this.rng() * 0.4 > 1 - threshold ? 1 : 0
+        this.grid[gy * this.gridCols + gx] = invert ? 1 - alive : alive
+      }
+    }
+
+    // --- Helper to safely draw ---
+    const draw = (x: number, y: number) => {
+      if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows)
+        this.grid[y * this.gridCols + x] = 1
+    }
+
+    // --- 3️⃣ Deterministic motif placement ---
+    const drawMotif = (type: string) => {
+      switch (type) {
+        case 'ring': {
+          const r = 10 + Math.floor(this.rng() * 30)
+          for (let a = 0; a < 2 * Math.PI; a += 0.02) {
+            draw(
+              Math.round(cx + r * Math.cos(a)),
+              Math.round(cy + r * Math.sin(a)),
+            )
+          }
+          break
+        }
+        case 'plus': {
+          const arm = 10 + Math.floor(this.rng() * 30)
+          for (let d = -arm; d <= arm; d++) {
+            draw(cx + d, cy)
+            draw(cx, cy + d)
+          }
+          break
+        }
+        case 'cross': {
+          const arm = 10 + Math.floor(this.rng() * 30)
+          for (let d = -arm; d <= arm; d++) {
+            draw(cx + d, cy + d)
+            draw(cx + d, cy - d)
+          }
+          break
+        }
+        case 'checker': {
+          const step = 2 + Math.floor(this.rng() * 4)
+          for (let y = 0; y < patch; y++) {
+            for (let x = 0; x < patch; x++) {
+              if ((x + y) % step === 0) draw(startX + x, startY + y)
+            }
+          }
+          break
+        }
+        case 'blob': {
+          const count = 10 + Math.floor(this.rng() * 50)
+          for (let i = 0; i < count; i++) {
+            const bx = cx + Math.floor(this.rng() * 60 - 30)
+            const by = cy + Math.floor(this.rng() * 60 - 30)
+            const r = 2 + Math.floor(this.rng() * 5)
+            for (let dy = -r; dy <= r; dy++) {
+              for (let dx = -r; dx <= r; dx++) {
+                if (dx * dx + dy * dy <= r * r) draw(bx + dx, by + dy)
+              }
+            }
+          }
+          break
         }
       }
     }
 
-    // Smoothing pass: keep alive cells that have at least 2 alive neighbors
-    const smoothed = new Array(this.grid.length).fill(0)
-    for (let dy = 0; dy < patch; dy++) {
-      for (let dx = 0; dx < patch; dx++) {
-        const x = startX + dx
-        const y = startY + dy
-        if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows) {
-          const idx = y * this.gridCols + x
+    drawMotif(motif)
+    if (this.rng() < secondaryMotifChance) {
+      const m2 = motifOptions[Math.floor(this.rng() * motifOptions.length)]
+      drawMotif(m2)
+    }
 
-          // Count neighbors
+    // --- 4️⃣ Optional smoothing pass ---
+    if (doSmooth) {
+      const smoothed = new Array(this.grid.length).fill(0)
+      for (let y = startY; y < startY + patch; y++) {
+        for (let x = startX; x < startX + patch; x++) {
           let neighbors = 0
           for (let ny = -1; ny <= 1; ny++) {
             for (let nx = -1; nx <= 1; nx++) {
               if (nx === 0 && ny === 0) continue
-              const checkX = x + nx
-              const checkY = y + ny
+              const gx = x + nx
+              const gy = y + ny
               if (
-                checkX >= 0 &&
-                checkX < this.gridCols &&
-                checkY >= 0 &&
-                checkY < this.gridRows
-              ) {
-                neighbors += this.grid[checkY * this.gridCols + checkX]
-              }
+                gx >= 0 &&
+                gx < this.gridCols &&
+                gy >= 0 &&
+                gy < this.gridRows
+              )
+                neighbors += this.grid[gy * this.gridCols + gx]
             }
           }
-
-          // Keep alive if it has 2+ neighbors, or convert dead to alive if 4+ neighbors
+          const idx = y * this.gridCols + x
           smoothed[idx] =
             (this.grid[idx] === 1 && neighbors >= 2) || neighbors >= 4 ? 1 : 0
         }
       }
-    }
-
-    // Copy smoothed result back
-    for (let dy = 0; dy < patch; dy++) {
-      for (let dx = 0; dx < patch; dx++) {
-        const x = startX + dx
-        const y = startY + dy
-        if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows) {
+      for (let y = startY; y < startY + patch; y++) {
+        for (let x = startX; x < startX + patch; x++) {
           this.grid[y * this.gridCols + x] = smoothed[y * this.gridCols + x]
         }
       }
@@ -330,7 +399,7 @@ export abstract class CellularAutomataBase {
         this.centerSeed()
         break
       case 'patch':
-        this.patchSeed(this.lastAlivePercentage)
+        this.patchSeed()
         break
       default:
         this.randomSeed(this.lastAlivePercentage)
@@ -364,7 +433,7 @@ export abstract class CellularAutomataBase {
         this.centerSeed()
         break
       case 'patch':
-        this.patchSeed(this.lastAlivePercentage)
+        this.patchSeed()
         break
       default:
         this.randomSeed(this.lastAlivePercentage)

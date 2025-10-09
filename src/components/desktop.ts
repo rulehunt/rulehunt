@@ -370,8 +370,7 @@ export async function setupDesktopLayout(
     if (initialConditionType === 'center') {
       cellularAutomata.centerSeed()
     } else if (initialConditionType === 'patch') {
-      const percentage = Number.parseInt(aliveSlider.value)
-      cellularAutomata.patchSeed(percentage)
+      cellularAutomata.patchSeed()
     } else {
       const percentage = Number.parseInt(aliveSlider.value)
       cellularAutomata.randomSeed(percentage)
