@@ -29,7 +29,10 @@ export class GPUCellularAutomata
   private cachedRulesetRef: Ruleset | null = null
   private batchSize: number
 
-  constructor(canvas: HTMLCanvasElement, options: CellularAutomataOptions) {
+  constructor(
+    canvas: HTMLCanvasElement | null,
+    options: CellularAutomataOptions,
+  ) {
     super(canvas, options)
 
     this.gpu = new GPU({ mode: 'gpu' })

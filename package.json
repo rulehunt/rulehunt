@@ -26,6 +26,7 @@
     "@cloudflare/workers-types": "^4.20241022.0",
     "@types/jsdom": "^27.0.0",
     "@types/node": "^22.8.7",
+    "canvas": "^3.2.0",
     "gpu.js": "^2.16.0",
     "jsdom": "^27.0.0",
     "tsx": "^4.20.6",
