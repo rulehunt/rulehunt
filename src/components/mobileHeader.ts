@@ -77,7 +77,7 @@ export function createMobileHeader(): {
         <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">🎯 The Vision</h3>
           <p>
-            Conway's Game of Life is just <em>one</em> rule out of 2<sup>512</sup> possible 3×3 
+            Conway's Game of Life is just <em>one</em> rule out of 2<sup>512</sup> possible 3x3 
             cellular automata rules. What other fascinating patterns are hiding in this 
             incomprehensibly large space?
           </p>
@@ -87,12 +87,12 @@ export function createMobileHeader(): {
           <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">📊 The Search Space</h3>
           <p>
             In a 2D cellular automaton with binary states, each cell's next state is determined by 
-            its 3×3 neighborhood. With 9 cells that can each be alive or dead, there are 
+            its 3x3 neighborhood. With 9 cells that can each be alive or dead, there are 
             <strong>2<sup>9</sup> = 512 possible neighborhoods</strong>.
           </p>
           <p class="mt-2">
             A "rule" maps each of these 512 neighborhoods to an output state, giving us 
-            <strong>2<sup>512</sup> ≈ 1.34 × 10<sup>154</sup> possible rules</strong> — more than 
+            <strong>2<sup>512</sup> ≈ 1.34 x 10<sup>154</sup> possible rules</strong> — more than 
             atoms in the observable universe!
           </p>
         </div>
@@ -101,7 +101,7 @@ export function createMobileHeader(): {
           <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">🔄 C4 Symmetry</h3>
           <p>
             By requiring rules to respect rotational symmetry (treating rotated patterns the same), 
-            we reduce the space to <strong>2<sup>140</sup> ≈ 1.39 × 10<sup>42</sup> symmetric rules</strong>. 
+            we reduce the space to <strong>2<sup>140</sup> ≈ 1.39 x 10<sup>42</sup> symmetric rules</strong>. 
             Still astronomical, but more tractable!
           </p>
         </div>
@@ -113,7 +113,7 @@ export function createMobileHeader(): {
             Each swipe generates a unique simulation with different behavior patterns.
           </p>
           <p>
-            <strong>Pinch to zoom</strong> to examine the patterns more closely.
+            <strong>Tap the + / - buttons</strong> in the lower-left corner to zoom in and out.
           </p>
         </div>
 
