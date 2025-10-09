@@ -40,6 +40,7 @@ export function createStatsOverlay(): {
   elements: StatsOverlayElements
   show: (data: RunSubmission) => void
   hide: () => void
+  update: (data: RunSubmission) => void
 } {
   const overlay = document.createElement('div')
   overlay.className =
@@ -112,60 +113,85 @@ export function createStatsOverlay(): {
           <div class="grid grid-cols-2 gap-x-4 gap-y-2 font-mono text-sm">
             <div>
               <div class="text-gray-500 dark:text-gray-400 text-xs">Steps</div>
-              <div class="text-gray-900 dark:text-white font-semibold">${data.stepCount.toLocaleString()}</div>
+              <div data-field="steps" class="text-gray-900 dark:text-white font-semibold">
+                ${data.stepCount.toLocaleString()}
+              </div>
             </div>
             <div>
               <div class="text-gray-500 dark:text-gray-400 text-xs">Watched Time</div>
-              <div class="text-gray-900 dark:text-white font-semibold">${(data.watchedWallMs / 1000).toFixed(1)}s</div>
+              <div data-field="watchedTime" class="text-gray-900 dark:text-white font-semibold">
+                ${(data.watchedWallMs / 1000).toFixed(1)}s
+              </div>
             </div>
             <div>
               <div class="text-gray-500 dark:text-gray-400 text-xs">Grid Size</div>
-              <div class="text-gray-900 dark:text-white font-semibold">${gridSize.toLocaleString()}</div>
+              <div class="text-gray-900 dark:text-white font-semibold">
+                ${gridSize.toLocaleString()}
+              </div>
             </div>
             <div>
               <div class="text-gray-500 dark:text-gray-400 text-xs">Steps/Second</div>
-              <div class="text-gray-900 dark:text-white font-semibold">${actualSps.toFixed(1)} / ${data.requestedSps}</div>
+              <div data-field="sps" class="text-gray-900 dark:text-white font-semibold">
+                ${actualSps.toFixed(1)} / ${data.requestedSps}
+              </div>
             </div>
             <div>
               <div class="text-gray-500 dark:text-gray-400 text-xs">Seed Type</div>
-              <div class="text-gray-900 dark:text-white font-semibold">${data.seedType} (${data.seedPercentage}%)</div>
+              <div class="text-gray-900 dark:text-white font-semibold">
+                ${data.seedType} (${data.seedPercentage}%)
+              </div>
             </div>
             <div>
               <div class="text-gray-500 dark:text-gray-400 text-xs">Interest Score</div>
-              <div class="text-gray-900 dark:text-white font-semibold text-lg">${data.interestScore.toFixed(4)}</div>
+              <div data-field="interest" class="text-gray-900 dark:text-white font-semibold text-lg">
+                ${data.interestScore.toFixed(4)}
+              </div>
             </div>
           </div>
         </div>
-
+        
         <div class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
           <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">Pattern Analysis</h3>
           <div class="grid grid-cols-2 gap-x-4 gap-y-2 font-mono text-sm">
             <div>
               <div class="text-gray-500 dark:text-gray-400 text-xs">Population</div>
-              <div class="text-gray-900 dark:text-white">${data.population.toLocaleString()}</div>
+              <div data-field="population" class="text-gray-900 dark:text-white">
+                ${data.population.toLocaleString()}
+              </div>
             </div>
             <div>
               <div class="text-gray-500 dark:text-gray-400 text-xs">Activity</div>
-              <div class="text-gray-900 dark:text-white">${data.activity.toLocaleString()}</div>
+              <div data-field="activity" class="text-gray-900 dark:text-white">
+                ${data.activity.toLocaleString()}
+              </div>
             </div>
             <div>
               <div class="text-gray-500 dark:text-gray-400 text-xs">Pop. Change</div>
-              <div class="text-gray-900 dark:text-white">${data.populationChange.toLocaleString()}</div>
+              <div data-field="popChange" class="text-gray-900 dark:text-white">
+                ${data.populationChange.toLocaleString()}
+              </div>
             </div>
             <div>
               <div class="text-gray-500 dark:text-gray-400 text-xs">Entropy 2×2</div>
-              <div class="text-gray-900 dark:text-white">${data.entropy2x2.toFixed(4)}</div>
+              <div data-field="entropy2x2" class="text-gray-900 dark:text-white">
+                ${data.entropy2x2.toFixed(4)}
+              </div>
             </div>
             <div>
               <div class="text-gray-500 dark:text-gray-400 text-xs">Entropy 4×4</div>
-              <div class="text-gray-900 dark:text-white">${data.entropy4x4.toFixed(4)}</div>
+              <div data-field="entropy4x4" class="text-gray-900 dark:text-white">
+                ${data.entropy4x4.toFixed(4)}
+              </div>
             </div>
             <div>
               <div class="text-gray-500 dark:text-gray-400 text-xs">Entropy 8×8</div>
-              <div class="text-gray-900 dark:text-white">${data.entropy8x8.toFixed(4)}</div>
+              <div data-field="entropy8x8" class="text-gray-900 dark:text-white">
+                ${data.entropy8x8.toFixed(4)}
+              </div>
             </div>
           </div>
         </div>
+
 
         <button 
           id="copy-json-btn"
@@ -244,38 +270,89 @@ export function createStatsOverlay(): {
     }, 300)
   }
 
-  return { elements, show, hide }
+  const update = (data: RunSubmission) => {
+    const updateField = (selector: string, value: string) => {
+      const el = content.querySelector(selector)
+      if (el) el.textContent = value
+    }
+
+    updateField('[data-field="steps"]', data.stepCount.toLocaleString())
+    updateField(
+      '[data-field="watchedTime"]',
+      `${(data.watchedWallMs / 1000).toFixed(1)}s`,
+    )
+    updateField(
+      '[data-field="sps"]',
+      `${(data.actualSps ?? 0).toFixed(1)} / ${data.requestedSps}`,
+    )
+    updateField('[data-field="interest"]', data.interestScore.toFixed(4))
+    updateField('[data-field="population"]', data.population.toLocaleString())
+    updateField('[data-field="activity"]', data.activity.toLocaleString())
+    updateField(
+      '[data-field="popChange"]',
+      data.populationChange.toLocaleString(),
+    )
+    updateField('[data-field="entropy2x2"]', data.entropy2x2.toFixed(4))
+    updateField('[data-field="entropy4x4"]', data.entropy4x4.toFixed(4))
+    updateField('[data-field="entropy8x8"]', data.entropy8x8.toFixed(4))
+  }
+
+  return { elements, show, hide, update }
 }
 
 export function setupStatsOverlay(
   elements: StatsOverlayElements,
   hideCallback: () => void,
+  refreshCallback?: () => void, // <–– new optional updater
 ): CleanupFunction {
   const { overlay, closeButton } = elements
+  let refreshTimer: number | null = null
+
+  const startRefreshing = () => {
+    stopRefreshing()
+    if (!refreshCallback) return
+    refreshTimer = window.setInterval(() => {
+      // only refresh if overlay visible
+      if (overlay.style.display !== 'none') refreshCallback()
+    }, 1000)
+  }
+
+  const stopRefreshing = () => {
+    if (refreshTimer) {
+      clearInterval(refreshTimer)
+      refreshTimer = null
+    }
+  }
 
   const closeHandler = () => {
+    stopRefreshing()
     hideCallback()
   }
 
   const overlayClickHandler = (e: MouseEvent) => {
     if (e.target === overlay) {
+      stopRefreshing()
       hideCallback()
     }
   }
+
+  // hook into display toggle so timer starts when opened
+  const observer = new MutationObserver(() => {
+    const visible = overlay.style.display !== 'none'
+    if (visible) startRefreshing()
+    else stopRefreshing()
+  })
+  observer.observe(overlay, { attributes: true, attributeFilter: ['style'] })
 
   closeButton.addEventListener('click', closeHandler)
   overlay.addEventListener('click', overlayClickHandler)
 
   return () => {
+    stopRefreshing()
+    observer.disconnect()
     closeButton.removeEventListener('click', closeHandler)
     overlay.removeEventListener('click', overlayClickHandler)
-
-    // Clean up overlay from DOM
-    if (overlay.parentNode) {
-      overlay.parentNode.removeChild(overlay)
-    }
-
-    // Restore body scroll in case it was locked
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay)
     document.body.style.overflow = ''
   }
 }

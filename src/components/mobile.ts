@@ -742,8 +742,14 @@ export async function setupMobileLayout(
     elements: statsElements,
     show: showStats,
     hide: hideStats,
+    update: updateStats,
   } = createStatsOverlay()
-  const cleanupStatsOverlay = setupStatsOverlay(statsElements, hideStats)
+
+  const cleanupStatsOverlay = setupStatsOverlay(
+    statsElements,
+    hideStats,
+    () => updateStats(getCurrentRunData()), // refresh every second
+  )
 
   // Helper function to get current run data
   const getCurrentRunData = (): RunSubmission => {
