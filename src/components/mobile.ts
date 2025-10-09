@@ -1,6 +1,7 @@
 // src/components/mobile.ts
 import { GPU } from 'gpu.js'
 import { saveRun } from '../api/save'
+import { fetchStarredPattern } from '../api/starred'
 import { CellularAutomata } from '../cellular-automata-cpu.ts'
 import { GPUCellularAutomata } from '../cellular-automata-gpu.ts'
 import type {
@@ -19,6 +20,7 @@ import {
   c4RulesetToHex,
   conwayRule,
   expandC4Ruleset,
+  hexToC4Ruleset,
   makeC4Ruleset,
   randomC4RulesetByDensity,
 } from '../utils.ts'
@@ -30,6 +32,7 @@ import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 60
 const TARGET_GRID_SIZE = 600_000
+const STARRED_PATTERN_PROBABILITY = 0.2 // 20% starred, 80% random
 
 const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1
 const SWIPE_COMMIT_MIN_DISTANCE = 50
@@ -512,6 +515,35 @@ function generateRandomRule(): RuleData {
   }
 }
 
+/**
+ * Generate next rule using exploration/exploitation strategy:
+ * - 20% chance: load random starred pattern (exploitation)
+ * - 80% chance: generate random rule (exploration)
+ */
+async function generateNextRule(): Promise<RuleData> {
+  const useStarred = Math.random() < STARRED_PATTERN_PROBABILITY
+
+  if (useStarred) {
+    const starred = await fetchStarredPattern()
+    if (starred) {
+      console.log(
+        '[generateNextRule] 🌟 Loading starred pattern:',
+        starred.ruleset_name,
+      )
+      const ruleset = hexToC4Ruleset(starred.ruleset_hex)
+      return {
+        name: starred.ruleset_name,
+        hex: starred.ruleset_hex,
+        ruleset,
+      }
+    }
+    // Fallback to random if no starred patterns exist
+    console.log('[generateNextRule] ℹ️  No starred patterns, using random')
+  }
+
+  return generateRandomRule()
+}
+
 // --- Explicit rule setup and play functions ---------------------------------
 
 /**
@@ -881,7 +913,7 @@ export async function setupMobileLayout(
     hex: c4RulesetToHex(conway),
     ruleset: conway,
   }
-  let offScreenRule = generateRandomRule()
+  let offScreenRule = await generateNextRule()
 
   // Initial setup with explicit renders
   prepareAutomata(onScreenCA, onScreenRule, lookup)
@@ -1035,14 +1067,14 @@ export async function setupMobileLayout(
       offScreenCA.setColors(nextCol, bgColor)
 
       // Defer CA operations by one frame to let layout settle
-      setTimeout(() => {
+      setTimeout(async () => {
         initializeRunStats(onScreenCA, onScreenRule)
 
         // Start the newly visible CA and render
         startAutomata(onScreenCA, onScreenRule)
 
         // Prepare offscreen CA for the next swipe with explicit render
-        offScreenRule = generateRandomRule()
+        offScreenRule = await generateNextRule()
         prepareAutomata(offScreenCA, offScreenRule, lookup, 50)
         offscreenReady = true
       }, 16)
