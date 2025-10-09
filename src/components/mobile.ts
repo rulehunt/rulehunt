@@ -24,7 +24,6 @@ import {
 } from '../utils.ts'
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 
-import { buildShareURL } from '../urlState.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
 // --- Constants --------------------------------------------------------------
@@ -718,10 +717,7 @@ function createSoftResetButton(
 }
 
 // --- Share Button (copy shareable link to clipboard) -----------------------
-function createShareButton(
-  parent: HTMLElement,
-  getShareState: () => { rulesetHex: string; seed: number },
-): HTMLButtonElement {
+function createShareButton(parent: HTMLElement): HTMLButtonElement {
   const btn = document.createElement('button')
   btn.setAttribute('data-swipe-ignore', 'true')
   btn.style.touchAction = 'manipulation' // avoids 300ms delay on iOS
@@ -750,13 +746,8 @@ function createShareButton(
     e.stopPropagation()
     if (isTransitioning) return
 
-    const { rulesetHex, seed } = getShareState()
-    const shareURL = buildShareURL({
-      rulesetHex,
-      seed,
-      seedType: 'patch', // Mobile always uses patch seed
-      seedPercentage: 50,
-    })
+    // URL is kept in sync automatically by PR #35, just copy current URL
+    const shareURL = window.location.href
 
     try {
       await navigator.clipboard.writeText(shareURL)
@@ -986,10 +977,7 @@ export async function setupMobileLayout(
   }
 
   // Create buttons
-  let shareBtn = createShareButton(wrapper, () => ({
-    rulesetHex: onScreenRule.hex,
-    seed: onScreenCA.getSeed(),
-  }))
+  let shareBtn = createShareButton(wrapper)
 
   let statsBtn = createStatsButton(wrapper, () =>
     showStats(getCurrentRunData()),
@@ -1063,10 +1051,7 @@ export async function setupMobileLayout(
       softResetButton.remove()
       statsBtn.remove()
 
-      shareBtn = createShareButton(wrapper, () => ({
-        rulesetHex: onScreenRule.hex,
-        seed: onScreenCA.getSeed(),
-      }))
+      shareBtn = createShareButton(wrapper)
 
       statsBtn = createStatsButton(wrapper, () =>
         showStats(getCurrentRunData()),
