@@ -132,6 +132,18 @@ function waitForTransitionEnd(el: HTMLElement): Promise<void> {
   })
 }
 
+function initializeRunStats(ca: ICellularAutomata, rule: RuleData) {
+  ca.getStatistics().initializeSimulation({
+    name: `Mobile - ${rule.name}`,
+    seedType: 'patch',
+    seedPercentage: 50,
+    rulesetName: rule.name,
+    rulesetHex: rule.hex,
+    startTime: Date.now(),
+    requestedStepsPerSecond: STEPS_PER_SECOND,
+  })
+}
+
 // --- Dual-Canvas Swipe Handler ----------------------------------------------
 // Swipe Flow (timing carefully orchestrated to prevent flashing):
 // 1. Touch start → pause onScreen CA (both canvases now static)
@@ -727,15 +739,7 @@ export async function setupMobileLayout(
   prepareRule(offScreenCA, offScreenRule, lookup)
   offscreenReady = true
 
-  onScreenCA.getStatistics().initializeSimulation({
-    name: `Mobile - ${onScreenRule.name}`,
-    seedType: 'patch',
-    seedPercentage: 50,
-    rulesetName: onScreenRule.name,
-    rulesetHex: onScreenRule.hex,
-    startTime: Date.now(),
-    requestedStepsPerSecond: STEPS_PER_SECOND,
-  })
+  initializeRunStats(onScreenCA, onScreenRule)
 
   // Create stats overlay
   const {
@@ -850,6 +854,8 @@ export async function setupMobileLayout(
 
       // Defer CA operations by one frame to let layout settle
       setTimeout(() => {
+        initializeRunStats(onScreenCA, onScreenRule)
+
         // Start the newly visible CA and render
         startRule(onScreenCA, onScreenRule)
 
