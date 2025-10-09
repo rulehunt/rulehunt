@@ -97,10 +97,15 @@ export class GPUCellularAutomata
     }
   }
 
-  private getRulesetArray(ruleset: Ruleset): number[] {
+  private getRulesetArray(ruleset?: Ruleset): number[] {
+    if (!ruleset) {
+      return this.cachedRuleset ?? []
+    }
+
     if (this.cachedRulesetRef === ruleset && this.cachedRuleset) {
       return this.cachedRuleset
     }
+
     this.cachedRuleset = Array.from(ruleset)
     this.cachedRulesetRef = ruleset
     return this.cachedRuleset

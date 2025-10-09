@@ -27,7 +27,7 @@ import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
 // --- Feature Flags ----------------------------------------------------------
-const ENABLE_ZOOM_AND_PAN = false
+const ENABLE_ZOOM = false
 
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
@@ -38,7 +38,6 @@ const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1
 const SWIPE_COMMIT_MIN_DISTANCE = 50
 const SWIPE_VELOCITY_THRESHOLD = -0.3
 const SWIPE_FAST_THROW_THRESHOLD = -0.5
-const SWIPE_COOLDOWN_MS = 500
 
 const LIGHT_FG_COLORS = [
   '#2563eb', // blue-600
@@ -120,18 +119,6 @@ function computeAdaptiveGrid(maxCells = TARGET_GRID_SIZE) {
   return { gridCols, gridRows, cellSize, totalCells, screenWidth, screenHeight }
 }
 
-function waitForTransitionEnd(el: HTMLElement): Promise<void> {
-  return new Promise((resolve) => {
-    const done = (ev: TransitionEvent) => {
-      if (ev.propertyName === 'transform') {
-        el.removeEventListener('transitionend', done)
-        resolve()
-      }
-    }
-    el.addEventListener('transitionend', done)
-  })
-}
-
 function initializeRunStats(ca: ICellularAutomata, rule: RuleData) {
   ca.getStatistics().initializeSimulation({
     name: `Mobile - ${rule.name}`,
@@ -156,30 +143,67 @@ function initializeRunStats(ca: ICellularAutomata, rule: RuleData) {
 // This timing eliminates race conditions and prevents visible flashes
 let isTransitioning = false
 let offscreenReady = false
+let swipeLockUntil = 0
+let gestureId = 0
 function setupDualCanvasSwipe(
   wrapper: HTMLElement,
-  outgoingCanvas: HTMLCanvasElement,
-  incomingCanvas: HTMLCanvasElement,
+  canvas1: HTMLCanvasElement,
+  canvas2: HTMLCanvasElement,
   onCommit: () => void,
   onCancel: () => void,
   onDragStart?: () => void,
 ): CleanupFunction {
+  // Track which canvas is currently on-screen (true = canvas1, false = canvas2)
+  let canvas1IsOnScreen = true
+
   let startY = 0
   let currentY = 0
   let startT = 0
   let dragging = false
   let directionLocked: 'up' | 'down' | null = null
-  let lastSwipeTime = -1
+  let pausedForDrag = false
+
   const samples: { t: number; y: number }[] = []
   const getHeight = () => wrapper.clientHeight
 
+  // Helper to get current canvas roles based on tracking variable
+  const getCurrentCanvases = () => {
+    return canvas1IsOnScreen
+      ? { onScreen: canvas1, offScreen: canvas2 }
+      : { onScreen: canvas2, offScreen: canvas1 }
+  }
+
   const resetTransforms = (h: number) => {
-    outgoingCanvas.style.transform = 'translateY(0)'
-    incomingCanvas.style.transform = `translateY(${h}px)`
+    const { onScreen, offScreen } = getCurrentCanvases()
+    onScreen.style.transform = 'translateY(0)'
+    offScreen.style.transform = `translateY(${h}px)`
+  }
+
+  function waitForTransitionEndScoped(
+    el: HTMLElement,
+    id: number,
+  ): Promise<void> {
+    return new Promise((resolve) => {
+      const done = (ev: TransitionEvent) => {
+        el.removeEventListener('transitionend', done)
+        if (ev.propertyName === 'transform' && id === gestureId) {
+          resolve()
+        }
+      }
+      el.addEventListener('transitionend', done)
+    })
   }
 
   const handleTouchStart = (e: TouchEvent) => {
     if (!offscreenReady) return
+
+    const now = performance.now()
+
+    if (now < swipeLockUntil) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
 
     const target = e.target as HTMLElement | null
     if (
@@ -191,22 +215,23 @@ function setupDualCanvasSwipe(
     }
 
     if (e.touches.length !== 1) return
-    const now = performance.now()
-    if (lastSwipeTime > 0 && now - lastSwipeTime < SWIPE_COOLDOWN_MS) return
     if (isTransitioning) return
+
+    gestureId++
 
     startY = e.touches[0].clientY
     currentY = startY
     startT = e.timeStamp
     directionLocked = null
     dragging = true
+    pausedForDrag = false
     samples.length = 0
     samples.push({ t: startT, y: startY })
 
+    const { onScreen, offScreen } = getCurrentCanvases()
     wrapper.style.transition = 'none'
-    outgoingCanvas.style.transition = 'none'
-    incomingCanvas.style.transition = 'none'
-    onDragStart?.()
+    onScreen.style.transition = 'none'
+    offScreen.style.transition = 'none'
   }
 
   const handleTouchMove = (e: TouchEvent) => {
@@ -216,7 +241,14 @@ function setupDualCanvasSwipe(
     const absDy = Math.abs(dy)
 
     // Lock direction with a little hysteresis
-    if (!directionLocked && absDy > 8) directionLocked = dy < 0 ? 'up' : 'down'
+    if (!directionLocked && absDy > 8) {
+      directionLocked = dy < 0 ? 'up' : 'down'
+      // Pause only when we know it's an upward swipe (real intent)
+      if (directionLocked === 'up' && !pausedForDrag) {
+        onDragStart?.()
+        pausedForDrag = true
+      }
+    }
 
     // Reject downward gestures early & visibly snap back
     if (directionLocked === 'down') {
@@ -235,26 +267,51 @@ function setupDualCanvasSwipe(
     const delta = Math.min(0, dy)
     const height = getHeight()
 
-    outgoingCanvas.style.transform = `translateY(${delta}px)`
-    incomingCanvas.style.transform = `translateY(${height + delta}px)`
+    const { onScreen, offScreen } = getCurrentCanvases()
+    onScreen.style.transform = `translateY(${delta}px)`
+    offScreen.style.transform = `translateY(${height + delta}px)`
   }
 
   const doCancel = async () => {
+    const { onScreen, offScreen } = getCurrentCanvases()
     const height = getHeight()
     const duration = 0.25
     const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1)`
-    outgoingCanvas.style.transition = transition
-    incomingCanvas.style.transition = transition
 
-    outgoingCanvas.style.transform = 'translateY(0)'
-    incomingCanvas.style.transform = `translateY(${height}px)`
+    const targetOnScreen = 'translateY(0)'
+    const targetOffScreen = `translateY(${height}px)`
 
-    await Promise.all([
-      waitForTransitionEnd(outgoingCanvas),
-      waitForTransitionEnd(incomingCanvas),
+    const curOnScreen = onScreen.style.transform || ''
+    const curOffScreen = offScreen.style.transform || ''
+
+    // Fast path: already in place — skip transitions entirely
+    if (curOnScreen === targetOnScreen && curOffScreen === targetOffScreen) {
+      onScreen.style.transition = 'none'
+      offScreen.style.transition = 'none'
+      onCancel()
+      return
+    }
+
+    onScreen.style.transition = transition
+    offScreen.style.transition = transition
+    onScreen.style.transform = targetOnScreen
+    offScreen.style.transform = targetOffScreen
+
+    // Safety timeout in case transitionend never fires
+    const timeout = new Promise<void>((resolve) =>
+      setTimeout(resolve, duration * 1000 + 50),
+    )
+
+    await Promise.race([
+      Promise.all([
+        waitForTransitionEndScoped(onScreen, gestureId),
+        waitForTransitionEndScoped(offScreen, gestureId),
+      ]),
+      timeout,
     ])
-    outgoingCanvas.style.transition = 'none'
-    incomingCanvas.style.transition = 'none'
+
+    onScreen.style.transition = 'none'
+    offScreen.style.transition = 'none'
     onCancel()
   }
 
@@ -262,18 +319,25 @@ function setupDualCanvasSwipe(
     const wasDragging = dragging
     const lockedDirection = directionLocked
     dragging = false
-    lastSwipeTime = performance.now()
 
-    if (!wasDragging || forceCancel || lockedDirection === 'down') {
+    const delta = currentY - startY
+    const dragDistance = Math.abs(delta)
+    const tinyAccidentalMove = dragDistance < 15
+
+    if (
+      !wasDragging ||
+      forceCancel ||
+      lockedDirection === 'down' ||
+      tinyAccidentalMove
+    ) {
       await doCancel()
+      swipeLockUntil = performance.now() + 350
       return
     }
 
     const height = getHeight()
-    const delta = currentY - startY
-    const dragDistance = Math.abs(delta)
 
-    // compute velocity
+    // Compute velocity
     let vy = 0
     if (samples.length >= 2) {
       const a = samples[0]
@@ -282,21 +346,38 @@ function setupDualCanvasSwipe(
       vy = (b.y - a.y) / dt
     }
 
-    const tinyAccidentalMove = dragDistance < 15
     const slowPullback = delta > 0
     const fastFlick = vy < SWIPE_FAST_THROW_THRESHOLD
     const normalFlick =
       dragDistance > height * SWIPE_COMMIT_THRESHOLD_PERCENT ||
       (dragDistance > SWIPE_COMMIT_MIN_DISTANCE &&
         vy < SWIPE_VELOCITY_THRESHOLD)
-    const shouldCommit =
-      !tinyAccidentalMove && !slowPullback && (fastFlick || normalFlick)
 
+    const shouldCommit =
+      height > 0 &&
+      dragDistance > 0 &&
+      !tinyAccidentalMove &&
+      !slowPullback &&
+      (fastFlick || normalFlick)
+
+    // Fast path for taps: if almost no drag, skip animations entirely
+    if (!shouldCommit && tinyAccidentalMove) {
+      const { onScreen, offScreen } = getCurrentCanvases()
+      const h = getHeight()
+      onScreen.style.transition = 'none'
+      offScreen.style.transition = 'none'
+      onScreen.style.transform = 'translateY(0)'
+      offScreen.style.transform = `translateY(${h}px)`
+      onCancel()
+      return
+    }
+
+    const { onScreen, offScreen } = getCurrentCanvases()
     const duration = shouldCommit ? 0.35 : 0.25
     const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1)`
-    outgoingCanvas.style.transition = transition
-    incomingCanvas.style.transition = transition
-    void outgoingCanvas.offsetWidth
+    onScreen.style.transition = transition
+    offScreen.style.transition = transition
+    void onScreen.offsetWidth
 
     isTransitioning = true
 
@@ -306,27 +387,31 @@ function setupDualCanvasSwipe(
 
       requestAnimationFrame(() => {
         // Explicitly fill background before rendering to prevent black flash
-        const ctx = incomingCanvas.getContext('2d')
+        const ctx = offScreen.getContext('2d')
         if (ctx) {
           ctx.save()
           ctx.fillStyle = bgColor
-          ctx.fillRect(0, 0, incomingCanvas.width, incomingCanvas.height)
+          ctx.fillRect(0, 0, offScreen.width, offScreen.height)
           ctx.restore()
         }
       })
+
       // Normal upward slide
-      outgoingCanvas.style.transform = `translateY(-${height}px)`
-      incomingCanvas.style.transform = 'translateY(0)'
+      onScreen.style.transform = `translateY(-${height}px)`
+      offScreen.style.transform = 'translateY(0)'
 
       await Promise.all([
-        waitForTransitionEnd(outgoingCanvas),
-        waitForTransitionEnd(incomingCanvas),
+        waitForTransitionEndScoped(onScreen, gestureId),
+        waitForTransitionEndScoped(offScreen, gestureId),
       ])
 
-      outgoingCanvas.style.transition = 'none'
-      incomingCanvas.style.transition = 'none'
-      outgoingCanvas.style.transform = `translateY(-${height}px)`
-      incomingCanvas.style.transform = 'translateY(0)'
+      onScreen.style.transition = 'none'
+      offScreen.style.transition = 'none'
+      onScreen.style.transform = `translateY(-${height}px)`
+      offScreen.style.transform = 'translateY(0)'
+
+      // Toggle the tracking flag BEFORE calling onCommit
+      canvas1IsOnScreen = !canvas1IsOnScreen
 
       requestAnimationFrame(() => onCommit())
     } else {
@@ -334,6 +419,7 @@ function setupDualCanvasSwipe(
     }
 
     isTransitioning = false
+    swipeLockUntil = performance.now() + 350
   }
 
   const handleTouchEnd = (_: TouchEvent) => {
@@ -356,15 +442,13 @@ function setupDualCanvasSwipe(
   }
 }
 
-// --- Pinch Zoom & Pan (centered on midpoint) -------------------------------
-function setupPinchZoomAndPan(
+// --- Pinch Zoom (centered on midpoint) -------------------------------// --- Pinch Zoom (centered on grid midpoint) ---------------------------------
+function setupPinchZoom(
   canvas: HTMLCanvasElement,
   cellularAutomata: ICellularAutomata,
 ): CleanupFunction {
   let initialDistance = 0
   let initialZoom = 1
-  let zoomCenterX = 0
-  let zoomCenterY = 0
 
   const handleTouchStart = (e: TouchEvent) => {
     if (e.touches.length === 2) {
@@ -373,39 +457,51 @@ function setupPinchZoomAndPan(
       const dy = t1.clientY - t2.clientY
       initialDistance = Math.sqrt(dx * dx + dy * dy)
       initialZoom = cellularAutomata.getZoom()
-
-      // Calculate midpoint in canvas coordinates
-      const rect = canvas.getBoundingClientRect()
-      zoomCenterX =
-        ((t1.clientX + t2.clientX) / 2 - rect.left) *
-        (canvas.width / rect.width)
-      zoomCenterY =
-        ((t1.clientY + t2.clientY) / 2 - rect.top) *
-        (canvas.height / rect.height)
     }
   }
 
   const handleTouchMove = (e: TouchEvent) => {
-    if (e.touches.length === 2) {
+    if (e.touches.length === 2 && initialDistance > 0) {
       e.preventDefault()
       const [t1, t2] = e.touches
       const dx = t1.clientX - t2.clientX
       const dy = t1.clientY - t2.clientY
       const distance = Math.sqrt(dx * dx + dy * dy)
+      const scale = distance / initialDistance
+      const newZoom = Math.min(100, Math.max(1, initialZoom * scale))
 
-      if (!initialDistance) return
-      const scaleChange = distance / initialDistance
-      const newZoom = initialZoom * scaleChange
-
-      // Zoom centered on the midpoint
-      cellularAutomata.setZoomCentered(newZoom, zoomCenterX, zoomCenterY)
-      cellularAutomata.render() // Explicit render after zoom
+      // Fixed-center zoom (handled internally)
+      cellularAutomata.setZoom(newZoom)
     }
   }
 
   const handleTouchEnd = (e: TouchEvent) => {
     if (e.touches.length < 2) initialDistance = 0
   }
+
+  let lastTap = 0
+  canvas.addEventListener(
+    'touchend',
+    (e) => {
+      if (e.touches.length > 0 || e.changedTouches.length > 1) return
+
+      const now = Date.now()
+      if (now - lastTap < 300) {
+        e.stopPropagation()
+
+        // ✅ Safely reset zoom: pause → reset → render → resume
+        const wasPlaying = cellularAutomata.isRunning?.() ?? false
+        cellularAutomata.pause()
+        cellularAutomata.setZoom(1)
+        cellularAutomata.render?.()
+        if (wasPlaying) {
+          cellularAutomata.play(STEPS_PER_SECOND)
+        }
+      }
+      lastTap = now
+    },
+    { passive: true },
+  )
 
   canvas.addEventListener('touchstart', handleTouchStart, { passive: true })
   canvas.addEventListener('touchmove', handleTouchMove, { passive: false })
@@ -902,7 +998,7 @@ export async function setupMobileLayout(
       console.log(`Switched to: ${onScreenRule.name}`)
     },
     // --- onCancel: Resume playing onScreen CA if user cancels swipe ----------
-    () => onScreenCA.play(STEPS_PER_SECOND, onScreenRule.ruleset),
+    () => onScreenCA.play(STEPS_PER_SECOND),
     // --- onDragStart: Pause onScreen CA so both canvases are static ----------
     () => onScreenCA.pause(),
   )
@@ -911,9 +1007,9 @@ export async function setupMobileLayout(
   let cleanupZoomOnScreen: CleanupFunction = () => {}
   let cleanupZoomOffScreen: CleanupFunction = () => {}
 
-  if (ENABLE_ZOOM_AND_PAN) {
-    cleanupZoomOnScreen = setupPinchZoomAndPan(onScreenCanvas, onScreenCA)
-    cleanupZoomOffScreen = setupPinchZoomAndPan(offScreenCanvas, offScreenCA)
+  if (ENABLE_ZOOM) {
+    cleanupZoomOnScreen = setupPinchZoom(onScreenCanvas, onScreenCA)
+    cleanupZoomOffScreen = setupPinchZoom(offScreenCanvas, offScreenCA)
   }
 
   const handleResize = () => {

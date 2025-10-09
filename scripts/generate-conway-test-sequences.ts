@@ -13,9 +13,9 @@ function countNeighbors(grid: Grid, x: number, y: number): number {
     for (let dx = -1; dx <= 1; dx++) {
       if (dx === 0 && dy === 0) continue
 
-      const ny = ((y + dy) % height + height) % height
-      const nx = ((x + dx) % width + width) % width
-      
+      const ny = (((y + dy) % height) + height) % height
+      const nx = (((x + dx) % width) + width) % width
+
       if (grid[ny][nx] === 1) {
         count++
       }
@@ -84,7 +84,7 @@ interface TestSequenceConfig {
 const testSequences: Record<string, TestSequenceConfig> = {
   // Blinker: oscillates between horizontal and vertical
   blinker: {
-    name: "Blinker (period 2 oscillator)",
+    name: 'Blinker (period 2 oscillator)',
     initial: [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -100,44 +100,98 @@ const testSequences: Record<string, TestSequenceConfig> = {
     steps: 5,
     expectations: {
       entityCount: 1,
-      description: "Single blinker oscillating between horizontal and vertical",
+      description: 'Single blinker oscillating between horizontal and vertical',
       trackingBehavior: {
         allSameId: true,
         totalUniqueIds: 1,
-        movementExpected: false
+        movementExpected: false,
       },
       stepExpectations: [
         {
-          entities: [{ cells: [{x: 3, y: 3}, {x: 4, y: 3}, {x: 5, y: 3}], type: "blinker-h" }],
-          description: "Horizontal blinker"
+          entities: [
+            {
+              cells: [
+                { x: 3, y: 3 },
+                { x: 4, y: 3 },
+                { x: 5, y: 3 },
+              ],
+              type: 'blinker-h',
+            },
+          ],
+          description: 'Horizontal blinker',
         },
         {
-          entities: [{ cells: [{x: 4, y: 2}, {x: 4, y: 3}, {x: 4, y: 4}], type: "blinker-v" }],
-          description: "Vertical blinker"
+          entities: [
+            {
+              cells: [
+                { x: 4, y: 2 },
+                { x: 4, y: 3 },
+                { x: 4, y: 4 },
+              ],
+              type: 'blinker-v',
+            },
+          ],
+          description: 'Vertical blinker',
         },
         {
-          entities: [{ cells: [{x: 3, y: 3}, {x: 4, y: 3}, {x: 5, y: 3}], type: "blinker-h" }],
-          description: "Back to horizontal"
+          entities: [
+            {
+              cells: [
+                { x: 3, y: 3 },
+                { x: 4, y: 3 },
+                { x: 5, y: 3 },
+              ],
+              type: 'blinker-h',
+            },
+          ],
+          description: 'Back to horizontal',
         },
         {
-          entities: [{ cells: [{x: 4, y: 2}, {x: 4, y: 3}, {x: 4, y: 4}], type: "blinker-v" }],
-          description: "Vertical again"
+          entities: [
+            {
+              cells: [
+                { x: 4, y: 2 },
+                { x: 4, y: 3 },
+                { x: 4, y: 4 },
+              ],
+              type: 'blinker-v',
+            },
+          ],
+          description: 'Vertical again',
         },
         {
-          entities: [{ cells: [{x: 3, y: 3}, {x: 4, y: 3}, {x: 5, y: 3}], type: "blinker-h" }],
-          description: "Horizontal again"
+          entities: [
+            {
+              cells: [
+                { x: 3, y: 3 },
+                { x: 4, y: 3 },
+                { x: 5, y: 3 },
+              ],
+              type: 'blinker-h',
+            },
+          ],
+          description: 'Horizontal again',
         },
         {
-          entities: [{ cells: [{x: 4, y: 2}, {x: 4, y: 3}, {x: 4, y: 4}], type: "blinker-v" }],
-          description: "Vertical final"
-        }
-      ]
-    }
+          entities: [
+            {
+              cells: [
+                { x: 4, y: 2 },
+                { x: 4, y: 3 },
+                { x: 4, y: 4 },
+              ],
+              type: 'blinker-v',
+            },
+          ],
+          description: 'Vertical final',
+        },
+      ],
+    },
   },
 
   // Block: still life
   block: {
-    name: "Block (still life)",
+    name: 'Block (still life)',
     initial: [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -153,36 +207,76 @@ const testSequences: Record<string, TestSequenceConfig> = {
     steps: 3,
     expectations: {
       entityCount: 1,
-      description: "Single block that remains still",
+      description: 'Single block that remains still',
       trackingBehavior: {
         allSameId: true,
         totalUniqueIds: 1,
-        movementExpected: false
+        movementExpected: false,
       },
       stepExpectations: [
         {
-          entities: [{ cells: [{x: 3, y: 2}, {x: 4, y: 2}, {x: 3, y: 3}, {x: 4, y: 3}], type: "block" }],
-          description: "Block initial"
+          entities: [
+            {
+              cells: [
+                { x: 3, y: 2 },
+                { x: 4, y: 2 },
+                { x: 3, y: 3 },
+                { x: 4, y: 3 },
+              ],
+              type: 'block',
+            },
+          ],
+          description: 'Block initial',
         },
         {
-          entities: [{ cells: [{x: 3, y: 2}, {x: 4, y: 2}, {x: 3, y: 3}, {x: 4, y: 3}], type: "block" }],
-          description: "Block unchanged"
+          entities: [
+            {
+              cells: [
+                { x: 3, y: 2 },
+                { x: 4, y: 2 },
+                { x: 3, y: 3 },
+                { x: 4, y: 3 },
+              ],
+              type: 'block',
+            },
+          ],
+          description: 'Block unchanged',
         },
         {
-          entities: [{ cells: [{x: 3, y: 2}, {x: 4, y: 2}, {x: 3, y: 3}, {x: 4, y: 3}], type: "block" }],
-          description: "Block still unchanged"
+          entities: [
+            {
+              cells: [
+                { x: 3, y: 2 },
+                { x: 4, y: 2 },
+                { x: 3, y: 3 },
+                { x: 4, y: 3 },
+              ],
+              type: 'block',
+            },
+          ],
+          description: 'Block still unchanged',
         },
         {
-          entities: [{ cells: [{x: 3, y: 2}, {x: 4, y: 2}, {x: 3, y: 3}, {x: 4, y: 3}], type: "block" }],
-          description: "Block final"
-        }
-      ]
-    }
+          entities: [
+            {
+              cells: [
+                { x: 3, y: 2 },
+                { x: 4, y: 2 },
+                { x: 3, y: 3 },
+                { x: 4, y: 3 },
+              ],
+              type: 'block',
+            },
+          ],
+          description: 'Block final',
+        },
+      ],
+    },
   },
 
   // Glider: moves diagonally
   glider: {
-    name: "Glider (spaceship)",
+    name: 'Glider (spaceship)',
     initial: [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
@@ -198,18 +292,19 @@ const testSequences: Record<string, TestSequenceConfig> = {
     steps: 8,
     expectations: {
       entityCount: 1,
-      description: "Single glider moving diagonally - requires phase association",
+      description:
+        'Single glider moving diagonally - requires phase association',
       trackingBehavior: {
         allSameId: true,
         totalUniqueIds: 1,
-        movementExpected: true
-      }
-    }
+        movementExpected: true,
+      },
+    },
   },
 
   // Two entities: blinker and block
   twoEntities: {
-    name: "Two entities (blinker + block)",
+    name: 'Two entities (blinker + block)',
     initial: [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -225,18 +320,18 @@ const testSequences: Record<string, TestSequenceConfig> = {
     steps: 4,
     expectations: {
       entityCount: 2,
-      description: "One oscillating blinker and one static block",
+      description: 'One oscillating blinker and one static block',
       trackingBehavior: {
         allSameId: false,
         totalUniqueIds: 2,
-        movementExpected: false
-      }
-    }
+        movementExpected: false,
+      },
+    },
   },
 
   // Toad: period 2 oscillator with shape change
   toad: {
-    name: "Toad (period 2 oscillator)",
+    name: 'Toad (period 2 oscillator)',
     initial: [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -252,18 +347,18 @@ const testSequences: Record<string, TestSequenceConfig> = {
     steps: 4,
     expectations: {
       entityCount: 1,
-      description: "Toad oscillator with two distinct phases",
+      description: 'Toad oscillator with two distinct phases',
       trackingBehavior: {
         allSameId: true,
         totalUniqueIds: 1,
-        movementExpected: false
-      }
-    }
+        movementExpected: false,
+      },
+    },
   },
 
   // Glider-blinker collision
   gliderBlinkerCollision: {
-    name: "Glider collides with blinker",
+    name: 'Glider collides with blinker',
     initial: [
       [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
@@ -279,13 +374,13 @@ const testSequences: Record<string, TestSequenceConfig> = {
     steps: 12,
     expectations: {
       entityCount: 2, // Initially 2, but collision behavior varies
-      description: "Glider and blinker collision - complex interaction",
+      description: 'Glider and blinker collision - complex interaction',
       trackingBehavior: {
         allSameId: false,
         totalUniqueIds: undefined, // Complex behavior - entities may merge/split
-        movementExpected: true
-      }
-    }
+        movementExpected: true,
+      },
+    },
   },
 }
 
@@ -308,11 +403,14 @@ if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true })
 }
 
-const allSequences: Record<string, { 
-  name: string
-  sequence: Grid[]
-  expectations: TestExpectation
-}> = {}
+const allSequences: Record<
+  string,
+  {
+    name: string
+    sequence: Grid[]
+    expectations: TestExpectation
+  }
+> = {}
 
 for (const [key, config] of Object.entries(testSequences)) {
   const sequence = generateSequence(key, config.initial, config.steps)
@@ -327,11 +425,11 @@ for (const [key, config] of Object.entries(testSequences)) {
 function stringifySequences(sequences: typeof allSequences): string {
   let result = '{\n'
   const entries = Object.entries(sequences)
-  
+
   entries.forEach(([key, data], index) => {
     result += `  "${key}": {\n`
     result += `    "name": "${data.name}",\n`
-    
+
     // Add expectations
     result += `    "expectations": {\n`
     result += `      "entityCount": ${data.expectations.entityCount},\n`
@@ -344,27 +442,27 @@ function stringifySequences(sequences: typeof allSequences): string {
       result += '      }'
     }
     result += '\n    },\n'
-    
+
     result += `    "sequence": [\n`
-    
+
     data.sequence.forEach((grid, stepIndex) => {
-      result += `      [\n`
+      result += '      [\n'
       grid.forEach((row, rowIndex) => {
         result += `        [${row.join(',')}]`
         if (rowIndex < grid.length - 1) result += ','
         result += '\n'
       })
-      result += `      ]`
+      result += '      ]'
       if (stepIndex < data.sequence.length - 1) result += ','
       result += '\n'
     })
-    
-    result += `    ]\n`
-    result += `  }`
+
+    result += '    ]\n'
+    result += '  }'
     if (index < entries.length - 1) result += ','
     result += '\n'
   })
-  
+
   result += '}\n'
   return result
 }

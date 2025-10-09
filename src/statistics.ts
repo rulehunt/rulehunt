@@ -25,7 +25,7 @@ export interface SimulationMetadata {
   lastStepTime: number
 }
 
-import { detectEntities, EntityTracker } from './entityDetection'
+import { EntityTracker, detectEntities } from './entityDetection'
 import type { Grid } from './schema'
 
 export class StatisticsTracker {
@@ -264,16 +264,18 @@ export class StatisticsTracker {
     // Entity dynamics score - reward fluctuating entity counts
     const entityDynamics =
       maxEntityChange > 0 ? Math.min(avgEntityChange / 5, 1) : 0 // Cap at average change of 5
-      
+
     // Entity identity score - reward systems that maintain entity identity over time
-    const identityPersistence = totalEntitiesEverSeen > 0 
-      ? Math.max(0, 1 - (entitiesDied / totalEntitiesEverSeen))
-      : 0
-      
+    const identityPersistence =
+      totalEntitiesEverSeen > 0
+        ? Math.max(0, 1 - entitiesDied / totalEntitiesEverSeen)
+        : 0
+
     // Pattern diversity score - reward systems with diverse entity types
-    const patternDiversity = uniquePatterns > 0 
-      ? Math.min(uniquePatterns / 5, 1) // Cap at 5 unique patterns
-      : 0
+    const patternDiversity =
+      uniquePatterns > 0
+        ? Math.min(uniquePatterns / 5, 1) // Cap at 5 unique patterns
+        : 0
 
     const populationRatio = avgPopulation / totalCells
     const activityRatio = avgActivity / totalCells
@@ -317,18 +319,18 @@ export class StatisticsTracker {
       populationRatio > 0.1 && populationRatio < 0.7 ? 1 : 0.5
 
     // Entity score now combines stability, dynamics, identity persistence, and pattern diversity
-    const entityScore = 
-      entityStability * 0.3 +      // Maintain entities
-      entityDynamics * 0.2 +       // Entity count fluctuations
-      identityPersistence * 0.3 +  // Keep entities alive over time
-      patternDiversity * 0.2       // Diverse entity types
+    const entityScore =
+      entityStability * 0.3 + // Maintain entities
+      entityDynamics * 0.2 + // Entity count fluctuations
+      identityPersistence * 0.3 + // Keep entities alive over time
+      patternDiversity * 0.2 // Diverse entity types
 
     // Final interest score with enhanced entity metrics
     const interestScore =
-      (entropyScore * 0.3 +        // High entropy is important
-        activityScore * 0.15 +     // Activity matters
-        entityScore * 0.4 +        // Entity identity tracking is now key
-        goldilocksPop * 0.15) *    // Population in good range
+      (entropyScore * 0.3 + // High entropy is important
+        activityScore * 0.15 + // Activity matters
+        entityScore * 0.4 + // Entity identity tracking is now key
+        goldilocksPop * 0.15) * // Population in good range
       dieOutPenalty *
       expansionPenalty
 

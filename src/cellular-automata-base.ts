@@ -53,9 +53,8 @@ export abstract class CellularAutomataBase {
   protected isPlaying = false
   protected playInterval: number | null = null
 
-  protected zoom = 1
-  protected panX = 0
-  protected panY = 0
+  protected zoomLevel = 1
+  protected displayZoom = 1
 
   constructor(canvas: HTMLCanvasElement, options: CellularAutomataOptions) {
     this.canvas = canvas
@@ -226,176 +225,79 @@ export abstract class CellularAutomataBase {
     this.render()
   }
 
-  // --- Rendering (common to all implementations) ----------------------------
-  render() {
-    const data = this.pixelData
-    const grid = this.grid
-    const [fr, fg, fb] = this.fgRGB
-    const [br, bg, bb] = this.bgRGB
-    const len = grid.length
-
-    // Unrolled loop for performance
-    let i = 0
-    let j = 0
-    const len4 = len - (len % 4)
-
-    for (; i < len4; i += 4, j += 16) {
-      // Cell 0
-      if (grid[i]) {
-        data[j] = fr
-        data[j + 1] = fg
-        data[j + 2] = fb
-      } else {
-        data[j] = br
-        data[j + 1] = bg
-        data[j + 2] = bb
-      }
-      data[j + 3] = 255
-
-      // Cell 1
-      if (grid[i + 1]) {
-        data[j + 4] = fr
-        data[j + 5] = fg
-        data[j + 6] = fb
-      } else {
-        data[j + 4] = br
-        data[j + 5] = bg
-        data[j + 6] = bb
-      }
-      data[j + 7] = 255
-
-      // Cell 2
-      if (grid[i + 2]) {
-        data[j + 8] = fr
-        data[j + 9] = fg
-        data[j + 10] = fb
-      } else {
-        data[j + 8] = br
-        data[j + 9] = bg
-        data[j + 10] = bb
-      }
-      data[j + 11] = 255
-
-      // Cell 3
-      if (grid[i + 3]) {
-        data[j + 12] = fr
-        data[j + 13] = fg
-        data[j + 14] = fb
-      } else {
-        data[j + 12] = br
-        data[j + 13] = bg
-        data[j + 14] = bb
-      }
-      data[j + 15] = 255
-    }
-
-    // Remainder
-    for (; i < len; i++, j += 4) {
-      if (grid[i]) {
-        data[j] = fr
-        data[j + 1] = fg
-        data[j + 2] = fb
-      } else {
-        data[j] = br
-        data[j + 1] = bg
-        data[j + 2] = bb
-      }
-      data[j + 3] = 255
-    }
-
-    const ctx = this.ctx
-    ctx.save()
-    ctx.fillStyle = this.bgColor
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
-    ctx.translate(this.panX, this.panY)
-    ctx.scale(this.zoom, this.zoom)
-    ctx.putImageData(this.imageData, 0, 0)
-    ctx.restore()
-  }
-
-  // --- Zoom and pan (common to all implementations) -------------------------
-  setZoom(zoom: number, centerX: number, centerY: number) {
-    const oldZoom = this.zoom
-    this.zoom = Math.max(0.5, Math.min(3, zoom))
-    const zoomChange = this.zoom / oldZoom
-    this.panX = centerX - (centerX - this.panX) * zoomChange
-    this.panY = centerY - (centerY - this.panY) * zoomChange
-    this.constrainPan()
-  }
-
-  setPan(x: number, y: number) {
-    this.panX = x
-    this.panY = y
-    this.constrainPan()
-  }
-
-  getPan(): { x: number; y: number } {
-    return { x: this.panX, y: this.panY }
-  }
-
-  setZoomAndPan(
-    zoom: number,
-    zoomCenterX: number,
-    zoomCenterY: number,
-    panX: number,
-    panY: number,
-  ) {
-    const oldZoom = this.zoom
-    this.zoom = Math.max(0.5, Math.min(3, zoom))
-    const zoomChange = this.zoom / oldZoom
-    const adjustedPanX = zoomCenterX - (zoomCenterX - panX) * zoomChange
-    const adjustedPanY = zoomCenterY - (zoomCenterY - panY) * zoomChange
-    this.panX = adjustedPanX
-    this.panY = adjustedPanY
-    this.constrainPan()
-  }
-
-  setZoomCentered(zoom: number, screenX: number, screenY: number) {
-    const oldZoom = this.zoom
-    this.zoom = Math.max(0.5, Math.min(3, zoom))
-    const gridX = (screenX - this.panX) / oldZoom
-    const gridY = (screenY - this.panY) / oldZoom
-    this.panX = screenX - gridX * this.zoom
-    this.panY = screenY - gridY * this.zoom
-    this.constrainPan()
-  }
-
-  private constrainPan() {
-    if (this.zoom <= 1) {
-      this.panX = (this.canvas.width * (1 - this.zoom)) / 2
-      this.panY = (this.canvas.height * (1 - this.zoom)) / 2
-    } else {
-      const gridWidth = this.canvas.width / this.zoom
-      const gridHeight = this.canvas.height / this.zoom
-      const margin = Math.min(this.canvas.width, this.canvas.height) * 0.2
-      const minPanX = -gridWidth * this.zoom + margin
-      const maxPanX = this.canvas.width - margin
-      const minPanY = -gridHeight * this.zoom + margin
-      const maxPanY = this.canvas.height - margin
-      this.panX = Math.max(minPanX, Math.min(maxPanX, this.panX))
-      this.panY = Math.max(minPanY, Math.min(maxPanY, this.panY))
-    }
-  }
-
-  resetZoom() {
-    this.zoom = 1
-    this.panX = 0
-    this.panY = 0
+  setZoom(level: number) {
+    this.zoomLevel = Math.max(1, Math.min(100, level))
+    this.render() // re-render immediately
   }
 
   getZoom(): number {
-    return this.zoom
+    return this.zoomLevel
+  }
+
+  // --- Rendering (zoom-aware, optimized) ------------------------------------
+  render() {
+    const grid = this.grid
+    const data = this.pixelData
+    const [fr, fg, fb] = this.fgRGB
+    const [br, bg, bb] = this.bgRGB
+    const ctx = this.ctx
+
+    this.displayZoom += (this.zoomLevel - this.displayZoom) * 0.15
+    const zoom = this.displayZoom
+
+    // Visible window centered around grid midpoint
+    const centerX = Math.floor(this.gridCols / 2)
+    const centerY = Math.floor(this.gridRows / 2)
+    const visibleCols = Math.max(1, Math.floor(this.gridCols / zoom))
+    const visibleRows = Math.max(1, Math.floor(this.gridRows / zoom))
+    const startX = Math.max(0, centerX - Math.floor(visibleCols / 2))
+    const startY = Math.max(0, centerY - Math.floor(visibleRows / 2))
+
+    // Target canvas resolution
+    const outW = this.imageData.width
+    const outH = this.imageData.height
+    const scaleX = visibleCols / outW
+    const scaleY = visibleRows / outH
+
+    // For each output pixel, sample from zoom window
+    let j = 0
+    for (let y = 0; y < outH; y++) {
+      const gy = startY + Math.floor(y * scaleY)
+      const rowOffset = gy * this.gridCols
+      for (let x = 0; x < outW; x++, j += 4) {
+        const gx = startX + Math.floor(x * scaleX)
+        const idx = rowOffset + gx
+        const alive = grid[idx]
+
+        if (alive) {
+          data[j] = fr
+          data[j + 1] = fg
+          data[j + 2] = fb
+        } else {
+          data[j] = br
+          data[j + 1] = bg
+          data[j + 2] = bb
+        }
+        data[j + 3] = 255
+      }
+    }
+
+    ctx.putImageData(this.imageData, 0, 0)
   }
 
   // --- Playback control (common to all implementations) ---------------------
-  play(stepsPerSecond: number, ruleset: Ruleset) {
+  play(stepsPerSecond: number, ruleset?: Ruleset) {
     if (this.isPlaying) return
-    this.currentRuleset = ruleset
+
+    this.currentRuleset = ruleset || this.currentRuleset
+    if (!this.currentRuleset) return
+    const active_ruleset = this.currentRuleset
+
     this.lastStepsPerSecond = stepsPerSecond
     this.isPlaying = true
     const intervalMs = 1000 / stepsPerSecond
     this.playInterval = window.setInterval(() => {
-      this.step(ruleset)
+      this.step(active_ruleset)
     }, intervalMs)
   }
 
@@ -493,5 +395,15 @@ export abstract class CellularAutomataBase {
     this.pause()
     // Subclasses can override to clean up engine-specific resources
     this.cleanup()
+  }
+
+  getCurrentRuleset() {
+    return this.currentRuleset
+  }
+  getLastStepsPerSecond() {
+    return this.lastStepsPerSecond
+  }
+  isRunning() {
+    return this.isPlaying
   }
 }

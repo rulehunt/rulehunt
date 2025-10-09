@@ -14,9 +14,9 @@ function countNeighbors(grid: Grid, x: number, y: number): number {
     for (let dx = -1; dx <= 1; dx++) {
       if (dx === 0 && dy === 0) continue
 
-      const ny = ((y + dy) % height + height) % height
-      const nx = ((x + dx) % width + width) % width
-      
+      const ny = (((y + dy) % height) + height) % height
+      const nx = (((x + dx) % width) + width) % width
+
       if (grid[ny][nx] === 1) {
         count++
       }
@@ -73,49 +73,49 @@ interface TestSequence {
 
 // Helper to create test sequences
 function createTestSequence(
-  name: string, 
-  description: string, 
-  initial: Grid, 
+  name: string,
+  description: string,
+  initial: Grid,
   steps: number,
-  entityGenerator: (stepIndex: number) => EntityInfo[]
+  entityGenerator: (stepIndex: number) => EntityInfo[],
 ): TestSequence {
   const grids: Grid[] = [initial]
   let current = initial
-  
+
   for (let i = 0; i < steps; i++) {
     current = step(current)
     grids.push(current)
   }
 
   const expectedEntities = grids.map((_, index) => entityGenerator(index))
-  
+
   // Calculate statistics
   const allEntityIds = new Set<string>()
   const lastStepIds = new Set<string>()
   const uniqueEntityPatterns = new Map<string, Set<string>>() // entityId -> set of unique patterns for that entity
-  
+
   // Track all unique entity IDs and patterns
-  expectedEntities.forEach(stepEntities => {
-    stepEntities.forEach(entity => {
+  for (const stepEntities of expectedEntities) {
+    for (const entity of stepEntities) {
       allEntityIds.add(entity.id)
-      
+
       // Track unique patterns per entity ID
       if (!uniqueEntityPatterns.has(entity.id)) {
         uniqueEntityPatterns.set(entity.id, new Set())
       }
-      
+
       // Use the same normalization as EntityTracker
       const normalizedPattern = normalizePattern(entity.cells)
-      uniqueEntityPatterns.get(entity.id)!.add(normalizedPattern)
-    })
-  })
-  
+      uniqueEntityPatterns.get(entity.id)?.add(normalizedPattern)
+    }
+  }
+
   // Track entities alive in the last step
   const lastStepEntities = expectedEntities[expectedEntities.length - 1]
-  lastStepEntities.forEach(entity => {
+  for (const entity of lastStepEntities) {
     lastStepIds.add(entity.id)
-  })
-  
+  }
+
   // Calculate how many died (appeared at some point but not in the last step)
   const deadEntityIds = new Set<string>()
   for (const id of allEntityIds) {
@@ -123,20 +123,22 @@ function createTestSequence(
       deadEntityIds.add(id)
     }
   }
-  
+
   // Count total unique patterns across all entities
   const allUniquePatterns = new Set<string>()
-  uniqueEntityPatterns.forEach(patterns => {
-    patterns.forEach(p => allUniquePatterns.add(p))
-  })
-  
+  for (const patterns of uniqueEntityPatterns.values()) {
+    for (const p of patterns) {
+      allUniquePatterns.add(p)
+    }
+  }
+
   const statistics: EntityStatistics = {
     totalEntities: allEntityIds.size,
     uniquePatterns: allUniquePatterns.size,
     entitiesAlive: lastStepIds.size,
-    entitiesDied: deadEntityIds.size
+    entitiesDied: deadEntityIds.size,
   }
-  
+
   return { name, description, grids, expectedEntities, statistics }
 }
 
@@ -144,8 +146,8 @@ function createTestSequence(
 const sequences: TestSequence[] = [
   // Blinker
   createTestSequence(
-    "blinker",
-    "Single blinker oscillating between horizontal and vertical",
+    'blinker',
+    'Single blinker oscillating between horizontal and vertical',
     [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -162,24 +164,35 @@ const sequences: TestSequence[] = [
     (step) => {
       if (step % 2 === 0) {
         // Horizontal
-        return [{ 
-          cells: [{x: 3, y: 3}, {x: 4, y: 3}, {x: 5, y: 3}], 
-          id: "E1"
-        }]
-      } else {
-        // Vertical
-        return [{ 
-          cells: [{x: 4, y: 2}, {x: 4, y: 3}, {x: 4, y: 4}], 
-          id: "E1"  // Same ID - it's the same entity
-        }]
+        return [
+          {
+            cells: [
+              { x: 3, y: 3 },
+              { x: 4, y: 3 },
+              { x: 5, y: 3 },
+            ],
+            id: 'E1',
+          },
+        ]
       }
-    }
+      // Vertical
+      return [
+        {
+          cells: [
+            { x: 4, y: 2 },
+            { x: 4, y: 3 },
+            { x: 4, y: 4 },
+          ],
+          id: 'E1', // Same ID - it's the same entity
+        },
+      ]
+    },
   ),
 
   // Block
   createTestSequence(
-    "block",
-    "Single 2x2 block (still life)",
+    'block',
+    'Single 2x2 block (still life)',
     [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -193,16 +206,23 @@ const sequences: TestSequence[] = [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     ],
     2,
-    () => [{
-      cells: [{x: 3, y: 2}, {x: 4, y: 2}, {x: 3, y: 3}, {x: 4, y: 3}],
-      id: "E1"
-    }]
+    () => [
+      {
+        cells: [
+          { x: 3, y: 2 },
+          { x: 4, y: 2 },
+          { x: 3, y: 3 },
+          { x: 4, y: 3 },
+        ],
+        id: 'E1',
+      },
+    ],
   ),
 
   // Two entities
   createTestSequence(
-    "twoEntities",
-    "One blinker and one block",
+    'twoEntities',
+    'One blinker and one block',
     [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -218,30 +238,48 @@ const sequences: TestSequence[] = [
     3,
     (step) => {
       const block = {
-        cells: [{x: 6, y: 6}, {x: 7, y: 6}, {x: 6, y: 7}, {x: 7, y: 7}],
-        id: "E2"
+        cells: [
+          { x: 6, y: 6 },
+          { x: 7, y: 6 },
+          { x: 6, y: 7 },
+          { x: 7, y: 7 },
+        ],
+        id: 'E2',
       }
-      
+
       if (step % 2 === 0) {
         // Blinker horizontal
         return [
-          { cells: [{x: 1, y: 2}, {x: 2, y: 2}, {x: 3, y: 2}], id: "E1" },
-          block
-        ]
-      } else {
-        // Blinker vertical
-        return [
-          { cells: [{x: 2, y: 1}, {x: 2, y: 2}, {x: 2, y: 3}], id: "E1" },
-          block
+          {
+            cells: [
+              { x: 1, y: 2 },
+              { x: 2, y: 2 },
+              { x: 3, y: 2 },
+            ],
+            id: 'E1',
+          },
+          block,
         ]
       }
-    }
+      // Blinker vertical
+      return [
+        {
+          cells: [
+            { x: 2, y: 1 },
+            { x: 2, y: 2 },
+            { x: 2, y: 3 },
+          ],
+          id: 'E1',
+        },
+        block,
+      ]
+    },
   ),
 
   // Toad
   createTestSequence(
-    "toad",
-    "Toad oscillator (period 2)",
+    'toad',
+    'Toad oscillator (period 2)',
     [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -258,34 +296,39 @@ const sequences: TestSequence[] = [
     (step) => {
       if (step % 2 === 0) {
         // Phase 1
-        return [{
-          cells: [
-            {x: 4, y: 4}, {x: 5, y: 4}, {x: 6, y: 4},
-            {x: 3, y: 5}, {x: 4, y: 5}, {x: 5, y: 5}
-          ],
-          id: "E1"  // Same entity across phases
-        }]
-      } else {
-        // Phase 2 - cells are disconnected, so no entity is detected
-        return []
+        return [
+          {
+            cells: [
+              { x: 4, y: 4 },
+              { x: 5, y: 4 },
+              { x: 6, y: 4 },
+              { x: 3, y: 5 },
+              { x: 4, y: 5 },
+              { x: 5, y: 5 },
+            ],
+            id: 'E1', // Same entity across phases
+          },
+        ]
       }
-    }
+      // Phase 2 - cells are disconnected, so no entity is detected
+      return []
+    },
   ),
 
   // Entity death with other entities present
   createTestSequence(
-    "entityDeath",
-    "One entity dies while others survive - tests ID preservation",
+    'entityDeath',
+    'One entity dies while others survive - tests ID preservation',
     [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],  // These two cells will die (too few neighbors)
+      [0, 0, 1, 0, 0, 0, 0, 0, 0, 0], // These two cells will die (too few neighbors)
       [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 1, 1, 0, 0],  // Block (will survive)
+      [0, 0, 0, 0, 0, 0, 1, 1, 0, 0], // Block (will survive)
       [0, 0, 0, 0, 0, 0, 1, 1, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 1, 1, 1, 0, 0, 0, 0, 0, 0],  // Blinker (will survive)
+      [0, 1, 1, 1, 0, 0, 0, 0, 0, 0], // Blinker (will survive)
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     ],
     4,
@@ -293,49 +336,132 @@ const sequences: TestSequence[] = [
       if (step === 0) {
         // Initial state: 3 entities
         return [
-          { cells: [{x: 2, y: 1}, {x: 2, y: 2}], id: "E1" },  // Vertical pair (will die)
-          { cells: [{x: 6, y: 5}, {x: 7, y: 5}, {x: 6, y: 6}, {x: 7, y: 6}], id: "E2" },  // Block
-          { cells: [{x: 1, y: 8}, {x: 2, y: 8}, {x: 3, y: 8}], id: "E3" }  // Blinker
-        ]
-      } else if (step === 1) {
-        // E1 died, E2 and E3 survive (E3 transforms to vertical)
-        return [
-          { cells: [{x: 6, y: 5}, {x: 7, y: 5}, {x: 6, y: 6}, {x: 7, y: 6}], id: "E2" },  // Block unchanged
-          { cells: [{x: 2, y: 7}, {x: 2, y: 8}, {x: 2, y: 9}], id: "E3" }  // Blinker vertical
-        ]
-      } else if (step === 2) {
-        // E2 and E3 continue (E3 back to horizontal)
-        return [
-          { cells: [{x: 6, y: 5}, {x: 7, y: 5}, {x: 6, y: 6}, {x: 7, y: 6}], id: "E2" },
-          { cells: [{x: 1, y: 8}, {x: 2, y: 8}, {x: 3, y: 8}], id: "E3" }  // Blinker horizontal
-        ]
-      } else if (step === 3) {
-        // E2 and E3 continue (E3 vertical again)
-        return [
-          { cells: [{x: 6, y: 5}, {x: 7, y: 5}, {x: 6, y: 6}, {x: 7, y: 6}], id: "E2" },
-          { cells: [{x: 2, y: 7}, {x: 2, y: 8}, {x: 2, y: 9}], id: "E3" }  // Blinker vertical
-        ]
-      } else {
-        // E2 and E3 continue (E3 horizontal)
-        return [
-          { cells: [{x: 6, y: 5}, {x: 7, y: 5}, {x: 6, y: 6}, {x: 7, y: 6}], id: "E2" },
-          { cells: [{x: 1, y: 8}, {x: 2, y: 8}, {x: 3, y: 8}], id: "E3" }  // Blinker horizontal
+          {
+            cells: [
+              { x: 2, y: 1 },
+              { x: 2, y: 2 },
+            ],
+            id: 'E1',
+          }, // Vertical pair (will die)
+          {
+            cells: [
+              { x: 6, y: 5 },
+              { x: 7, y: 5 },
+              { x: 6, y: 6 },
+              { x: 7, y: 6 },
+            ],
+            id: 'E2',
+          }, // Block
+          {
+            cells: [
+              { x: 1, y: 8 },
+              { x: 2, y: 8 },
+              { x: 3, y: 8 },
+            ],
+            id: 'E3',
+          }, // Blinker
         ]
       }
-    }
-  )
+      if (step === 1) {
+        // E1 died, E2 and E3 survive (E3 transforms to vertical)
+        return [
+          {
+            cells: [
+              { x: 6, y: 5 },
+              { x: 7, y: 5 },
+              { x: 6, y: 6 },
+              { x: 7, y: 6 },
+            ],
+            id: 'E2',
+          }, // Block unchanged
+          {
+            cells: [
+              { x: 2, y: 7 },
+              { x: 2, y: 8 },
+              { x: 2, y: 9 },
+            ],
+            id: 'E3',
+          }, // Blinker vertical
+        ]
+      }
+      if (step === 2) {
+        // E2 and E3 continue (E3 back to horizontal)
+        return [
+          {
+            cells: [
+              { x: 6, y: 5 },
+              { x: 7, y: 5 },
+              { x: 6, y: 6 },
+              { x: 7, y: 6 },
+            ],
+            id: 'E2',
+          },
+          {
+            cells: [
+              { x: 1, y: 8 },
+              { x: 2, y: 8 },
+              { x: 3, y: 8 },
+            ],
+            id: 'E3',
+          }, // Blinker horizontal
+        ]
+      }
+      if (step === 3) {
+        // E2 and E3 continue (E3 vertical again)
+        return [
+          {
+            cells: [
+              { x: 6, y: 5 },
+              { x: 7, y: 5 },
+              { x: 6, y: 6 },
+              { x: 7, y: 6 },
+            ],
+            id: 'E2',
+          },
+          {
+            cells: [
+              { x: 2, y: 7 },
+              { x: 2, y: 8 },
+              { x: 2, y: 9 },
+            ],
+            id: 'E3',
+          }, // Blinker vertical
+        ]
+      }
+      // E2 and E3 continue (E3 horizontal)
+      return [
+        {
+          cells: [
+            { x: 6, y: 5 },
+            { x: 7, y: 5 },
+            { x: 6, y: 6 },
+            { x: 7, y: 6 },
+          ],
+          id: 'E2',
+        },
+        {
+          cells: [
+            { x: 1, y: 8 },
+            { x: 2, y: 8 },
+            { x: 3, y: 8 },
+          ],
+          id: 'E3',
+        }, // Blinker horizontal
+      ]
+    },
+  ),
 ]
 
 // Custom JSON stringifier for readable grids
 function stringifyOutput(sequences: TestSequence[]): string {
   let result = '{\n  "sequences": [\n'
-  
+
   sequences.forEach((seq, seqIndex) => {
     result += '    {\n'
     result += `      "name": "${seq.name}",\n`
     result += `      "description": "${seq.description}",\n`
     result += `      "grids": [\n`
-    
+
     seq.grids.forEach((grid, gridIndex) => {
       result += '        [\n'
       grid.forEach((row, rowIndex) => {
@@ -347,10 +473,10 @@ function stringifyOutput(sequences: TestSequence[]): string {
       if (gridIndex < seq.grids.length - 1) result += ','
       result += '\n'
     })
-    
+
     result += '      ],\n'
     result += '      "expectedEntities": [\n'
-    
+
     seq.expectedEntities.forEach((entities, stepIndex) => {
       result += '        [\n'
       entities.forEach((entity, entityIndex) => {
@@ -371,7 +497,7 @@ function stringifyOutput(sequences: TestSequence[]): string {
       if (stepIndex < seq.expectedEntities.length - 1) result += ','
       result += '\n'
     })
-    
+
     result += '      ],\n'
     result += '      "statistics": {\n'
     result += `        "totalEntities": ${seq.statistics.totalEntities},\n`
@@ -383,17 +509,21 @@ function stringifyOutput(sequences: TestSequence[]): string {
     if (seqIndex < sequences.length - 1) result += ','
     result += '\n'
   })
-  
+
   result += '  ]\n}\n'
   return result
 }
 
 // Output
-const outputPath = path.join(process.cwd(), 'resources', 'conway-test-sequences-detailed.json')
+const outputPath = path.join(
+  process.cwd(),
+  'resources',
+  'conway-test-sequences-detailed.json',
+)
 fs.writeFileSync(outputPath, stringifyOutput(sequences))
 
 console.log(`Generated detailed test sequences to ${outputPath}`)
 console.log('Sequences generated:')
-sequences.forEach(seq => {
+for (const seq of sequences) {
   console.log(`- ${seq.name}: ${seq.description} (${seq.grids.length} grids)`)
-})
+}

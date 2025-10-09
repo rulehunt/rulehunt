@@ -64,7 +64,8 @@ export const onRequestGet = async (
     for (const r of results) {
       if (r.entity_count === undefined) r.entity_count = null
       if (r.entity_change === undefined) r.entity_change = null
-      if (r.total_entities_ever_seen === undefined) r.total_entities_ever_seen = null
+      if (r.total_entities_ever_seen === undefined)
+        r.total_entities_ever_seen = null
       if (r.unique_patterns === undefined) r.unique_patterns = null
       if (r.entities_alive === undefined) r.entities_alive = null
       if (r.entities_died === undefined) r.entities_died = null
