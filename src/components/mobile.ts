@@ -476,6 +476,12 @@ function saveRunStatistics(
     entropy2x2: 0,
     entropy4x4: 0,
     entropy8x8: 0,
+    entityCount: 0,
+    entityChange: 0,
+    totalEntitiesEverSeen: 0,
+    uniquePatterns: 0,
+    entitiesAlive: 0,
+    entitiesDied: 0,
   }
 
   const payload: RunSubmission = {
@@ -501,6 +507,10 @@ function saveRunStatistics(
     entropy8x8: recent.entropy8x8,
     entityCount: recent.entityCount,
     entityChange: recent.entityChange,
+    totalEntitiesEverSeen: recent.totalEntitiesEverSeen,
+    uniquePatterns: recent.uniquePatterns,
+    entitiesAlive: recent.entitiesAlive,
+    entitiesDied: recent.entitiesDied,
     interestScore: stats.calculateInterestScore(),
     simVersion: 'v0.1.0',
     engineCommit: undefined,
@@ -761,6 +771,12 @@ export async function setupMobileLayout(
       entropy2x2: 0,
       entropy4x4: 0,
       entropy8x8: 0,
+      entityCount: 0,
+      entityChange: 0,
+      totalEntitiesEverSeen: 0,
+      uniquePatterns: 0,
+      entitiesAlive: 0,
+      entitiesDied: 0,
     }
 
     return {
@@ -789,6 +805,10 @@ export async function setupMobileLayout(
       entropy8x8: recent.entropy8x8,
       entityCount: recent.entityCount,
       entityChange: recent.entityChange,
+      totalEntitiesEverSeen: recent.totalEntitiesEverSeen,
+      uniquePatterns: recent.uniquePatterns,
+      entitiesAlive: recent.entitiesAlive,
+      entitiesDied: recent.entitiesDied,
       interestScore: stats.calculateInterestScore(),
       simVersion: 'v0.1.0',
       engineCommit: undefined,
