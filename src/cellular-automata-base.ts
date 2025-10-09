@@ -408,8 +408,21 @@ export abstract class CellularAutomataBase {
     }
   }
 
+  /** Lightweight deterministic 32-bit hash (FNV-1a) */
+  fnv1a32(seed: number): number {
+    let hash = 0x811c9dc5
+    for (let i = 0; i < 4; i++) {
+      hash ^= (seed >>> (i * 8)) & 0xff
+      hash = Math.imul(hash, 0x01000193)
+    }
+    return hash >>> 0
+  }
+
   softReset() {
+    // Deterministic hash-chain evolution
+    this.seed = this.fnv1a32(this.seed)
     this.rng = makeRng(this.seed)
+
     switch (this.lastSeedMethod) {
       case 'center':
         this.centerSeed()
