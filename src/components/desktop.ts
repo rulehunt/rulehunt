@@ -13,7 +13,11 @@ import {
   randomC4RulesetByDensity,
 } from '../utils.ts'
 
-import { parseURLRuleset, parseURLState } from '../urlState.ts'
+import {
+  parseURLRuleset,
+  parseURLState,
+  updateURLWithoutReload,
+} from '../urlState.ts'
 import { setupBenchmarkModal } from './benchmark.ts'
 import { createHeader, setupTheme } from './desktopHeader.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
@@ -420,6 +424,7 @@ export async function setupDesktopLayout(
       progressBar,
     )
     initializeSimulationMetadata()
+    updateURL()
   }
 
   function initializeSimulationMetadata() {
@@ -441,6 +446,23 @@ export async function setupDesktopLayout(
       requestedStepsPerSecond: cellularAutomata.isCurrentlyPlaying()
         ? stepsPerSecond
         : undefined,
+    })
+  }
+
+  function updateURL() {
+    const rulesetHex = c4RulesetToHex(currentRuleset)
+    const seed = cellularAutomata.getSeed()
+
+    let seedPercentage: number | undefined
+    if (initialConditionType === 'random' || initialConditionType === 'patch') {
+      seedPercentage = Number.parseInt(aliveSlider.value)
+    }
+
+    updateURLWithoutReload({
+      rulesetHex,
+      seed,
+      seedType: initialConditionType,
+      seedPercentage,
     })
   }
 
@@ -469,6 +491,7 @@ export async function setupDesktopLayout(
       const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
       cellularAutomata.play(stepsPerSecond, expanded)
     }
+    // URL already updated by applyInitialCondition()
   }
 
   // Initialize with URL ruleset if available, otherwise Conway
@@ -704,6 +727,7 @@ export async function setupDesktopLayout(
         progressBar,
       )
       initializeSimulationMetadata()
+      updateURL()
     } else {
       applyInitialCondition()
     }

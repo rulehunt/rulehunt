@@ -24,7 +24,11 @@ import {
 } from '../utils.ts'
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 
-import { parseURLRuleset, parseURLState } from '../urlState.ts'
+import {
+  parseURLRuleset,
+  parseURLState,
+  updateURLWithoutReload,
+} from '../urlState.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
 // --- Constants --------------------------------------------------------------
@@ -1034,6 +1038,14 @@ export async function setupMobileLayout(
         offScreenRule = generateRandomRule()
         prepareAutomata(offScreenCA, offScreenRule, lookup, 50)
         offscreenReady = true
+
+        // Update URL to match current simulation state
+        updateURLWithoutReload({
+          rulesetHex: onScreenRule.hex,
+          seed: onScreenCA.getSeed(),
+          seedType: 'patch',
+          seedPercentage: 50,
+        })
       }, 16)
 
       softResetButton.remove()
