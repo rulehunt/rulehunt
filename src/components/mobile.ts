@@ -725,8 +725,15 @@ export async function setupMobileLayout(
     'fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 overflow-hidden'
 
   const { root: headerRoot, elements: headerElements } = createMobileHeader()
-  const cleanupHeader = setupMobileHeader(headerElements, headerRoot)
+  const { cleanup: cleanupHeader, resetFade: resetHeaderFade } =
+    setupMobileHeader(headerElements, headerRoot)
   container.appendChild(headerRoot)
+
+  // Helper function to update header title color and reset fade
+  const updateHeaderColor = (color: string) => {
+    headerElements.titleElement.style.color = color
+    resetHeaderFade()
+  }
 
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   const palette = isDark ? DARK_FG_COLORS : LIGHT_FG_COLORS
@@ -839,6 +846,9 @@ export async function setupMobileLayout(
   offscreenReady = true
 
   initializeRunStats(onScreenCA, onScreenRule)
+
+  // Set initial header color to match canvas
+  updateHeaderColor(palette[colorIndex])
 
   // Create stats overlay
   const {
@@ -962,6 +972,9 @@ export async function setupMobileLayout(
       const nextCol = palette[(colorIndex + 1) % palette.length]
       onScreenCA.setColors(col, bgColor)
       offScreenCA.setColors(nextCol, bgColor)
+
+      // Update header color to match new canvas color
+      updateHeaderColor(col)
 
       // Defer CA operations by one frame to let layout settle
       setTimeout(() => {
