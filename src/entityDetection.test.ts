@@ -476,7 +476,7 @@ describe('Entity Tracking with Conway Sequences', () => {
     
     // Pre-associate toad patterns since phase 2 has disconnected cells
     // Phase 1 pattern (connected)
-    const phase1Pattern = '0,0;1,0;2,0;0,1;1,1;2,1'
+    // const phase1Pattern = '0,0;1,0;2,0;0,1;1,1;2,1'
     // Phase 2 would have disconnected cells, so we track the phase 1 entity only
     
     const entitiesByStep = toadSeq.map(grid => detectEntities(grid, tracker))
