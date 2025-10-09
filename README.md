@@ -12,6 +12,8 @@ This project was created for fun during the [**ALife 2025 Hackathon**](https://2
 
 The hackathon theme was "*Exploration of emergence in complex systems*" – a core topic in ALife research. While we're not *exactly* on theme (we're more about exploring the space of rules than emergence per se), this is what we were excited to build! Sometimes the best hackathon projects come from following your curiosity rather than the rubric. 😄
 
+You can view our [hackathon presentation](https://docs.google.com/presentation/d/1uo_2bg1RGI6B0KRR4Mh2AJhQ3s7SQxGSlmYfA117G1k/edit?usp=sharing) on Google slides.
+
 ## 🌟 The Vision
 
 Conway's Game of Life is just *one* rule out of 2^512 possible 3×3 cellular automata rules. What other fascinating patterns are hiding in this incomprehensibly large space?
