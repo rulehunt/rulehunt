@@ -26,7 +26,8 @@ tsconfig.tsbuildinfo
 /.direnv
 /result
 
-.claude/
+.claude/*
+!.claude/commands/
 
 # Cloudflare Wrangler local state (D1, KV, R2, etc.)
 .wrangler/

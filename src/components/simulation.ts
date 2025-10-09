@@ -5,6 +5,7 @@ export interface SimulationPanelElements {
   btnStep: HTMLButtonElement
   btnReset: HTMLButtonElement
   btnPlay: HTMLButtonElement
+  btnBenchmark: HTMLButtonElement
   stepsPerSecondInput: HTMLInputElement
   aliveSlider: HTMLInputElement
   aliveValue: HTMLSpanElement
@@ -56,6 +57,9 @@ export function createSimulationPanel(): {
       <button id="btn-play" class="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2">
         Play
       </button>
+      <button id="btn-benchmark" class="px-4 py-2 rounded-md border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900 text-sm hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2" title="Run GPU vs CPU performance benchmark">
+        Benchmark
+      </button>
       <label for="steps-per-second" class="ml-2">Steps/sec:</label>
       <input type="number" id="steps-per-second" min="1" max="1000" value="1000" class="w-auto min-w-[6rem] px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
     </div>
@@ -66,6 +70,7 @@ export function createSimulationPanel(): {
     btnStep: root.querySelector('#btn-step') as HTMLButtonElement,
     btnReset: root.querySelector('#btn-reset') as HTMLButtonElement,
     btnPlay: root.querySelector('#btn-play') as HTMLButtonElement,
+    btnBenchmark: root.querySelector('#btn-benchmark') as HTMLButtonElement,
     stepsPerSecondInput: root.querySelector(
       '#steps-per-second',
     ) as HTMLInputElement,
