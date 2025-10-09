@@ -13,6 +13,7 @@ import {
   randomC4RulesetByDensity,
 } from '../utils.ts'
 
+import { parseURLRuleset, parseURLState } from '../urlState.ts'
 import { createHeader, setupTheme } from './desktopHeader.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import { createProgressBar } from './progressBar.ts'
@@ -353,6 +354,16 @@ export async function setupDesktopLayout(
     bgColor: colors.bgColor,
   })
 
+  // Parse URL state for shareable links
+  const urlState = parseURLState()
+  const urlRuleset = parseURLRuleset()
+
+  // Apply URL seed if provided
+  if (urlState.seed !== undefined) {
+    cellularAutomata.setSeed(urlState.seed)
+    console.log('[desktop] Using seed from URL:', urlState.seed)
+  }
+
   // Initial render after construction (constructor no longer auto-renders)
   cellularAutomata.render()
 
@@ -434,21 +445,38 @@ export async function setupDesktopLayout(
     }
   }
 
-  // Initialize with Conway
-  const conwayRuleset = makeC4Ruleset(conwayRule, orbitLookup)
-  currentRuleset = conwayRuleset
-  renderRule(
-    conwayRuleset,
-    orbitLookup,
-    ctx,
-    ruleCanvas,
-    ruleLabelDisplay,
-    ruleIdDisplay,
-    'Conway',
-    displayMode,
-    colors.fgColor,
-    colors.bgColor,
-  )
+  // Initialize with URL ruleset if available, otherwise Conway
+  if (urlRuleset) {
+    currentRuleset = urlRuleset.ruleset
+    renderRule(
+      urlRuleset.ruleset,
+      orbitLookup,
+      ctx,
+      ruleCanvas,
+      ruleLabelDisplay,
+      ruleIdDisplay,
+      'Shared Rule',
+      displayMode,
+      colors.fgColor,
+      colors.bgColor,
+    )
+    console.log('[desktop] Loaded rule from URL:', urlRuleset.hex)
+  } else {
+    const conwayRuleset = makeC4Ruleset(conwayRule, orbitLookup)
+    currentRuleset = conwayRuleset
+    renderRule(
+      conwayRuleset,
+      orbitLookup,
+      ctx,
+      ruleCanvas,
+      ruleLabelDisplay,
+      ruleIdDisplay,
+      'Conway',
+      displayMode,
+      colors.fgColor,
+      colors.bgColor,
+    )
+  }
 
   // Now apply initial condition which will also initialize simulation metadata
   applyInitialCondition()

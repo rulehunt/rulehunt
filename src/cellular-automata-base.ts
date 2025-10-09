@@ -457,6 +457,11 @@ export abstract class CellularAutomataBase {
     return this.seed
   }
 
+  setSeed(newSeed: number): void {
+    this.seed = newSeed
+    this.rng = makeRng(newSeed)
+  }
+
   getGridSize(): number {
     return this.gridArea
   }

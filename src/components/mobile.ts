@@ -24,6 +24,7 @@ import {
 } from '../utils.ts'
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 
+import { parseURLRuleset, parseURLState } from '../urlState.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
 // --- Constants --------------------------------------------------------------
@@ -823,13 +824,36 @@ export async function setupMobileLayout(
     bgColor,
   })
 
-  const conway = makeC4Ruleset(conwayRule, lookup)
-  let onScreenRule: RuleData = {
-    name: "Conway's Game of Life",
-    hex: c4RulesetToHex(conway),
-    ruleset: conway,
+  // Parse URL state for shareable links
+  const urlState = parseURLState()
+  const urlRuleset = parseURLRuleset()
+
+  // Determine initial rule (URL takes precedence over default Conway)
+  let onScreenRule: RuleData
+  if (urlRuleset) {
+    onScreenRule = {
+      name: 'Shared Rule',
+      hex: urlRuleset.hex,
+      ruleset: urlRuleset.ruleset,
+    }
+    console.log('[mobile] Loaded rule from URL:', urlRuleset.hex)
+  } else {
+    const conway = makeC4Ruleset(conwayRule, lookup)
+    onScreenRule = {
+      name: "Conway's Game of Life",
+      hex: c4RulesetToHex(conway),
+      ruleset: conway,
+    }
   }
+
   let offScreenRule = generateRandomRule()
+
+  // Apply URL seed if provided
+  if (urlState.seed !== undefined) {
+    onScreenCA.setSeed(urlState.seed)
+    offScreenCA.setSeed(urlState.seed + 1) // Different seed for offscreen
+    console.log('[mobile] Using seed from URL:', urlState.seed)
+  }
 
   // Initial setup with explicit renders
   prepareAutomata(onScreenCA, onScreenRule, lookup)
