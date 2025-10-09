@@ -38,6 +38,10 @@ export interface ICellularAutomata {
   getSeed(): number
   getGridSize(): number
 
+  // Grid access (for testing and debugging)
+  getGrid(): Uint8Array
+  setGrid(newGrid: Uint8Array): void
+
   // Cleanup
   destroy(): void
 }
