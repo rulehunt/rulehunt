@@ -859,38 +859,16 @@ export async function setupMobileLayout(
 
   let offScreenRule = generateRandomRule()
 
-  // Apply URL seed and initial condition if provided
+  // Apply URL seed if provided (only on initial load)
   if (urlState.seed !== undefined) {
     onScreenCA.setSeed(urlState.seed)
-    offScreenCA.setSeed(urlState.seed + 1) // Different seed for offscreen
     console.log('[mobile] Using seed from URL:', urlState.seed)
   }
 
-  // Apply initial condition based on URL parameters (if provided)
-  if (urlState.seedType || urlState.seedPercentage !== undefined) {
-    const seedType = urlState.seedType || 'patch' // Default to patch
-    const seedPercentage = urlState.seedPercentage ?? 50 // Default to 50%
-
-    switch (seedType) {
-      case 'center':
-        onScreenCA.centerSeed()
-        break
-      case 'random':
-        onScreenCA.randomSeed(seedPercentage)
-        break
-      default:
-        onScreenCA.patchSeed()
-        break
-    }
-    console.log(
-      '[mobile] Applied seed type from URL:',
-      seedType,
-      seedPercentage,
-    )
-  }
-
   // Initial setup with explicit renders
-  prepareAutomata(onScreenCA, onScreenRule, lookup)
+  // Use URL seedPercentage if provided, otherwise default to 50%
+  const initialSeedPercentage = urlState.seedPercentage ?? 50
+  prepareAutomata(onScreenCA, onScreenRule, lookup, initialSeedPercentage)
   startAutomata(onScreenCA, onScreenRule)
 
   prepareAutomata(offScreenCA, offScreenRule, lookup)
