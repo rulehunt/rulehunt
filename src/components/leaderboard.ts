@@ -47,6 +47,7 @@ export function createLeaderboardPanel(): {
         <thead class="text-xs uppercase text-gray-500 dark:text-gray-400">
           <tr>
             <th class="px-2 py-1">#</th>
+            <th class="px-2 py-1">Timestamp</th>
             <th class="px-2 py-1">Ruleset</th>
             <th class="px-2 py-1">User</th>
             <th class="px-2 py-1 text-right">Watch Time</th>
@@ -105,11 +106,17 @@ export function createLeaderboardPanel(): {
         const interest = (row.interest_score ?? 0).toFixed(2)
         const entropy = (row.entropy4x4 ?? 0).toFixed(1)
 
-        tr.innerHTML = `
+        const submitted = new Date(row.submitted_at).toLocaleString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+
+        tr.innerHTML = `        
           <td class="px-2 py-1">${idx + 1}</td>
-          <td class="px-2 py-1 font-mono truncate" title="${row.ruleset_hex ?? ''}">
-            ${row.ruleset_name ?? '—'}
-          </td>
+          <td class="px-2 py-1 text-right text-gray-500 dark:text-gray-400">${submitted}</td>
+          <td class="px-2 py-1 font-mono truncate" title="${row.ruleset_hex ?? ''}">${row.ruleset_name ?? '—'}</td>
           <td class="px-2 py-1 text-xs">${row.user_label ?? row.user_id ?? 'anon'}</td>
           <td class="px-2 py-1 text-right">${seconds}s</td>
           <td class="px-2 py-1 text-right">${interest}</td>
