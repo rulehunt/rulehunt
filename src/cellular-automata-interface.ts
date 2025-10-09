@@ -36,6 +36,7 @@ export interface ICellularAutomata {
   isCurrentlyPlaying(): boolean
   getStatistics(): StatisticsTracker
   getSeed(): number
+  setSeed(seed: number): void
   getGridSize(): number
 
   // Cleanup

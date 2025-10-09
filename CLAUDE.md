@@ -9,6 +9,81 @@ Distributed exploration of 2^140 C4-symmetric cellular automata rules. TikTok-st
 - `pnpm run build` - Full production build (tsc + vite + copy resources)
 - `pnpm run dev` - Local Vite dev server
 
+## PR Reviews with Claude Code
+
+RuleHunt uses custom slash commands to streamline PR reviews with
+component-specific criteria. Reviews leverage Claude Code's GitHub CLI
+integration (`gh pr view`, `gh pr diff`, `gh pr review`).
+
+### Quick Review Pattern
+
+For general reviews, use natural language:
+```bash
+claude
+Please review PR #42 and post your findings
+```
+
+For component-specific reviews, use slash commands:
+```bash
+claude
+/review-migration 21  # Database schema changes
+/review-api 23        # API endpoint changes
+/review-ui 24         # UI component changes
+```
+
+### Slash Command Usage
+
+**Database migrations:**
+```bash
+/review-migration <PR_NUMBER>
+```
+
+**API endpoints:**
+```bash
+/review-api <PR_NUMBER>
+```
+
+**UI components:**
+```bash
+/review-ui <PR_NUMBER>
+```
+
+### Review Criteria by Component
+
+| Component | Key Checks |
+|-----------|------------|
+| **Database Migrations** | SQLite syntax, indexes (partial for booleans), schema.ts alignment, naming (`NNNN_description.sql`) |
+| **API Endpoints** | Zod validation, parameterized queries, error format `{ ok: false, error: string }`, status codes |
+| **UI Components** | No swipe conflicts (`data-swipe-ignore`), event cleanup, theme support, touch optimization (`passive: true`) |
+| **CA Engine** | Interface stability, explicit operations, memory cleanup (`destroy()`), GPU fallback |
+| **Utils/Core** | Pure functions, explicit return types, unit tests, no `any` types |
+
+### Examples
+
+**Review a migration PR:**
+```bash
+claude
+/review-migration 21
+```
+Claude will fetch the diff, check SQL syntax, verify indexes, compare with
+schema.ts, and post findings directly to the PR.
+
+**Review an API PR:**
+```bash
+claude
+/review-api 23
+```
+Claude will verify Zod validation, check for SQL injection prevention, test
+error handling patterns, and ensure consistency with existing endpoints.
+
+**Review a UI PR:**
+```bash
+claude
+/review-ui 24
+```
+Claude will check for swipe gesture conflicts, verify event cleanup, test
+theme support, and validate mobile-first responsive patterns.
+
 ## Architecture
 
 **Entry Point:** `src/main.ts` - Detects mobile/desktop (<640px breakpoint), mounts layout

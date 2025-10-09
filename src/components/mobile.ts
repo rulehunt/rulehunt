@@ -24,6 +24,7 @@ import {
 } from '../utils.ts'
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 
+import { parseURLRuleset, parseURLState } from '../urlState.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 
 // --- Constants --------------------------------------------------------------
@@ -725,8 +726,15 @@ export async function setupMobileLayout(
     'fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 overflow-hidden'
 
   const { root: headerRoot, elements: headerElements } = createMobileHeader()
-  const cleanupHeader = setupMobileHeader(headerElements)
+  const { cleanup: cleanupHeader, resetFade: resetHeaderFade } =
+    setupMobileHeader(headerElements, headerRoot)
   container.appendChild(headerRoot)
+
+  // Helper function to update header title color and reset fade
+  const updateHeaderColor = (color: string) => {
+    headerElements.titleElement.style.color = color
+    resetHeaderFade()
+  }
 
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   const palette = isDark ? DARK_FG_COLORS : LIGHT_FG_COLORS
@@ -823,13 +831,59 @@ export async function setupMobileLayout(
     bgColor,
   })
 
-  const conway = makeC4Ruleset(conwayRule, lookup)
-  let onScreenRule: RuleData = {
-    name: "Conway's Game of Life",
-    hex: c4RulesetToHex(conway),
-    ruleset: conway,
+  // Parse URL state for shareable links
+  const urlState = parseURLState()
+  const urlRuleset = parseURLRuleset()
+
+  // Determine initial rule (URL takes precedence over default Conway)
+  let onScreenRule: RuleData
+  if (urlRuleset) {
+    onScreenRule = {
+      name: 'Shared Rule',
+      hex: urlRuleset.hex,
+      ruleset: urlRuleset.ruleset,
+    }
+    console.log('[mobile] Loaded rule from URL:', urlRuleset.hex)
+  } else {
+    const conway = makeC4Ruleset(conwayRule, lookup)
+    onScreenRule = {
+      name: "Conway's Game of Life",
+      hex: c4RulesetToHex(conway),
+      ruleset: conway,
+    }
   }
+
   let offScreenRule = generateRandomRule()
+
+  // Apply URL seed and initial condition if provided
+  if (urlState.seed !== undefined) {
+    onScreenCA.setSeed(urlState.seed)
+    offScreenCA.setSeed(urlState.seed + 1) // Different seed for offscreen
+    console.log('[mobile] Using seed from URL:', urlState.seed)
+  }
+
+  // Apply initial condition based on URL parameters (if provided)
+  if (urlState.seedType || urlState.seedPercentage !== undefined) {
+    const seedType = urlState.seedType || 'patch' // Default to patch
+    const seedPercentage = urlState.seedPercentage ?? 50 // Default to 50%
+
+    switch (seedType) {
+      case 'center':
+        onScreenCA.centerSeed()
+        break
+      case 'random':
+        onScreenCA.randomSeed(seedPercentage)
+        break
+      default:
+        onScreenCA.patchSeed()
+        break
+    }
+    console.log(
+      '[mobile] Applied seed type from URL:',
+      seedType,
+      seedPercentage,
+    )
+  }
 
   // Initial setup with explicit renders
   prepareAutomata(onScreenCA, onScreenRule, lookup)
@@ -839,6 +893,9 @@ export async function setupMobileLayout(
   offscreenReady = true
 
   initializeRunStats(onScreenCA, onScreenRule)
+
+  // Set initial header color to match canvas
+  updateHeaderColor(palette[colorIndex])
 
   // Create stats overlay
   const {
@@ -962,6 +1019,9 @@ export async function setupMobileLayout(
       const nextCol = palette[(colorIndex + 1) % palette.length]
       onScreenCA.setColors(col, bgColor)
       offScreenCA.setColors(nextCol, bgColor)
+
+      // Update header color to match new canvas color
+      updateHeaderColor(col)
 
       // Defer CA operations by one frame to let layout settle
       setTimeout(() => {
