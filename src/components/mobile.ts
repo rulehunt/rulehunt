@@ -725,7 +725,7 @@ export async function setupMobileLayout(
     'fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 overflow-hidden'
 
   const { root: headerRoot, elements: headerElements } = createMobileHeader()
-  const cleanupHeader = setupMobileHeader(headerElements)
+  const cleanupHeader = setupMobileHeader(headerElements, headerRoot)
   container.appendChild(headerRoot)
 
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches

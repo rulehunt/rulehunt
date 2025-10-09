@@ -14,7 +14,8 @@ export function createMobileHeader(): {
 } {
   const root = document.createElement('header')
   root.className =
-    'fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-300/50 dark:border-gray-600/50'
+    'fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-300/50 dark:border-gray-600/50 transition-opacity duration-500'
+  root.style.opacity = '1'
 
   root.innerHTML = `
     <div class="px-6 py-3 flex items-center justify-between">
@@ -157,8 +158,18 @@ export function createMobileHeader(): {
 
 export function setupMobileHeader(
   elements: MobileHeaderElements,
+  headerRoot: HTMLElement,
 ): CleanupFunction {
   const { infoButton, infoOverlay, closeButton } = elements
+
+  let fadeTimer: number | null = null
+  const resetFade = () => {
+    if (fadeTimer) clearTimeout(fadeTimer)
+    headerRoot.style.opacity = '1'
+    fadeTimer = window.setTimeout(() => {
+      headerRoot.style.opacity = '0.3'
+    }, 3000)
+  }
 
   const showOverlay = () => {
     infoOverlay.style.display = 'flex'
@@ -175,6 +186,7 @@ export function setupMobileHeader(
   // Show overlay when info button is clicked
   const infoHandler = () => {
     showOverlay()
+    resetFade()
   }
 
   // Hide overlay when close button is clicked
@@ -194,8 +206,12 @@ export function setupMobileHeader(
   closeButton.addEventListener('click', closeHandler)
   infoOverlay.addEventListener('click', overlayClickHandler)
 
+  // Start the initial fade timer
+  resetFade()
+
   // Return cleanup function
   return () => {
+    if (fadeTimer) clearTimeout(fadeTimer)
     infoButton.removeEventListener('click', infoHandler)
     closeButton.removeEventListener('click', closeHandler)
     infoOverlay.removeEventListener('click', overlayClickHandler)
