@@ -41,7 +41,7 @@ function createCanvas(width: number, height: number): HTMLCanvasElement {
 // Load orbit data once
 async function loadOrbits() {
   try {
-    const fs = await import('fs/promises')
+    const fs = await import('node:fs/promises')
     const data = await fs.readFile('./resources/c4-orbits.json', 'utf-8')
     return JSON.parse(data)
   } catch {

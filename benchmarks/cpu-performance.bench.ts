@@ -49,7 +49,7 @@ async function loadOrbits() {
   }
 }
 
-describe('CPU Performance - Conway\'s Game of Life', async () => {
+describe("CPU Performance - Conway's Game of Life", async () => {
   const orbitsData = await loadOrbits()
   const orbitLookup = buildOrbitLookup(orbitsData as C4OrbitsData)
   const conwayRuleset = makeC4Ruleset(conwayRule, orbitLookup)
