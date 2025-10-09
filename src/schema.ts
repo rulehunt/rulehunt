@@ -183,11 +183,12 @@ const ISODateString = z
     'must be a valid ISO 8601 datetime string',
   )
 
-// Full database record as it’s inserted into D1
+// Full database record as it's inserted into D1
 export const RunRecord = z
   .object({
     runId: z.string().optional(),
     submittedAt: ISODateString.optional(),
+    isStarred: z.boolean().optional().default(false),
     ...UserIdentity.shape,
     ...SimulationInfo.shape,
     ...Scores.shape,
@@ -195,10 +196,13 @@ export const RunRecord = z
   })
   .strict()
 
-// When saving from the frontend, you’ll usually send this shape:
+// When saving from the frontend, you'll usually send this shape:
 export const RunSubmission = RunRecord.omit({
   runId: true,
   submittedAt: true,
+}).extend({
+  // Make isStarred explicitly optional in submissions (defaults to false if omitted)
+  isStarred: z.boolean().optional(),
 })
 
 export const RunQuery = z.object({
