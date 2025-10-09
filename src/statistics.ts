@@ -7,6 +7,10 @@ export interface GridStatistics {
   entropy8x8: number
   entityCount: number
   entityChange: number
+  totalEntitiesEverSeen: number
+  uniquePatterns: number
+  entitiesAlive: number
+  entitiesDied: number
 }
 
 export interface SimulationMetadata {
@@ -21,7 +25,7 @@ export interface SimulationMetadata {
   lastStepTime: number
 }
 
-import { detectEntities } from './entityDetection'
+import { detectEntities, EntityTracker } from './entityDetection'
 import type { Grid } from './schema'
 
 export class StatisticsTracker {
@@ -34,10 +38,15 @@ export class StatisticsTracker {
   private stepTimes: number[] = [] // Track last 20 step times for SPS calculation
   private maxStepTimes = 20
   private previousEntityCount = 0
+  private entityTracker: EntityTracker | null = null
 
   constructor(gridRows: number, gridCols: number) {
     this.gridRows = gridRows
     this.gridCols = gridCols
+    // Initialize entity tracker if grid is 10x10
+    if (gridRows === 10 && gridCols === 10) {
+      this.entityTracker = new EntityTracker()
+    }
   }
 
   initializeSimulation(
@@ -51,6 +60,9 @@ export class StatisticsTracker {
     this.stepTimes = []
     this.history = []
     this.previousGrid = null
+    if (this.entityTracker) {
+      this.entityTracker.reset()
+    }
   }
 
   getMetadata(): SimulationMetadata | null {
@@ -114,10 +126,18 @@ export class StatisticsTracker {
 
     // Convert to 2D grid for entity detection
     const grid2D = this.convertTo2DGrid(grid)
-    const entities = detectEntities(grid2D)
+    const entities = detectEntities(grid2D, this.entityTracker || undefined)
     const entityCount = entities.length
     const entityChange = entityCount - this.previousEntityCount
     this.previousEntityCount = entityCount
+
+    // Get entity identity statistics
+    const entityStats = this.entityTracker?.getStats() || {
+      totalEntities: entityCount,
+      uniquePatterns: entityCount,
+      entitiesAlive: entityCount,
+      entitiesDied: 0,
+    }
 
     return {
       population,
@@ -128,6 +148,10 @@ export class StatisticsTracker {
       entropy8x8: this.calculateBlockEntropy(grid, 8),
       entityCount,
       entityChange,
+      totalEntitiesEverSeen: entityStats.totalEntities,
+      uniquePatterns: entityStats.uniquePatterns,
+      entitiesAlive: entityStats.entitiesAlive,
+      entitiesDied: entityStats.entitiesDied,
     }
   }
 
@@ -227,6 +251,12 @@ export class StatisticsTracker {
       entityChanges.reduce((a, b) => a + b, 0) / entityChanges.length
     const maxEntityChange = Math.max(...entityChanges)
 
+    // Get latest entity identity metrics
+    const latestStats = recent[recent.length - 1]
+    const totalEntitiesEverSeen = latestStats.totalEntitiesEverSeen || 0
+    const uniquePatterns = latestStats.uniquePatterns || 0
+    const entitiesDied = latestStats.entitiesDied || 0
+
     // Entity stability score - reward systems that maintain entities
     const entityStability =
       avgEntityCount > 0 ? Math.min(avgEntityCount / 10, 1) : 0 // Cap at 10 entities
@@ -234,6 +264,16 @@ export class StatisticsTracker {
     // Entity dynamics score - reward fluctuating entity counts
     const entityDynamics =
       maxEntityChange > 0 ? Math.min(avgEntityChange / 5, 1) : 0 // Cap at average change of 5
+      
+    // Entity identity score - reward systems that maintain entity identity over time
+    const identityPersistence = totalEntitiesEverSeen > 0 
+      ? Math.max(0, 1 - (entitiesDied / totalEntitiesEverSeen))
+      : 0
+      
+    // Pattern diversity score - reward systems with diverse entity types
+    const patternDiversity = uniquePatterns > 0 
+      ? Math.min(uniquePatterns / 5, 1) // Cap at 5 unique patterns
+      : 0
 
     const populationRatio = avgPopulation / totalCells
     const activityRatio = avgActivity / totalCells
@@ -276,15 +316,19 @@ export class StatisticsTracker {
     const goldilocksPop =
       populationRatio > 0.1 && populationRatio < 0.7 ? 1 : 0.5
 
-    // Entity score combines stability and dynamics
-    const entityScore = entityStability * 0.6 + entityDynamics * 0.4
+    // Entity score now combines stability, dynamics, identity persistence, and pattern diversity
+    const entityScore = 
+      entityStability * 0.3 +      // Maintain entities
+      entityDynamics * 0.2 +       // Entity count fluctuations
+      identityPersistence * 0.3 +  // Keep entities alive over time
+      patternDiversity * 0.2       // Diverse entity types
 
-    // Final interest score with entity dynamics
+    // Final interest score with enhanced entity metrics
     const interestScore =
-      (entropyScore * 0.35 + // High entropy is important
-        activityScore * 0.2 + // Activity matters
-        entityScore * 0.3 + // Entity dynamics are key
-        goldilocksPop * 0.15) * // Population in good range
+      (entropyScore * 0.3 +        // High entropy is important
+        activityScore * 0.15 +     // Activity matters
+        entityScore * 0.4 +        // Entity identity tracking is now key
+        goldilocksPop * 0.15) *    // Population in good range
       dieOutPenalty *
       expansionPenalty
 
@@ -320,5 +364,8 @@ export class StatisticsTracker {
     this.metadata = null
     this.stepTimes = []
     this.previousEntityCount = 0
+    if (this.entityTracker) {
+      this.entityTracker.reset()
+    }
   }
 }

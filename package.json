@@ -14,7 +14,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "generate:c4-orbits": "tsx scripts/generate-c4-orbits.ts && pnpm run format"
+    "generate:c4-orbits": "tsx scripts/generate-c4-orbits.ts && pnpm run format",
+    "test": "vitest"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

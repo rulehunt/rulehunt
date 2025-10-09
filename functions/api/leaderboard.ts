@@ -46,6 +46,10 @@ export const onRequestGet = async (
         entropy4x4,
         entity_count,
         entity_change,
+        total_entities_ever_seen,
+        unique_patterns,
+        entities_alive,
+        entities_died,
         submitted_at
       FROM runs
       ORDER BY ${sortField} DESC
@@ -60,6 +64,10 @@ export const onRequestGet = async (
     for (const r of results) {
       if (r.entity_count === undefined) r.entity_count = null
       if (r.entity_change === undefined) r.entity_change = null
+      if (r.total_entities_ever_seen === undefined) r.total_entities_ever_seen = null
+      if (r.unique_patterns === undefined) r.unique_patterns = null
+      if (r.entities_alive === undefined) r.entities_alive = null
+      if (r.entities_died === undefined) r.entities_died = null
     }
 
     // --- Validate with extended schema -------------------------------------
@@ -68,6 +76,10 @@ export const onRequestGet = async (
         LeaderboardResponse.shape.results.element.extend({
           entity_count: z.number().nullable().optional(),
           entity_change: z.number().nullable().optional(),
+          total_entities_ever_seen: z.number().nullable().optional(),
+          unique_patterns: z.number().nullable().optional(),
+          entities_alive: z.number().nullable().optional(),
+          entities_died: z.number().nullable().optional(),
         }),
       ),
     })
