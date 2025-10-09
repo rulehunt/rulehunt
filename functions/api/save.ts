@@ -56,12 +56,16 @@ export const onRequestPost = async (
         entropy8x8,
         entity_count,
         entity_change,
+        total_entities_ever_seen,
+        unique_patterns,
+        entities_alive,
+        entities_died,
         interest_score,
         sim_version,
         engine_commit,
         extra_scores
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
     await stmt
@@ -89,6 +93,10 @@ export const onRequestPost = async (
         data.entropy8x8,
         data.entityCount ?? null,
         data.entityChange ?? null,
+        data.totalEntitiesEverSeen ?? null,
+        data.uniquePatterns ?? null,
+        data.entitiesAlive ?? null,
+        data.entitiesDied ?? null,
         data.interestScore,
         data.simVersion,
         data.engineCommit ?? null,
