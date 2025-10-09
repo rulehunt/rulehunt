@@ -691,7 +691,22 @@ export async function setupDesktopLayout(
   })
 
   addEventListener(btnReset, 'click', () => {
-    applyInitialCondition()
+    // Soft reset for patch and random modes (advances seed for new random ICs)
+    // Center mode keeps existing behavior (deterministic single pixel)
+    if (initialConditionType === 'patch' || initialConditionType === 'random') {
+      cellularAutomata.pause()
+      cellularAutomata.clearGrid()
+      cellularAutomata.softReset()
+      cellularAutomata.render()
+      updateStatisticsDisplay(
+        cellularAutomata,
+        summaryPanel.elements,
+        progressBar,
+      )
+      initializeSimulationMetadata()
+    } else {
+      applyInitialCondition()
+    }
   })
 
   addEventListener(btnPlay, 'click', () => {
