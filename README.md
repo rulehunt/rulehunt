@@ -147,7 +147,7 @@ Pattern scores are stored in the database automatically.
 
 ```bash
 # Clone the repository
-git clone https://github.com/irgolic/rulehunt.git
+git clone https://github.com/rulehunt/rulehunt.git
 cd rulehunt
 
 # Install dependencies (if using a build system)

@@ -131,8 +131,8 @@ export function createMobileHeader(): {
 
       <!-- Footer -->
       <div class="sticky bottom-0 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-6 py-4">
-        <a 
-          href="https://github.com/irgolic/rulehunt" 
+        <a
+          href="https://github.com/rulehunt/rulehunt"
           target="_blank"
           rel="noopener noreferrer"
           class="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
