@@ -57,11 +57,16 @@ export interface BenchmarkConfig {
 
 const DEFAULT_CONFIG: BenchmarkConfig = {
   gridSizes: [
+    // Square grids
     { rows: 100, cols: 100, name: '100x100', cells: 10_000 },
     { rows: 200, cols: 200, name: '200x200', cells: 40_000 },
     { rows: 300, cols: 300, name: '300x300', cells: 90_000 },
     { rows: 500, cols: 500, name: '500x500', cells: 250_000 },
     { rows: 700, cols: 700, name: '700x700', cells: 490_000 },
+    // Rectangular grids
+    { rows: 200, cols: 300, name: '200x300', cells: 60_000 },
+    { rows: 300, cols: 500, name: '300x500', cells: 150_000 },
+    { rows: 500, cols: 700, name: '500x700', cells: 350_000 },
   ],
   warmupSteps: 3, // Minimal warmup to get GPU/CPU caches warm
   stepsPerTest: 10, // Single measurement per grid per round
