@@ -1,13 +1,13 @@
-// src/components/headless.ts
+// src/components/dataMode.ts
 
-import type { HeadlessState } from '../headlessRunner'
-import { runHeadlessLoop } from '../headlessRunner'
+import type { DataModeState } from '../dataRunner'
+import { runDataLoop } from '../dataRunner'
 import {
-  clearHeadlessStats,
+  clearDataStats,
   formatDuration,
   formatTimeAgo,
-  loadHeadlessStats,
-} from '../headlessStorage'
+  loadDataStats,
+} from '../dataStorage'
 import type { C4OrbitsData } from '../schema'
 import { buildOrbitLookup } from '../utils'
 import { createHeader, setupTheme } from './desktopHeader'
@@ -15,10 +15,10 @@ import { createProgressBar } from './progressBar'
 
 export type CleanupFunction = () => void
 
-export async function setupHeadlessLayout(
+export async function setupDataModeLayout(
   appRoot: HTMLDivElement,
 ): Promise<CleanupFunction> {
-  console.log('[Headless] Setting up headless layout')
+  console.log('[DataMode] Setting up data mode layout')
 
   // Create header
   const header = createHeader()
@@ -39,7 +39,7 @@ export async function setupHeadlessLayout(
     <div class="flex items-center justify-between flex-wrap gap-4">
       <div class="flex items-center gap-3">
         <span class="text-3xl">🤖</span>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Headless Data Mode</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Data Mode</h1>
       </div>
       <div class="flex gap-2">
         <button id="btn-pause" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded transition-colors">
@@ -69,6 +69,11 @@ export async function setupHeadlessLayout(
       <div class="flex justify-between">
         <span class="text-gray-600 dark:text-gray-400">Hex:</span>
         <span id="current-hex" class="text-gray-900 dark:text-white font-mono text-xs truncate max-w-xs">--</span>
+      </div>
+      <div class="flex items-center gap-3 text-sm">
+        <label for="speed-slider" class="min-w-16 text-right text-gray-600 dark:text-gray-400">Speed:</label>
+        <input type="range" id="speed-slider" min="10" max="1000" value="200" class="w-48 cursor-pointer" />
+        <span id="speed-value" class="min-w-20 text-gray-900 dark:text-white">200/sec</span>
       </div>
       <div class="mt-4" id="progress-container"></div>
       <div class="flex justify-between">
@@ -150,23 +155,28 @@ export async function setupHeadlessLayout(
   const orbitsData: C4OrbitsData = await response.json()
   const orbitLookup = buildOrbitLookup(orbitsData)
 
-  console.log(`[Headless] Loaded ${orbitsData.orbits.length} C4 orbits`)
+  console.log(`[DataMode] Loaded ${orbitsData.orbits.length} C4 orbits`)
 
   // Setup theme
   const cleanupTheme = setupTheme(header.elements.themeToggle, () => {
-    // Headless doesn't need canvas re-rendering
+    // Data mode doesn't need canvas re-rendering
   })
 
   // State
   let stopLoop: (() => void) | null = null
   let isPaused = false
+  let stepsPerSecond = 200
 
   const btnStop = document.getElementById('btn-stop') as HTMLButtonElement
   const btnPause = document.getElementById('btn-pause') as HTMLButtonElement
   const btnClear = document.getElementById('btn-clear') as HTMLButtonElement
+  const speedSlider = document.getElementById(
+    'speed-slider',
+  ) as HTMLInputElement
+  const speedValue = document.getElementById('speed-value') as HTMLSpanElement
 
   // Update UI helper functions
-  function updateCurrentRunDisplay(state: HeadlessState) {
+  function updateCurrentRunDisplay(state: DataModeState) {
     const currentRuleset = document.getElementById('current-ruleset')
     const currentHex = document.getElementById('current-hex')
     const currentSteps = document.getElementById('current-steps')
@@ -187,7 +197,7 @@ export async function setupHeadlessLayout(
   }
 
   function updateStatsDisplay() {
-    const stats = loadHeadlessStats()
+    const stats = loadDataStats()
 
     const statRounds = document.getElementById('stat-rounds')
     const statSteps = document.getElementById('stat-steps')
@@ -207,7 +217,7 @@ export async function setupHeadlessLayout(
   }
 
   function updateHighScoresDisplay() {
-    const stats = loadHeadlessStats()
+    const stats = loadDataStats()
     const container = document.getElementById('high-scores-content')
 
     if (!container) return
@@ -240,14 +250,14 @@ export async function setupHeadlessLayout(
 
   // Button handlers
   btnStop.addEventListener('click', () => {
-    console.log('[Headless] Stop button clicked')
+    console.log('[DataMode] Stop button clicked')
     stopLoop?.()
     window.location.href = `${window.location.origin}${window.location.pathname}`
   })
 
   btnPause.addEventListener('click', () => {
     isPaused = !isPaused
-    console.log(`[Headless] ${isPaused ? 'Paused' : 'Resumed'}`)
+    console.log(`[DataMode] ${isPaused ? 'Paused' : 'Resumed'}`)
     btnPause.textContent = isPaused ? 'Resume' : 'Pause'
     btnPause.className = isPaused
       ? 'px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors'
@@ -256,10 +266,24 @@ export async function setupHeadlessLayout(
 
   btnClear.addEventListener('click', () => {
     if (confirm('Clear all accumulated data? This cannot be undone.')) {
-      console.log('[Headless] Clearing data')
-      clearHeadlessStats()
+      console.log('[DataMode] Clearing data')
+      clearDataStats()
       updateStatsDisplay()
       updateHighScoresDisplay()
+    }
+  })
+
+  // Speed slider handler
+  speedSlider.addEventListener('input', () => {
+    const value = Number.parseInt(speedSlider.value, 10)
+    if (value >= 1000) {
+      stepsPerSecond = 0 // 0 means unlimited
+      speedValue.textContent = 'Unlimited'
+      console.log('[DataMode] Unlimited speed enabled')
+    } else {
+      stepsPerSecond = value
+      speedValue.textContent = `${value}/sec`
+      console.log(`[DataMode] Steps/sec set to ${stepsPerSecond}`)
     }
   })
 
@@ -273,9 +297,9 @@ export async function setupHeadlessLayout(
   updateStatsDisplay()
   updateHighScoresDisplay()
 
-  // Start the headless loop
-  console.log('[Headless] Starting simulation loop')
-  stopLoop = await runHeadlessLoop(
+  // Start the data generation loop
+  console.log('[DataMode] Starting simulation loop')
+  stopLoop = await runDataLoop(
     orbitLookup,
     (state) => {
       if (!isPaused) {
@@ -283,11 +307,12 @@ export async function setupHeadlessLayout(
       }
     },
     () => isPaused,
+    () => stepsPerSecond,
   )
 
   // Cleanup
   return () => {
-    console.log('[Headless] Cleanup')
+    console.log('[DataMode] Cleanup')
     stopLoop?.()
     clearInterval(statsInterval)
     cleanupTheme()

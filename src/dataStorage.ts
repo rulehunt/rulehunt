@@ -1,6 +1,6 @@
-// src/headlessStorage.ts
+// src/dataStorage.ts
 
-export interface HeadlessStats {
+export interface DataStats {
   roundCount: number
   totalSteps: number
   totalComputeTimeMs: number
@@ -17,16 +17,16 @@ export interface HeadlessStats {
   lastUpdateTime: number
 }
 
-const STORAGE_KEY = 'rulehunt-headless-stats'
+const STORAGE_KEY = 'rulehunt-data-stats'
 
-export function loadHeadlessStats(): HeadlessStats {
+export function loadDataStats(): DataStats {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       return JSON.parse(stored)
     }
   } catch (error) {
-    console.error('[headlessStorage] Failed to load stats:', error)
+    console.error('[dataStorage] Failed to load stats:', error)
   }
 
   return {
@@ -42,11 +42,11 @@ export function loadHeadlessStats(): HeadlessStats {
   }
 }
 
-export function saveHeadlessStats(stats: HeadlessStats): void {
+export function saveDataStats(stats: DataStats): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stats))
   } catch (error) {
-    console.error('[headlessStorage] Failed to save stats:', error)
+    console.error('[dataStorage] Failed to save stats:', error)
   }
 }
 
@@ -59,7 +59,7 @@ export function updateAccumulatedStats(update: {
   rulesetName: string
   success: boolean
 }): void {
-  const stats = loadHeadlessStats()
+  const stats = loadDataStats()
 
   stats.roundCount = update.roundCount
   stats.totalSteps += update.stepCount
@@ -88,16 +88,16 @@ export function updateAccumulatedStats(update: {
   stats.highScores.sort((a, b) => b.interestScore - a.interestScore)
   stats.highScores = stats.highScores.slice(0, 10)
 
-  saveHeadlessStats(stats)
+  saveDataStats(stats)
 }
 
 export function incrementSaveErrorCount(): void {
-  const stats = loadHeadlessStats()
+  const stats = loadDataStats()
   stats.saveErrors++
-  saveHeadlessStats(stats)
+  saveDataStats(stats)
 }
 
-export function clearHeadlessStats(): void {
+export function clearDataStats(): void {
   localStorage.removeItem(STORAGE_KEY)
 }
 
