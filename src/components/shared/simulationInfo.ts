@@ -38,7 +38,7 @@ export function generateSimulationMetricsHTML(
       
       <div class="flex justify-between items-start">
         <span class="text-gray-600 dark:text-gray-400 text-xs">Hex:</span>
-        <span data-field="ruleset-hex" class="text-gray-900 dark:text-gray-100 text-right text-xs break-all max-w-[200px]">${data.rulesetHex}</span>
+        <span data-field="ruleset-hex" class="text-gray-900 dark:text-gray-100 text-right text-xs break-all">${data.rulesetHex}</span>
       </div>
       
       <div class="flex justify-between items-center">
