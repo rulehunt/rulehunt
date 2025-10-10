@@ -49,7 +49,7 @@ export function createMobileHeader(): {
   infoOverlay.style.pointerEvents = 'none' // Initially disabled
 
   infoOverlay.innerHTML = `
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full overflow-y-auto" style="max-height: 85%">
       <!-- Header -->
       <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
         <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">About RuleHunt</h2>
