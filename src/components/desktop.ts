@@ -22,6 +22,10 @@ import { setupBenchmarkModal } from './benchmark.ts'
 import { createHeader, setupTheme } from './desktopHeader.ts'
 import { setupHeadlessLayout } from './headless.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
+import {
+  type PatternInspectorData,
+  createPatternInspector,
+} from './patternInspector.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
 import { generateSimulationMetricsHTML } from './shared/simulationInfo.ts'
@@ -161,6 +165,7 @@ function handleCanvasClick(
   orbitsData: C4OrbitsData,
   orbitLookup: Uint8Array,
   displayMode: DisplayMode,
+  onPatternClick: (data: PatternInspectorData) => void,
 ) {
   const rect = canvas.getBoundingClientRect()
   const x = event.clientX - rect.left
@@ -187,10 +192,14 @@ function handleCanvasClick(
       bits.push((representative >> i) & 1)
     }
 
-    console.log(
-      `\nOrbit ${orbitIndex} (output: ${output})\nRepresentative pattern:\n${bits[0]} ${bits[1]} ${bits[2]}\n${bits[3]} ${bits[4]} ${bits[5]}     --->  ${output}\n${bits[6]} ${bits[7]} ${bits[8]}\n`,
-    )
-    console.log(`Stabilizer: ${orbit.stabilizer}, Size: ${orbit.size}`)
+    onPatternClick({
+      type: 'orbit',
+      index: orbitIndex,
+      output,
+      bits,
+      stabilizer: orbit.stabilizer,
+      size: orbit.size,
+    })
   } else {
     const cols = 32
     const rows = 16
@@ -220,9 +229,13 @@ function handleCanvasClick(
       bits.push((patternIndex >> i) & 1)
     }
 
-    console.log(
-      `\nPattern ${patternIndex} (orbit: ${orbitId}, output: ${output})\n${bits[0]} ${bits[1]} ${bits[2]}\n${bits[3]} ${bits[4]} ${bits[5]}     --->  ${output}\n${bits[6]} ${bits[7]} ${bits[8]}\n`,
-    )
+    onPatternClick({
+      type: 'pattern',
+      index: patternIndex,
+      output,
+      bits,
+      orbitId,
+    })
   }
 }
 
@@ -324,8 +337,10 @@ export async function setupDesktopLayout(
   rightColumn.className = 'flex flex-col items-center gap-3'
 
   const rulesetPanel = createRulesetPanel()
+  const patternInspector = createPatternInspector()
   const leaderboardPanel = createLeaderboardPanel()
   rightColumn.appendChild(rulesetPanel.root)
+  rightColumn.appendChild(patternInspector.root)
   rightColumn.appendChild(leaderboardPanel.root)
 
   mainContainer.appendChild(leftColumn)
@@ -595,6 +610,7 @@ export async function setupDesktopLayout(
       orbitsData,
       orbitLookup,
       displayMode,
+      (data) => patternInspector.update(data),
     )
   }
   addEventListener(ruleCanvas, 'click', canvasClickHandler)
