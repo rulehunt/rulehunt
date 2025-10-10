@@ -825,16 +825,16 @@ export async function setupMobileLayout(
       transform-origin: bottom center;
     }
     .instruction-oval {
-      background: rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.5);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-radius: 9999px;
-      padding: 12px 32px;
+      padding: 14px 32px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     }
     @media (prefers-color-scheme: dark) {
       .instruction-oval {
-        background: rgba(31, 41, 55, 0.7);
+        background: rgba(31, 41, 55, 0.5);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       }
     }
