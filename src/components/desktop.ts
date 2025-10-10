@@ -340,6 +340,7 @@ export async function setupDesktopLayout(
     btnReset,
     btnPlay,
     btnBenchmark,
+    btnHeadless,
     stepsPerSecondInput,
     aliveSlider,
     aliveValue,
@@ -578,6 +579,11 @@ export async function setupDesktopLayout(
   const benchmarkModal = setupBenchmarkModal(orbitLookup)
   addEventListener(btnBenchmark, 'click', () => {
     benchmarkModal.show()
+  })
+
+  // Headless mode button
+  addEventListener(btnHeadless, 'click', () => {
+    window.location.href = `${window.location.origin}${window.location.pathname}?headless=true`
   })
 
   // Canvas click handler
