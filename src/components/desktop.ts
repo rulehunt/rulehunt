@@ -758,6 +758,7 @@ export async function setupDesktopLayout(
     // Soft reset for patch and random modes (advances seed for new random ICs)
     // Center mode keeps existing behavior (deterministic single pixel)
     if (initialConditionType === 'patch' || initialConditionType === 'random') {
+      const wasPlaying = cellularAutomata.isCurrentlyPlaying()
       cellularAutomata.pause()
       cellularAutomata.clearGrid()
       cellularAutomata.softReset()
@@ -769,6 +770,13 @@ export async function setupDesktopLayout(
       )
       initializeSimulationMetadata()
       updateURL()
+
+      // Resume playing if it was playing before reset
+      if (wasPlaying) {
+        const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
+        const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+        cellularAutomata.play(stepsPerSecond, expanded)
+      }
     } else {
       applyInitialCondition()
     }
