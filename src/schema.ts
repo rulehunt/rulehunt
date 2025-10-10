@@ -183,7 +183,7 @@ const ISODateString = z
     'must be a valid ISO 8601 datetime string',
   )
 
-// Full database record as it's inserted into D1
+// Full database record as its inserted into D1
 export const RunRecord = z
   .object({
     runId: z.string().optional(),
@@ -211,6 +211,7 @@ export const RunQuery = z.object({
     .string()
     .regex(/^[0-9a-f]{35}$/i)
     .optional(),
+  isStarred: z.boolean().optional(),
   limit: z.number().int().positive().max(100).default(20),
   sortBy: z
     .enum(['submittedAt', 'interestScore', 'entropy4x4'])

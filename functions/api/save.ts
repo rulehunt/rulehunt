@@ -34,6 +34,7 @@ export const onRequestPost = async (
     const stmt = ctx.env.DB.prepare(`
       INSERT OR IGNORE INTO runs (
         run_hash,
+        is_starred,
         user_id,
         user_label,
         ruleset_name,
@@ -65,12 +66,13 @@ export const onRequestPost = async (
         engine_commit,
         extra_scores
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
     await stmt
       .bind(
         runHash,
+        data.isStarred ? 1 : 0,
         data.userId,
         data.userLabel ?? null,
         data.rulesetName,

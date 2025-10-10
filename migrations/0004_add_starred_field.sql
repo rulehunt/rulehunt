@@ -4,8 +4,9 @@
 -- Date: 2025-10-09
 -- Description:
 --   Adds is_starred boolean field to the `runs` table to allow users to
---   mark favorite patterns for later recall. Includes partial index for
---   efficient queries on starred patterns only.
+--   mark favorite patterns for later recall. When a user stars a simulation,
+--   the seed field will contain the current active seed at that moment,
+--   enabling perfect reproduction of the favorited state.
 -- ========================================================================
 
 ALTER TABLE runs ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0 CHECK (is_starred IN (0, 1));
