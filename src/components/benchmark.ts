@@ -528,8 +528,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 							<tr class="border-b border-gray-200 dark:border-gray-700">
 								<td class="p-2 text-gray-700 dark:text-gray-300">${r.gridSize}</td>
 								<td class="p-2 text-right text-gray-700 dark:text-gray-300">${r.cells.toLocaleString()}</td>
-								<td class="p-2 text-right ${cpuWinnerClass}">${r.cpuSPS.toFixed(0)}</td>
-								<td class="p-2 text-right ${gpuWinnerClass}">${r.gpuSPS.toFixed(0)}</td>
+								<td class="p-2 text-right ${cpuWinnerClass}">${r.cpuSPS.toFixed(2)}</td>
+								<td class="p-2 text-right ${gpuWinnerClass}">${r.gpuSPS.toFixed(2)}</td>
 								<td class="p-2 text-center uppercase font-bold text-gray-900 dark:text-gray-100">${r.winner}</td>
 								<td class="p-2 text-right text-gray-700 dark:text-gray-300">${r.speedup.toFixed(2)}x</td>
 								${sampleCell}
