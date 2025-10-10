@@ -43,10 +43,8 @@ export class StatisticsTracker {
   constructor(gridRows: number, gridCols: number) {
     this.gridRows = gridRows
     this.gridCols = gridCols
-    // Initialize entity tracker if grid is 10x10
-    if (gridRows === 10 && gridCols === 10) {
-      this.entityTracker = new EntityTracker()
-    }
+    // Initialize entity tracker for all grid sizes
+    this.entityTracker = new EntityTracker()
   }
 
   initializeSimulation(
@@ -342,13 +340,6 @@ export class StatisticsTracker {
   }
 
   private convertTo2DGrid(grid: Uint8Array): Grid {
-    if (this.gridRows !== 10 || this.gridCols !== 10) {
-      // Entity detection only works on 10x10 grids, return empty grid for others
-      return Array(10)
-        .fill(null)
-        .map(() => Array(10).fill(0))
-    }
-
     const grid2D: Grid = []
     for (let y = 0; y < this.gridRows; y++) {
       const row: (0 | 1)[] = []

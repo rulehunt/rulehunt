@@ -210,8 +210,8 @@ export function detectEntities(grid: Grid, tracker?: EntityTracker): Entity[] {
   const height = grid.length
   const width = grid[0]?.length ?? 0
 
-  if (height !== 10 || width !== 10) {
-    throw new Error('Grid must be 10x10')
+  if (height === 0 || width === 0) {
+    return []
   }
 
   const visited = Array(height)
