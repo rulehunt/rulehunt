@@ -32,6 +32,7 @@ import {
 import { createAutoFadeContainer } from './buttonContainer.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 import { createRoundButton } from './roundButton.ts'
+import { createStarButton } from './starButton.ts'
 
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
@@ -569,6 +570,7 @@ function saveRunStatistics(
   cellularAutomata: ICellularAutomata,
   ruleName: string,
   ruleHex: string,
+  isStarred = false,
 ): void {
   const stats = cellularAutomata.getStatistics()
   const metadata = stats.getMetadata()
@@ -615,6 +617,7 @@ function saveRunStatistics(
     entitiesAlive: recent.entitiesAlive,
     entitiesDied: recent.entitiesDied,
     interestScore: stats.calculateInterestScore(),
+    isStarred,
     simVersion: 'v0.1.0',
     engineCommit: undefined,
     extraScores: undefined,
@@ -1005,6 +1008,9 @@ export async function setupMobileLayout(
     }
   }
 
+  // Track starred status (resets to false after each swipe)
+  let currentIsStarred = false
+
   // Create control buttons with auto-fade container
   const {
     container: controlContainer,
@@ -1022,6 +1028,14 @@ export async function setupMobileLayout(
     () => showStats(getCurrentRunData()),
     resetControlFade,
   )
+  let starBtn = createStarButton({
+    getIsStarred: () => currentIsStarred,
+    onToggle: (isStarred) => {
+      currentIsStarred = isStarred
+    },
+    onResetFade: resetControlFade,
+    isTransitioning: () => isTransitioning,
+  })
   let softResetButton = createSoftResetButton(
     () => {
       softResetAutomata(onScreenCA)
@@ -1033,6 +1047,7 @@ export async function setupMobileLayout(
   )
 
   controlContainer.appendChild(softResetButton.button)
+  controlContainer.appendChild(starBtn.button)
   controlContainer.appendChild(statsBtn.button)
   controlContainer.appendChild(shareBtn.button)
   wrapper.appendChild(controlContainer)
@@ -1052,7 +1067,15 @@ export async function setupMobileLayout(
         instruction.style.opacity = '0'
         setTimeout(() => instruction.remove(), 300)
       }
-      saveRunStatistics(onScreenCA, onScreenRule.name, onScreenRule.hex)
+      saveRunStatistics(
+        onScreenCA,
+        onScreenRule.name,
+        onScreenRule.hex,
+        currentIsStarred,
+      )
+
+      // Reset starred status for next simulation
+      currentIsStarred = false
 
       // Swap references: incoming becomes onScreen, outgoing becomes offScreen
       ;[onScreenCanvas, offScreenCanvas] = [offScreenCanvas, onScreenCanvas]
@@ -1103,6 +1126,7 @@ export async function setupMobileLayout(
       // Recreate buttons after swipe
       shareBtn.cleanup()
       softResetButton.cleanup()
+      starBtn.cleanup()
       statsBtn.cleanup()
 
       shareBtn = createShareButton(resetControlFade)
@@ -1110,6 +1134,14 @@ export async function setupMobileLayout(
         () => showStats(getCurrentRunData()),
         resetControlFade,
       )
+      starBtn = createStarButton({
+        getIsStarred: () => currentIsStarred,
+        onToggle: (isStarred) => {
+          currentIsStarred = isStarred
+        },
+        onResetFade: resetControlFade,
+        isTransitioning: () => isTransitioning,
+      })
       softResetButton = createSoftResetButton(
         () => {
           softResetAutomata(onScreenCA)
@@ -1122,6 +1154,7 @@ export async function setupMobileLayout(
 
       controlContainer.innerHTML = ''
       controlContainer.appendChild(softResetButton.button)
+      controlContainer.appendChild(starBtn.button)
       controlContainer.appendChild(statsBtn.button)
       controlContainer.appendChild(shareBtn.button)
       resetControlFade()
