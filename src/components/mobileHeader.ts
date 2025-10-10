@@ -44,8 +44,9 @@ export function createMobileHeader(): {
   const infoOverlay = document.createElement('div')
   infoOverlay.id = 'info-overlay'
   infoOverlay.className =
-    'bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4'
+    'absolute inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4'
   infoOverlay.style.display = 'none'
+  infoOverlay.style.pointerEvents = 'none' // Initially disabled
 
   infoOverlay.innerHTML = `
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto">
@@ -162,6 +163,7 @@ export function createMobileHeader(): {
 export function setupMobileHeader(
   elements: MobileHeaderElements,
   headerRoot: HTMLElement,
+  overlayWrapper?: HTMLElement,
 ): { cleanup: CleanupFunction; resetFade: () => void } {
   const { infoButton, infoOverlay, closeButton } = elements
 
@@ -176,12 +178,20 @@ export function setupMobileHeader(
 
   const showOverlay = () => {
     infoOverlay.style.display = 'flex'
+    infoOverlay.style.pointerEvents = 'auto' // Re-enable pointer events when shown
+    if (overlayWrapper) {
+      overlayWrapper.style.pointerEvents = 'auto' // Also enable wrapper
+    }
     // Prevent body scrolling when overlay is open
     document.body.style.overflow = 'hidden'
   }
 
   const hideOverlay = () => {
     infoOverlay.style.display = 'none'
+    infoOverlay.style.pointerEvents = 'none' // Disable pointer events when hidden
+    if (overlayWrapper) {
+      overlayWrapper.style.pointerEvents = 'none' // Also disable wrapper
+    }
     // Restore body scrolling
     document.body.style.overflow = ''
   }
