@@ -20,6 +20,7 @@ import {
 } from '../urlState.ts'
 import { setupBenchmarkModal } from './benchmark.ts'
 import { createHeader, setupTheme } from './desktopHeader.ts'
+import { setupHeadlessLayout } from './headless.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
@@ -229,6 +230,13 @@ function handleCanvasClick(
 export async function setupDesktopLayout(
   appRoot: HTMLDivElement,
 ): Promise<CleanupFunction> {
+  // Check for headless mode
+  const urlParams = new URLSearchParams(window.location.search)
+  if (urlParams.get('headless') === 'true') {
+    console.log('[desktop] Headless mode detected, routing to headless layout')
+    return setupHeadlessLayout(appRoot)
+  }
+
   // Track all cleanup tasks
   const eventListeners: Array<{
     element: EventTarget
