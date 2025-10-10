@@ -15,7 +15,7 @@ export function createMobileHeader(): {
 } {
   const root = document.createElement('header')
   root.className =
-    'fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-300/50 dark:border-gray-600/50 transition-opacity duration-500'
+    'absolute top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-300/50 dark:border-gray-600/50 transition-opacity duration-500'
   root.style.opacity = '1'
 
   root.innerHTML = `
@@ -44,7 +44,7 @@ export function createMobileHeader(): {
   const infoOverlay = document.createElement('div')
   infoOverlay.id = 'info-overlay'
   infoOverlay.className =
-    'fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4'
+    'absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4'
   infoOverlay.style.display = 'none'
 
   infoOverlay.innerHTML = `
