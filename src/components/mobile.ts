@@ -822,7 +822,7 @@ export async function setupMobileLayout(
   // Instruction
   const instruction = document.createElement('div')
   instruction.className =
-    'fixed bottom-8 left-0 right-0 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none transition-opacity duration-300'
+    'fixed top-1/2 left-0 right-0 -translate-y-1/2 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none transition-opacity duration-300'
   instruction.style.opacity = '0.7'
   instruction.style.zIndex = '1000'
   instruction.style.transition = 'opacity 0.6s ease'
