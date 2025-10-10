@@ -176,7 +176,7 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ## 📬 Contact
 
-- GitHub: [@irgolic](https://github.com/irgolic)
+- GitHub: [@irgolic](https://github.com/irgolic) & [@rjwalters](https://github.com/rjwalters) 
 - Live Site: [https://rulehunt.org/](https://rulehunt.org/)
 
 ---
