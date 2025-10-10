@@ -1,6 +1,7 @@
 // src/components/mobileHeader.ts
 
 export interface MobileHeaderElements {
+  titleElement: HTMLHeadingElement
   infoButton: HTMLButtonElement
   infoOverlay: HTMLDivElement
   closeButton: HTMLButtonElement
@@ -14,12 +15,13 @@ export function createMobileHeader(): {
 } {
   const root = document.createElement('header')
   root.className =
-    'fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-300/50 dark:border-gray-600/50'
+    'fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-300/50 dark:border-gray-600/50 transition-opacity duration-500'
+  root.style.opacity = '1'
 
   root.innerHTML = `
     <div class="px-6 py-3 flex items-center justify-between">
       <!-- Left: Logo/Title -->
-      <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">
+      <h1 id="rulehunt-title" class="text-xl font-bold text-gray-900 dark:text-gray-100 transition-colors duration-500">
         RuleHunt
       </h1>
 
@@ -129,8 +131,8 @@ export function createMobileHeader(): {
 
       <!-- Footer -->
       <div class="sticky bottom-0 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-6 py-4">
-        <a 
-          href="https://github.com/irgolic/rulehunt" 
+        <a
+          href="https://github.com/rulehunt/rulehunt"
           target="_blank"
           rel="noopener noreferrer"
           class="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -147,6 +149,7 @@ export function createMobileHeader(): {
   document.body.appendChild(infoOverlay)
 
   const elements: MobileHeaderElements = {
+    titleElement: root.querySelector('#rulehunt-title') as HTMLHeadingElement,
     infoButton: root.querySelector('#info-button') as HTMLButtonElement,
     infoOverlay: infoOverlay,
     closeButton: infoOverlay.querySelector('#close-info') as HTMLButtonElement,
@@ -157,8 +160,18 @@ export function createMobileHeader(): {
 
 export function setupMobileHeader(
   elements: MobileHeaderElements,
-): CleanupFunction {
+  headerRoot: HTMLElement,
+): { cleanup: CleanupFunction; resetFade: () => void } {
   const { infoButton, infoOverlay, closeButton } = elements
+
+  let fadeTimer: number | null = null
+  const resetFade = () => {
+    if (fadeTimer) clearTimeout(fadeTimer)
+    headerRoot.style.opacity = '1'
+    fadeTimer = window.setTimeout(() => {
+      headerRoot.style.opacity = '0.3'
+    }, 3000)
+  }
 
   const showOverlay = () => {
     infoOverlay.style.display = 'flex'
@@ -175,6 +188,7 @@ export function setupMobileHeader(
   // Show overlay when info button is clicked
   const infoHandler = () => {
     showOverlay()
+    resetFade()
   }
 
   // Hide overlay when close button is clicked
@@ -194,18 +208,25 @@ export function setupMobileHeader(
   closeButton.addEventListener('click', closeHandler)
   infoOverlay.addEventListener('click', overlayClickHandler)
 
-  // Return cleanup function
-  return () => {
-    infoButton.removeEventListener('click', infoHandler)
-    closeButton.removeEventListener('click', closeHandler)
-    infoOverlay.removeEventListener('click', overlayClickHandler)
+  // Start the initial fade timer
+  resetFade()
 
-    // Clean up overlay from DOM
-    if (infoOverlay.parentNode) {
-      infoOverlay.parentNode.removeChild(infoOverlay)
-    }
+  // Return cleanup function and resetFade function
+  return {
+    cleanup: () => {
+      if (fadeTimer) clearTimeout(fadeTimer)
+      infoButton.removeEventListener('click', infoHandler)
+      closeButton.removeEventListener('click', closeHandler)
+      infoOverlay.removeEventListener('click', overlayClickHandler)
 
-    // Restore body scroll in case it was locked
-    document.body.style.overflow = ''
+      // Clean up overlay from DOM
+      if (infoOverlay.parentNode) {
+        infoOverlay.parentNode.removeChild(infoOverlay)
+      }
+
+      // Restore body scroll in case it was locked
+      document.body.style.overflow = ''
+    },
+    resetFade,
   }
 }

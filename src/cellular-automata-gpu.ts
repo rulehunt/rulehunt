@@ -24,12 +24,16 @@ export class GPUCellularAutomata
 {
   private gpu: GPU
   private stepKernel: IKernelRunShortcut | null = null
-  private grid2D: number[][]
+  private grid2D: number[][] | Texture
   private cachedRuleset: number[] | null = null
   private cachedRulesetRef: Ruleset | null = null
   private batchSize: number
+  private needsSync = false
 
-  constructor(canvas: HTMLCanvasElement, options: CellularAutomataOptions) {
+  constructor(
+    canvas: HTMLCanvasElement | null,
+    options: CellularAutomataOptions,
+  ) {
     super(canvas, options)
 
     this.gpu = new GPU({ mode: 'gpu' })
@@ -91,10 +95,11 @@ export class GPUCellularAutomata
       for (let x = 0; x < this.gridCols; x++) {
         const val = row[x] > 0.5 ? 1 : 0
         this.grid[idx] = val
-        this.grid2D[y][x] = val
         idx++
       }
     }
+    // Update grid2D to the synced output array
+    this.grid2D = output
   }
 
   private getRulesetArray(ruleset?: Ruleset): number[] {
@@ -117,21 +122,57 @@ export class GPUCellularAutomata
     }
 
     const rulesetArray = this.getRulesetArray(ruleset)
-    const result = this.stepKernel(this.grid2D, rulesetArray)
-    const output = (result as Texture).toArray() as number[][]
+    this.grid2D = this.stepKernel(this.grid2D, rulesetArray) as Texture
+    this.needsSync = true
+  }
 
+  /**
+   * Force GPU→CPU sync for external access to grid state.
+   * Called automatically by render(), or manually when CPU needs current state.
+   * Public method to allow benchmarks to force GPU execution completion.
+   */
+  public syncToHost() {
+    if (!this.needsSync) return
+
+    const output = (this.grid2D as Texture).toArray() as number[][]
     this.syncFrom2D(output)
+    this.needsSync = false
   }
 
   protected onGridChanged() {
     // Sync grid -> grid2D
+    const grid2DArray: number[][] = Array.from({ length: this.gridRows }, () =>
+      new Array(this.gridCols).fill(0),
+    )
+
     let idx = 0
     for (let y = 0; y < this.gridRows; y++) {
-      const row = this.grid2D[y]
+      const row = grid2DArray[y]
       for (let x = 0; x < this.gridCols; x++) {
         row[x] = this.grid[idx++]
       }
     }
+
+    this.grid2D = grid2DArray
+    this.needsSync = false
+  }
+
+  override step(ruleset: Ruleset) {
+    this.computeStep(ruleset)
+
+    // Only sync if we have a canvas (for rendering/stats)
+    // Headless benchmarks skip this entirely for max performance
+    if (this.canvas) {
+      this.syncToHost()
+      this.statistics.recordStep(this.grid)
+      this.render()
+    }
+  }
+
+  override render() {
+    // Sync GPU state to CPU before rendering
+    this.syncToHost()
+    super.render()
   }
 
   protected cleanup() {
@@ -144,6 +185,7 @@ export class GPUCellularAutomata
     this.grid2D = Array.from({ length: this.gridRows }, () =>
       new Array(this.gridCols).fill(0),
     )
+    this.needsSync = false
   }
 
   // Override play() for GPU batching
@@ -165,15 +207,17 @@ export class GPUCellularAutomata
     }
 
     const rulesetArray = this.getRulesetArray(ruleset)
-    let result = this.stepKernel(this.grid2D, rulesetArray)
+    let result = this.stepKernel(this.grid2D, rulesetArray) as Texture
 
     for (let i = 1; i < count; i++) {
-      result = this.stepKernel(result, rulesetArray)
+      result = this.stepKernel(result, rulesetArray) as Texture
     }
 
-    const output = (result as Texture).toArray() as number[][]
-    this.syncFrom2D(output)
+    this.grid2D = result
+    this.needsSync = true
 
+    // Sync before recording stats (needs CPU grid access)
+    this.syncToHost()
     this.statistics.recordStep(this.grid)
     this.render()
   }

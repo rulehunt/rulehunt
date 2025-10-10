@@ -30,8 +30,8 @@ function hexToRGB(hex: string): [number, number, number] {
  */
 export abstract class CellularAutomataBase {
   protected grid: Uint8Array
-  protected canvas: HTMLCanvasElement
-  protected ctx: CanvasRenderingContext2D
+  protected canvas: HTMLCanvasElement | null
+  protected ctx: CanvasRenderingContext2D | null
   protected statistics: StatisticsTracker
   protected gridRows: number
   protected gridCols: number
@@ -40,8 +40,8 @@ export abstract class CellularAutomataBase {
   protected bgColor: string
   protected fgRGB: [number, number, number]
   protected bgRGB: [number, number, number]
-  protected imageData: ImageData
-  protected pixelData: Uint8ClampedArray
+  protected imageData: ImageData | null
+  protected pixelData: Uint8ClampedArray | null
 
   protected seed = Math.floor(Math.random() * 0xffffffff)
   protected rng = makeRng(this.seed)
@@ -56,12 +56,17 @@ export abstract class CellularAutomataBase {
   protected zoomLevel = 1
   protected displayZoom = 1
 
-  constructor(canvas: HTMLCanvasElement, options: CellularAutomataOptions) {
+  constructor(
+    canvas: HTMLCanvasElement | null,
+    options: CellularAutomataOptions,
+  ) {
     this.canvas = canvas
-    this.ctx = canvas.getContext('2d', {
-      alpha: false,
-      willReadFrequently: false,
-    }) as CanvasRenderingContext2D
+    this.ctx = canvas
+      ? (canvas.getContext('2d', {
+          alpha: false,
+          willReadFrequently: false,
+        }) as CanvasRenderingContext2D)
+      : null
 
     this.gridRows = options.gridRows
     this.gridCols = options.gridCols
@@ -74,8 +79,13 @@ export abstract class CellularAutomataBase {
     this.grid = new Uint8Array(this.gridArea)
     this.statistics = new StatisticsTracker(this.gridRows, this.gridCols)
 
-    this.imageData = this.ctx.createImageData(this.gridCols, this.gridRows)
-    this.pixelData = this.imageData.data
+    if (this.ctx) {
+      this.imageData = this.ctx.createImageData(this.gridCols, this.gridRows)
+      this.pixelData = this.imageData.data
+    } else {
+      this.imageData = null
+      this.pixelData = null
+    }
   }
 
   // --- Abstract methods (implemented by subclasses) -------------------------
@@ -114,10 +124,11 @@ export abstract class CellularAutomataBase {
   /** Explicitly clear the visible canvas to the background color */
   protected clearCanvas(): void {
     const ctx = this.ctx
-    if (!ctx) return
+    const canvas = this.canvas
+    if (!ctx || !canvas) return
     ctx.save()
     ctx.fillStyle = this.bgColor
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
     ctx.restore()
   }
 
@@ -305,11 +316,16 @@ export abstract class CellularAutomataBase {
 
   // --- Rendering (zoom-aware, optimized) ------------------------------------
   render() {
-    const grid = this.grid
+    const ctx = this.ctx
     const data = this.pixelData
+    const imageData = this.imageData
+
+    // Skip rendering if no canvas is attached (headless mode for testing)
+    if (!ctx || !data || !imageData) return
+
+    const grid = this.grid
     const [fr, fg, fb] = this.fgRGB
     const [br, bg, bb] = this.bgRGB
-    const ctx = this.ctx
 
     this.displayZoom += (this.zoomLevel - this.displayZoom) * 0.5
     const zoom = this.displayZoom
@@ -323,8 +339,8 @@ export abstract class CellularAutomataBase {
     const startY = Math.max(0, centerY - Math.floor(visibleRows / 2))
 
     // Target canvas resolution
-    const outW = this.imageData.width
-    const outH = this.imageData.height
+    const outW = imageData.width
+    const outH = imageData.height
     const scaleX = visibleCols / outW
     const scaleY = visibleRows / outH
 
@@ -351,7 +367,7 @@ export abstract class CellularAutomataBase {
       }
     }
 
-    ctx.putImageData(this.imageData, 0, 0)
+    ctx.putImageData(imageData, 0, 0)
   }
 
   // --- Playback control (common to all implementations) ---------------------
@@ -412,16 +428,22 @@ export abstract class CellularAutomataBase {
     const ruleset = this.currentRuleset
     if (wasPlaying) this.pause()
 
-    this.canvas.width = this.canvas.clientWidth
-    this.canvas.height = this.canvas.clientHeight
+    if (this.canvas) {
+      this.canvas.width = this.canvas.clientWidth
+      this.canvas.height = this.canvas.clientHeight
+    }
+
     this.gridRows = newRows
     this.gridCols = newCols
     this.gridArea = newRows * newCols
 
     this.grid = new Uint8Array(this.gridArea)
     this.statistics = new StatisticsTracker(this.gridRows, this.gridCols)
-    this.imageData = this.ctx.createImageData(this.gridCols, this.gridRows)
-    this.pixelData = this.imageData.data
+
+    if (this.ctx) {
+      this.imageData = this.ctx.createImageData(this.gridCols, this.gridRows)
+      this.pixelData = this.imageData.data
+    }
 
     // Let subclass clean up engine-specific resources
     this.cleanup()
@@ -457,6 +479,11 @@ export abstract class CellularAutomataBase {
     return this.seed
   }
 
+  setSeed(newSeed: number): void {
+    this.seed = newSeed
+    this.rng = makeRng(newSeed)
+  }
+
   getGridSize(): number {
     return this.gridArea
   }
@@ -474,5 +501,29 @@ export abstract class CellularAutomataBase {
   }
   isRunning() {
     return this.isPlaying
+  }
+
+  // --- Grid access for testing ----------------------------------------------
+  /**
+   * Get a copy of the current grid state.
+   * Primarily for testing and debugging.
+   */
+  getGrid(): Uint8Array {
+    return new Uint8Array(this.grid)
+  }
+
+  /**
+   * Set the grid state directly.
+   * Primarily for testing - allows setting up specific patterns.
+   * @param newGrid - Grid data to copy (must match grid dimensions)
+   */
+  setGrid(newGrid: Uint8Array): void {
+    if (newGrid.length !== this.gridArea) {
+      throw new Error(
+        `Grid size mismatch: expected ${this.gridArea}, got ${newGrid.length}`,
+      )
+    }
+    this.grid.set(newGrid)
+    this.onGridChanged()
   }
 }

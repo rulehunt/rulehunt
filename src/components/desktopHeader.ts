@@ -37,9 +37,9 @@ export function createHeader(): {
       <!-- Right: GitHub + Theme Toggle -->
       <div class="flex items-center gap-4">
         <!-- GitHub Link -->
-        <a 
+        <a
           id="github-link"
-          href="https://github.com/irgolic/rulehunt/tree/main" 
+          href="https://github.com/rulehunt/rulehunt"
           target="_blank"
           rel="noopener noreferrer"
           class="flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm"

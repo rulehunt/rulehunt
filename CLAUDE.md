@@ -9,6 +9,88 @@ Distributed exploration of 2^140 C4-symmetric cellular automata rules. TikTok-st
 - `pnpm run build` - Full production build (tsc + vite + copy resources)
 - `pnpm run dev` - Local Vite dev server
 
+## Development Workflow
+
+**IMPORTANT: Always use PRs instead of pushing directly to main**
+- Create feature branches for all changes: `git checkout -b feature/description`
+- Open PRs for review before merging to main
+- Exceptions: Only push to main for urgent hotfixes or documentation typos
+
+## PR Reviews with Claude Code
+
+RuleHunt uses custom slash commands to streamline PR reviews with
+component-specific criteria. Reviews leverage Claude Code's GitHub CLI
+integration (`gh pr view`, `gh pr diff`, `gh pr review`).
+
+### Quick Review Pattern
+
+For general reviews, use natural language:
+```bash
+claude
+Please review PR #42 and post your findings
+```
+
+For component-specific reviews, use slash commands:
+```bash
+claude
+/review-migration 21  # Database schema changes
+/review-api 23        # API endpoint changes
+/review-ui 24         # UI component changes
+```
+
+### Slash Command Usage
+
+**Database migrations:**
+```bash
+/review-migration <PR_NUMBER>
+```
+
+**API endpoints:**
+```bash
+/review-api <PR_NUMBER>
+```
+
+**UI components:**
+```bash
+/review-ui <PR_NUMBER>
+```
+
+### Review Criteria by Component
+
+| Component | Key Checks |
+|-----------|------------|
+| **Database Migrations** | SQLite syntax, indexes (partial for booleans), schema.ts alignment, naming (`NNNN_description.sql`) |
+| **API Endpoints** | Zod validation, parameterized queries, error format `{ ok: false, error: string }`, status codes |
+| **UI Components** | No swipe conflicts (`data-swipe-ignore`), event cleanup, theme support, touch optimization (`passive: true`) |
+| **CA Engine** | Interface stability, explicit operations, memory cleanup (`destroy()`), GPU fallback |
+| **Utils/Core** | Pure functions, explicit return types, unit tests, no `any` types |
+
+### Examples
+
+**Review a migration PR:**
+```bash
+claude
+/review-migration 21
+```
+Claude will fetch the diff, check SQL syntax, verify indexes, compare with
+schema.ts, and post findings directly to the PR.
+
+**Review an API PR:**
+```bash
+claude
+/review-api 23
+```
+Claude will verify Zod validation, check for SQL injection prevention, test
+error handling patterns, and ensure consistency with existing endpoints.
+
+**Review a UI PR:**
+```bash
+claude
+/review-ui 24
+```
+Claude will check for swipe gesture conflicts, verify event cleanup, test
+theme support, and validate mobile-first responsive patterns.
+
 ## Architecture
 
 **Entry Point:** `src/main.ts` - Detects mobile/desktop (<640px breakpoint), mounts layout
@@ -127,10 +209,16 @@ scripts/
 
 ## Conventions
 
-**Commits:** `feat:`, `fix:`, `chore:` + Claude Code footer
+**Workflow:** Always create PRs for changes - avoid pushing directly to main
+**Commits:** `feat:`, `fix:`, `chore:`, `docs:` + Claude Code footer
 **PRs:** Title matches commit convention, link issues with `Resolves #N`
 **TypeScript:** Strict mode, no `any` types, explicit return types on exported functions
 **Formatting:** Biome with single quotes, semicolons optional, 80 char line width, 2-space indent
+**Styling:**
+- Tailwind CSS for static styles with dark mode support - ALWAYS use `dark:` variants
+- Inline styles (`element.style.property`) for dynamic state changes (show/hide, animations)
+- Tailwind's JIT compiler only includes classes present in source code at build time
+- Never dynamically add/remove Tailwind utility classes at runtime (won't work reliably)
 **Testing:** Minimal (vitest for `entityDetection.test.ts` only) - more tests needed (issue #13)
 
 ## Common Patterns from Codebase
@@ -144,6 +232,28 @@ btn.style.touchAction = 'manipulation' // avoids 300ms delay
 **Theme detection**
 ```typescript
 const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+```
+
+**Tailwind CSS styling patterns**
+```typescript
+// Good: Tailwind for static styles, inline for dynamic state
+const overlay = document.createElement('div')
+overlay.className = 'fixed inset-0 bg-black/80 flex justify-center items-center'
+overlay.style.display = 'none' // Dynamic state
+
+function show() {
+  overlay.style.display = 'flex' // Toggle dynamic state
+}
+
+// Bad: Dynamically adding/removing Tailwind classes (unreliable)
+overlay.classList.add('hidden') // Won't work if 'hidden' not in source at build time
+overlay.classList.remove('hidden')
+
+// Good: Static Tailwind with dark mode
+element.className = 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+
+// Bad: Inline styles for static styling (no dark mode support)
+element.style.cssText = 'background: white; color: black;'
 ```
 
 **Resize debouncing**

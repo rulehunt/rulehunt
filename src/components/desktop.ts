@@ -13,6 +13,12 @@ import {
   randomC4RulesetByDensity,
 } from '../utils.ts'
 
+import {
+  parseURLRuleset,
+  parseURLState,
+  updateURLWithoutReload,
+} from '../urlState.ts'
+import { setupBenchmarkModal } from './benchmark.ts'
 import { createHeader, setupTheme } from './desktopHeader.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import { createProgressBar } from './progressBar.ts'
@@ -314,6 +320,7 @@ export async function setupDesktopLayout(
     btnStep,
     btnReset,
     btnPlay,
+    btnBenchmark,
     stepsPerSecondInput,
     aliveSlider,
     aliveValue,
@@ -353,17 +360,51 @@ export async function setupDesktopLayout(
     bgColor: colors.bgColor,
   })
 
+  // Parse URL state for shareable links
+  const urlState = parseURLState()
+  const urlRuleset = parseURLRuleset()
+
+  // State - declare before using in URL parameter processing
+  let currentRuleset: C4Ruleset
+  let initialConditionType: 'center' | 'random' | 'patch' = 'patch'
+  let displayMode: DisplayMode = 'orbits'
+  let statsUpdateInterval: number | null = null
+
+  // Apply URL seed if provided
+  if (urlState.seed !== undefined) {
+    cellularAutomata.setSeed(urlState.seed)
+    console.log('[desktop] Using seed from URL:', urlState.seed)
+  }
+
+  // Apply seedType from URL if provided (affects initial condition later)
+  if (urlState.seedType) {
+    initialConditionType = urlState.seedType
+    console.log('[desktop] Using seed type from URL:', urlState.seedType)
+    // Update radio button selection
+    if (urlState.seedType === 'center') {
+      radioCenterSeed.checked = true
+    } else if (urlState.seedType === 'random') {
+      radioRandomSeed.checked = true
+    } else if (urlState.seedType === 'patch') {
+      radioPatchSeed.checked = true
+    }
+  }
+
+  // Apply seedPercentage from URL if provided (set slider value)
+  if (urlState.seedPercentage !== undefined) {
+    aliveSlider.value = urlState.seedPercentage.toString()
+    aliveValue.textContent = `${urlState.seedPercentage}%`
+    console.log(
+      '[desktop] Using seed percentage from URL:',
+      urlState.seedPercentage,
+    )
+  }
+
   // Initial render after construction (constructor no longer auto-renders)
   cellularAutomata.render()
 
   ctx.fillStyle = colors.bgColor
   ctx.fillRect(0, 0, ruleCanvas.width, ruleCanvas.height)
-
-  // State
-  let currentRuleset: C4Ruleset
-  let initialConditionType: 'center' | 'random' | 'patch' = 'patch'
-  let displayMode: DisplayMode = 'orbits'
-  let statsUpdateInterval: number | null = null
 
   // Functions
   function applyInitialCondition() {
@@ -383,6 +424,7 @@ export async function setupDesktopLayout(
       progressBar,
     )
     initializeSimulationMetadata()
+    updateURL()
   }
 
   function initializeSimulationMetadata() {
@@ -404,6 +446,23 @@ export async function setupDesktopLayout(
       requestedStepsPerSecond: cellularAutomata.isCurrentlyPlaying()
         ? stepsPerSecond
         : undefined,
+    })
+  }
+
+  function updateURL() {
+    const rulesetHex = c4RulesetToHex(currentRuleset)
+    const seed = cellularAutomata.getSeed()
+
+    let seedPercentage: number | undefined
+    if (initialConditionType === 'random' || initialConditionType === 'patch') {
+      seedPercentage = Number.parseInt(aliveSlider.value)
+    }
+
+    updateURLWithoutReload({
+      rulesetHex,
+      seed,
+      seedType: initialConditionType,
+      seedPercentage,
     })
   }
 
@@ -432,23 +491,41 @@ export async function setupDesktopLayout(
       const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
       cellularAutomata.play(stepsPerSecond, expanded)
     }
+    // URL already updated by applyInitialCondition()
   }
 
-  // Initialize with Conway
-  const conwayRuleset = makeC4Ruleset(conwayRule, orbitLookup)
-  currentRuleset = conwayRuleset
-  renderRule(
-    conwayRuleset,
-    orbitLookup,
-    ctx,
-    ruleCanvas,
-    ruleLabelDisplay,
-    ruleIdDisplay,
-    'Conway',
-    displayMode,
-    colors.fgColor,
-    colors.bgColor,
-  )
+  // Initialize with URL ruleset if available, otherwise Conway
+  if (urlRuleset) {
+    currentRuleset = urlRuleset.ruleset
+    renderRule(
+      urlRuleset.ruleset,
+      orbitLookup,
+      ctx,
+      ruleCanvas,
+      ruleLabelDisplay,
+      ruleIdDisplay,
+      'Shared Rule',
+      displayMode,
+      colors.fgColor,
+      colors.bgColor,
+    )
+    console.log('[desktop] Loaded rule from URL:', urlRuleset.hex)
+  } else {
+    const conwayRuleset = makeC4Ruleset(conwayRule, orbitLookup)
+    currentRuleset = conwayRuleset
+    renderRule(
+      conwayRuleset,
+      orbitLookup,
+      ctx,
+      ruleCanvas,
+      ruleLabelDisplay,
+      ruleIdDisplay,
+      'Conway',
+      displayMode,
+      colors.fgColor,
+      colors.bgColor,
+    )
+  }
 
   // Now apply initial condition which will also initialize simulation metadata
   applyInitialCondition()
@@ -476,6 +553,12 @@ export async function setupDesktopLayout(
       newColors.fgColor,
       newColors.bgColor,
     )
+  })
+
+  // Setup benchmark modal
+  const benchmarkModal = setupBenchmarkModal(orbitLookup)
+  addEventListener(btnBenchmark, 'click', () => {
+    benchmarkModal.show()
   })
 
   // Canvas click handler
@@ -631,7 +714,23 @@ export async function setupDesktopLayout(
   })
 
   addEventListener(btnReset, 'click', () => {
-    applyInitialCondition()
+    // Soft reset for patch and random modes (advances seed for new random ICs)
+    // Center mode keeps existing behavior (deterministic single pixel)
+    if (initialConditionType === 'patch' || initialConditionType === 'random') {
+      cellularAutomata.pause()
+      cellularAutomata.clearGrid()
+      cellularAutomata.softReset()
+      cellularAutomata.render()
+      updateStatisticsDisplay(
+        cellularAutomata,
+        summaryPanel.elements,
+        progressBar,
+      )
+      initializeSimulationMetadata()
+      updateURL()
+    } else {
+      applyInitialCondition()
+    }
   })
 
   addEventListener(btnPlay, 'click', () => {
@@ -784,6 +883,7 @@ export async function setupDesktopLayout(
       element.removeEventListener(event, handler)
     }
     cleanupTheme()
+    benchmarkModal.cleanup()
     console.log('Desktop layout cleaned up')
   }
 }

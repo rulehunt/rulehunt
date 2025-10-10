@@ -10,16 +10,14 @@ export class CellularAutomata
   implements ICellularAutomata
 {
   private nextGrid: Uint8Array
-  private neighborOffsets: number[]
 
-  constructor(canvas: HTMLCanvasElement, options: CellularAutomataOptions) {
+  constructor(
+    canvas: HTMLCanvasElement | null,
+    options: CellularAutomataOptions,
+  ) {
     super(canvas, options)
 
     this.nextGrid = new Uint8Array(this.gridArea)
-
-    // Precompute neighbor offsets for the 3x3 kernel
-    const c = this.gridCols
-    this.neighborOffsets = [-c - 1, -c, -c + 1, -1, 0, 1, c - 1, c, c + 1]
 
     this.randomSeed()
   }
@@ -29,7 +27,10 @@ export class CellularAutomata
     const rows = this.gridRows
     const grid = this.grid
     const next = this.nextGrid
-    const offsets = this.neighborOffsets
+
+    // 3x3 neighborhood offsets in reading order (top-left to bottom-right)
+    const dx = [-1, 0, 1, -1, 0, 1, -1, 0, 1]
+    const dy = [-1, -1, -1, 0, 0, 0, 1, 1, 1]
 
     for (let y = 0; y < rows; y++) {
       const yOffset = y * cols
@@ -37,9 +38,8 @@ export class CellularAutomata
         let index = 0
         let bit = 0
         for (let k = 0; k < 9; k++) {
-          const off = offsets[k]
-          const nx = (x + (off % cols) + cols) % cols
-          const ny = (y + Math.floor(off / cols) + rows) % rows
+          const nx = (x + dx[k] + cols) % cols
+          const ny = (y + dy[k] + rows) % rows
           if (grid[ny * cols + nx]) index |= 1 << bit
           bit++
         }
@@ -59,9 +59,13 @@ export class CellularAutomata
 
   protected cleanup() {
     this.nextGrid = new Uint8Array(this.gridArea)
+  }
 
-    // Recompute offsets in case grid dimensions changed
-    const c = this.gridCols
-    this.neighborOffsets = [-c - 1, -c, -c + 1, -1, 0, 1, c - 1, c, c + 1]
+  /**
+   * No-op for CPU (grid is always in sync).
+   * Exists for API compatibility with GPU implementation.
+   */
+  public syncToHost() {
+    // CPU grid is always synced - nothing to do
   }
 }
