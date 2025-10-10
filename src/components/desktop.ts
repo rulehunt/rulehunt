@@ -948,10 +948,10 @@ export async function setupDesktopLayout(
         mobileWrapper.className =
           'fixed inset-0 z-40 flex justify-center items-center bg-black/20 backdrop-blur-sm'
 
-        // Create phone frame
+        // Create phone frame with fixed height
         const phoneFrame = document.createElement('div')
         phoneFrame.className =
-          'w-[390px] max-h-[844px] overflow-y-auto bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] relative flex flex-col border-2 border-purple-500'
+          'w-[390px] h-[844px] bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] relative flex flex-col border-2 border-purple-500 overflow-hidden'
 
         // Create return button
         const returnButton = document.createElement('button')
@@ -960,11 +960,12 @@ export async function setupDesktopLayout(
         returnButton.textContent = '← Return to Desktop'
         returnButton.onclick = toggleMobilePreview
 
-        // Clone and append main content
+        // Create mobile content container that fills remaining space
         const mobileContent = document.createElement('div')
-        mobileContent.className = 'flex-1 overflow-auto'
-        // Replace the entire appRoot content with mobile layout
-        mobileContent.innerHTML = '<div id="mobile-app-root" style="width: 100%; height: 100%; position: relative;"></div>'
+        mobileContent.className = 'flex-1 overflow-hidden relative'
+        // Mobile app root will fill the mobileContent container
+        mobileContent.innerHTML =
+          '<div id="mobile-app-root" style="width: 100%; height: 100%; position: absolute; inset: 0;"></div>'
 
         phoneFrame.appendChild(returnButton)
         phoneFrame.appendChild(mobileContent)
@@ -980,7 +981,7 @@ export async function setupDesktopLayout(
         ) as HTMLDivElement
         ;(async () => {
           // Wait for layout to complete so dimensions are available
-          await new Promise(resolve => requestAnimationFrame(resolve))
+          await new Promise((resolve) => requestAnimationFrame(resolve))
           const { setupMobileLayout } = await import('./mobile.ts')
           await setupMobileLayout(mobileAppRoot)
         })()
