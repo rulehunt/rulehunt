@@ -32,6 +32,7 @@ import {
 import { createAutoFadeContainer } from './buttonContainer.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 import { createRoundButton } from './roundButton.ts'
+import { createStarButton } from './starButton.ts'
 
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
@@ -748,76 +749,6 @@ function createShareButton(onResetFade?: () => void): {
   return { button, cleanup }
 }
 
-// --- Star Button (toggle starred status) -----------------------------------
-function createStarButton(
-  getIsStarred: () => boolean,
-  onToggle: (isStarred: boolean) => void,
-  onResetFade?: () => void,
-): {
-  button: HTMLButtonElement
-  cleanup: () => void
-} {
-  const starFilledIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-         fill="currentColor" class="w-6 h-6">
-      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-    </svg>`
-
-  const starOutlineIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-         fill="none" stroke="currentColor" stroke-width="2" class="w-6 h-6">
-      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-    </svg>`
-
-  const updateButtonAppearance = (button: HTMLButtonElement) => {
-    const isStarred = getIsStarred()
-    button.innerHTML = isStarred ? starFilledIcon : starOutlineIcon
-
-    // Update background color
-    if (isStarred) {
-      button.className = button.className.replace(
-        /bg-gray-800 dark:bg-gray-700/,
-        'bg-yellow-500',
-      )
-      button.className = button.className.replace(
-        /hover:bg-gray-700 dark:hover:bg-gray-600/,
-        'hover:bg-yellow-400',
-      )
-    } else {
-      button.className = button.className.replace(
-        /bg-yellow-500/,
-        'bg-gray-800 dark:bg-gray-700',
-      )
-      button.className = button.className.replace(
-        /hover:bg-yellow-400/,
-        'hover:bg-gray-700 dark:hover:bg-gray-600',
-      )
-    }
-  }
-
-  const { button, cleanup } = createRoundButton(
-    {
-      icon: starOutlineIcon,
-      title: 'Star this simulation',
-      onClick: () => {
-        if (isTransitioning) return
-
-        const newStarredState = !getIsStarred()
-        onToggle(newStarredState)
-        updateButtonAppearance(button)
-        onResetFade?.()
-      },
-      preventTransition: true,
-    },
-    () => isTransitioning,
-  )
-
-  // Set initial appearance
-  updateButtonAppearance(button)
-
-  return { button, cleanup }
-}
-
 // --- Main -------------------------------------------------------------------
 export async function setupMobileLayout(
   appRoot: HTMLDivElement,
@@ -1097,13 +1028,14 @@ export async function setupMobileLayout(
     () => showStats(getCurrentRunData()),
     resetControlFade,
   )
-  let starBtn = createStarButton(
-    () => currentIsStarred,
-    (isStarred) => {
+  let starBtn = createStarButton({
+    getIsStarred: () => currentIsStarred,
+    onToggle: (isStarred) => {
       currentIsStarred = isStarred
     },
-    resetControlFade,
-  )
+    onResetFade: resetControlFade,
+    isTransitioning: () => isTransitioning,
+  })
   let softResetButton = createSoftResetButton(
     () => {
       softResetAutomata(onScreenCA)
@@ -1202,13 +1134,14 @@ export async function setupMobileLayout(
         () => showStats(getCurrentRunData()),
         resetControlFade,
       )
-      starBtn = createStarButton(
-        () => currentIsStarred,
-        (isStarred) => {
+      starBtn = createStarButton({
+        getIsStarred: () => currentIsStarred,
+        onToggle: (isStarred) => {
           currentIsStarred = isStarred
         },
-        resetControlFade,
-      )
+        onResetFade: resetControlFade,
+        isTransitioning: () => isTransitioning,
+      })
       softResetButton = createSoftResetButton(
         () => {
           softResetAutomata(onScreenCA)
