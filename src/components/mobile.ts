@@ -845,26 +845,6 @@ function createShareButton(onResetFade?: () => void): {
 export async function setupMobileLayout(
   appRoot: HTMLDivElement,
 ): Promise<CleanupFunction> {
-  // Apply mobile-specific viewport constraints to html and body
-  const html = document.documentElement
-  const body = document.body
-  const originalHtmlStyle = {
-    width: html.style.width,
-    height: html.style.height,
-    overflow: html.style.overflow,
-  }
-  const originalBodyStyle = {
-    height: body.style.height,
-    overflow: body.style.overflow,
-  }
-
-  // Set mobile viewport constraints
-  html.style.width = '100%'
-  html.style.height = '100%'
-  html.style.overflow = 'hidden'
-  body.style.height = '100dvh'
-  body.style.overflow = 'hidden'
-
   const container = document.createElement('div')
   // Use absolute positioning instead of fixed to work correctly inside preview frame
   container.className =
@@ -1330,13 +1310,6 @@ export async function setupMobileLayout(
   ])
 
   return () => {
-    // Restore original viewport styles
-    html.style.width = originalHtmlStyle.width
-    html.style.height = originalHtmlStyle.height
-    html.style.overflow = originalHtmlStyle.overflow
-    body.style.height = originalBodyStyle.height
-    body.style.overflow = originalBodyStyle.overflow
-
     onScreenCA.pause()
     offScreenCA.pause()
     cleanupSwipe()
