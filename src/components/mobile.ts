@@ -24,11 +24,13 @@ import {
 } from '../utils.ts'
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 
+import { fetchStarredPattern } from '../api/starred.ts'
 import {
   parseURLRuleset,
   parseURLState,
   updateURLWithoutReload,
 } from '../urlState.ts'
+import { hexToC4Ruleset } from '../utils.ts'
 import { createAutoFadeContainer } from './buttonContainer.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 import { createRoundButton } from './roundButton.ts'
@@ -38,6 +40,7 @@ import { createStarButton } from './starButton.ts'
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 60
 const TARGET_GRID_SIZE = 600_000
+const STARRED_PATTERN_PROBABILITY = 0.2 // 20% starred, 80% random
 
 const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1
 const SWIPE_COMMIT_MIN_DISTANCE = 50
@@ -522,6 +525,41 @@ function generateRandomRule(): RuleData {
   }
 }
 
+/**
+ * Exploration/Exploitation Strategy:
+ * 20% of the time, load a starred pattern from the database (exploitation)
+ * 80% of the time, generate a new random rule (exploration)
+ */
+async function generateNextRule(): Promise<RuleData> {
+  const shouldUseStarred = Math.random() < STARRED_PATTERN_PROBABILITY
+
+  if (shouldUseStarred) {
+    try {
+      const starred = await fetchStarredPattern()
+      if (starred) {
+        console.log(
+          '[generateNextRule] Using starred pattern:',
+          starred.ruleset_name,
+        )
+        const ruleset = hexToC4Ruleset(starred.ruleset_hex)
+        return {
+          name: starred.ruleset_name,
+          hex: starred.ruleset_hex,
+          ruleset,
+        }
+      }
+    } catch (err) {
+      console.warn(
+        '[generateNextRule] Failed to fetch starred pattern, falling back to random:',
+        err,
+      )
+    }
+  }
+
+  // Fallback to random rule (either by design or if starred fetch failed)
+  return generateRandomRule()
+}
+
 // --- Explicit rule setup and play functions ---------------------------------
 
 /**
@@ -916,7 +954,8 @@ export async function setupMobileLayout(
     }
   }
 
-  let offScreenRule = generateRandomRule()
+  // Use exploration/exploitation strategy for initial offscreen rule
+  let offScreenRule = await generateNextRule()
 
   // Apply URL seed if provided (only on initial load)
   if (urlState.seed !== undefined) {
@@ -1103,14 +1142,15 @@ export async function setupMobileLayout(
       updateHeaderColor(col)
 
       // Defer CA operations by one frame to let layout settle
-      setTimeout(() => {
+      setTimeout(async () => {
         initializeRunStats(onScreenCA, onScreenRule)
 
         // Start the newly visible CA and render
         startAutomata(onScreenCA, onScreenRule)
 
         // Prepare offscreen CA for the next swipe with explicit render
-        offScreenRule = generateRandomRule()
+        // Use exploration/exploitation strategy (80% random, 20% starred)
+        offScreenRule = await generateNextRule()
         prepareAutomata(offScreenCA, offScreenRule, lookup, 50)
         offscreenReady = true
 
