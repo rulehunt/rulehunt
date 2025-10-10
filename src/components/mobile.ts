@@ -647,6 +647,7 @@ function createStatsButton(
   button.className += ' absolute'
   button.style.bottom = '16px'
   button.style.right = '80px'
+  button.style.zIndex = '10'
 
   parent.appendChild(button)
   return { button, cleanup }
@@ -700,6 +701,7 @@ function createSoftResetButton(
   button.className += ' absolute'
   button.style.bottom = '16px'
   button.style.right = '16px'
+  button.style.zIndex = '10'
 
   parent.appendChild(button)
   return { button, cleanup: cleanupButton }
@@ -753,6 +755,7 @@ function createShareButton(parent: HTMLElement): {
   button.className += ' absolute'
   button.style.bottom = '16px'
   button.style.right = '144px'
+  button.style.zIndex = '10'
 
   parent.appendChild(button)
   return { button, cleanup }
