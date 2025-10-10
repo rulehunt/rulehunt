@@ -44,59 +44,6 @@ export function createZoomSlider(options: ZoomSliderOptions = {}): {
     </button>
 
     <div class="flex flex-col items-center flex-1 justify-center gap-2">
-      <style>
-        #zoom-slider::-webkit-slider-runnable-track {
-          width: 8px;
-          height: 100%;
-          background: #d1d5db; /* gray-300 */
-          border-radius: 4px;
-        }
-        .dark #zoom-slider::-webkit-slider-runnable-track {
-          background: #4b5563; /* gray-600 */
-        }
-        #zoom-slider::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 20px;
-          height: 20px;
-          background: #6b7280; /* gray-500 */
-          border: 2px solid #ffffff;
-          border-radius: 50%;
-          cursor: pointer;
-        }
-        .dark #zoom-slider::-webkit-slider-thumb {
-          background: #9ca3af; /* gray-400 */
-          border-color: #1f2937; /* gray-800 */
-        }
-        #zoom-slider::-webkit-slider-thumb:hover {
-          background: #4b5563; /* gray-600 */
-        }
-        .dark #zoom-slider::-webkit-slider-thumb:hover {
-          background: #d1d5db; /* gray-300 */
-        }
-        /* Firefox */
-        #zoom-slider::-moz-range-track {
-          width: 8px;
-          height: 100%;
-          background: #d1d5db;
-          border-radius: 4px;
-        }
-        .dark #zoom-slider::-moz-range-track {
-          background: #4b5563;
-        }
-        #zoom-slider::-moz-range-thumb {
-          width: 20px;
-          height: 20px;
-          background: #6b7280;
-          border: 2px solid #ffffff;
-          border-radius: 50%;
-          cursor: pointer;
-        }
-        .dark #zoom-slider::-moz-range-thumb {
-          background: #9ca3af;
-          border-color: #1f2937;
-        }
-      </style>
       <input
         type="range"
         id="zoom-slider"
@@ -105,11 +52,8 @@ export function createZoomSlider(options: ZoomSliderOptions = {}): {
         value="${initial}"
         step="${step}"
         orient="vertical"
-        class="flex-1 appearance-none cursor-pointer [writing-mode:vertical-lr] [direction:rtl]"
-        style="
-          -webkit-appearance: slider-vertical;
-          width: 20px;
-        "
+        class="flex-1 cursor-pointer [writing-mode:vertical-lr] [direction:rtl]"
+        style="-webkit-appearance: slider-vertical;"
         aria-label="Zoom level"
         aria-valuemin="${min}"
         aria-valuemax="${max}"
