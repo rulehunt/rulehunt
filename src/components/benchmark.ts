@@ -419,6 +419,11 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
       // Create new chart
       const ctx = chartCanvas.getContext('2d')
       if (ctx) {
+        // Detect dark mode for chart styling
+        const isDarkMode = document.documentElement.classList.contains('dark')
+        const textColor = isDarkMode ? '#e5e7eb' : '#374151'
+        const gridColor = isDarkMode ? '#4b5563' : '#d1d5db'
+
         const config: ChartConfiguration = {
           type: 'line',
           data: {
@@ -447,6 +452,7 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
               title: {
                 display: true,
                 text: 'CPU vs GPU Performance Scaling',
+                color: textColor,
               },
               tooltip: {
                 mode: 'index',
@@ -455,6 +461,9 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
               legend: {
                 display: true,
                 position: 'top',
+                labels: {
+                  color: textColor,
+                },
               },
             },
             scales: {
@@ -463,6 +472,13 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
                 title: {
                   display: true,
                   text: 'Grid Size',
+                  color: textColor,
+                },
+                ticks: {
+                  color: textColor,
+                },
+                grid: {
+                  color: gridColor,
                 },
               },
               y: {
@@ -470,6 +486,13 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
                 title: {
                   display: true,
                   text: 'Time (ms) for 50 steps',
+                  color: textColor,
+                },
+                ticks: {
+                  color: textColor,
+                },
+                grid: {
+                  color: gridColor,
                 },
                 beginAtZero: true,
               },
