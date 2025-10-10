@@ -19,8 +19,8 @@ import {
   updateURLWithoutReload,
 } from '../urlState.ts'
 import { setupBenchmarkModal } from './benchmark.ts'
+import { setupDataModeLayout } from './dataMode.ts'
 import { createHeader, setupTheme } from './desktopHeader.ts'
-import { setupHeadlessLayout } from './headless.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
@@ -230,11 +230,11 @@ function handleCanvasClick(
 export async function setupDesktopLayout(
   appRoot: HTMLDivElement,
 ): Promise<CleanupFunction> {
-  // Check for headless mode
+  // Check for data mode
   const urlParams = new URLSearchParams(window.location.search)
-  if (urlParams.get('headless') === 'true') {
-    console.log('[desktop] Headless mode detected, routing to headless layout')
-    return setupHeadlessLayout(appRoot)
+  if (urlParams.get('dataMode') === 'true') {
+    console.log('[desktop] Data mode detected, routing to data mode layout')
+    return setupDataModeLayout(appRoot)
   }
 
   // Track all cleanup tasks
@@ -581,9 +581,9 @@ export async function setupDesktopLayout(
     benchmarkModal.show()
   })
 
-  // Headless mode button
+  // Data mode button
   addEventListener(btnHeadless, 'click', () => {
-    window.location.href = `${window.location.origin}${window.location.pathname}?headless=true`
+    window.location.href = `${window.location.origin}${window.location.pathname}?dataMode=true`
   })
 
   // Canvas click handler

@@ -61,8 +61,8 @@ export function createSimulationPanel(): {
       <button id="btn-benchmark" class="px-4 py-2 rounded-md border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900 text-sm hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2" title="Run GPU vs CPU performance benchmark">
         Benchmark
       </button>
-      <button id="btn-headless" class="px-4 py-2 rounded-md border border-purple-300 dark:border-purple-600 bg-purple-50 dark:bg-purple-900 text-sm hover:bg-purple-100 dark:hover:bg-purple-800 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:ring-offset-2" title="Enter headless data generation mode">
-        🤖 Headless
+      <button id="btn-headless" class="px-4 py-2 rounded-md border border-purple-300 dark:border-purple-600 bg-purple-50 dark:bg-purple-900 text-sm hover:bg-purple-100 dark:hover:bg-purple-800 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:ring-offset-2" title="Enter data generation mode">
+        🤖 Data
       </button>
       <label for="steps-per-second" class="ml-2">Steps/sec:</label>
       <input type="number" id="steps-per-second" min="1" max="1000" value="1000" class="w-auto min-w-[6rem] px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
