@@ -1,12 +1,12 @@
-// src/headlessRunner.ts
+// src/dataRunner.ts
 
 import { saveRun } from './api/save'
 import { CellularAutomata } from './cellular-automata-cpu'
 import {
   incrementSaveErrorCount,
-  loadHeadlessStats,
+  loadDataStats,
   updateAccumulatedStats,
-} from './headlessStorage'
+} from './dataStorage'
 import { outlierRule } from './outlier-rule'
 import type { C4Ruleset, RunSubmission } from './schema'
 import {
@@ -23,7 +23,7 @@ const GRID_COLS = 400
 const DELAY_BETWEEN_RUNS_MS = 100
 const SAVE_RETRY_ATTEMPTS = 3
 
-export interface HeadlessState {
+export interface DataModeState {
   roundCount: number
   rulesetName: string
   rulesetHex: string
@@ -32,7 +32,7 @@ export interface HeadlessState {
   interestScore?: number
 }
 
-export type HeadlessProgressCallback = (state: HeadlessState) => void
+export type DataProgressCallback = (state: DataModeState) => void
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -83,10 +83,10 @@ async function saveRunWithRetry(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       await saveRun(payload)
-      console.log(`[Headless] Run saved successfully (attempt ${attempt})`)
+      console.log(`[DataMode] Run saved successfully (attempt ${attempt})`)
       return true
     } catch (error) {
-      console.error(`[Headless] Save failed (attempt ${attempt}):`, error)
+      console.error(`[DataMode] Save failed (attempt ${attempt}):`, error)
 
       if (attempt < maxRetries) {
         // Exponential backoff: 1s, 2s, 4s
@@ -94,7 +94,7 @@ async function saveRunWithRetry(
         await delay(delayMs)
       } else {
         // Final failure - log and update error counter
-        console.error('[Headless] All retry attempts failed')
+        console.error('[DataMode] All retry attempts failed')
         incrementSaveErrorCount()
         return false
       }
@@ -103,13 +103,13 @@ async function saveRunWithRetry(
   return false
 }
 
-export async function runHeadlessLoop(
+export async function runDataLoop(
   orbitLookup: Uint8Array,
-  onProgress: HeadlessProgressCallback,
+  onProgress: DataProgressCallback,
   pauseCheck: () => boolean,
 ): Promise<() => void> {
   let shouldStop = false
-  const stats = loadHeadlessStats()
+  const stats = loadDataStats()
   let roundCount = stats.roundCount
 
   // Start the loop
@@ -130,9 +130,9 @@ export async function runHeadlessLoop(
         orbitLookup,
       )
 
-      console.log(`[Headless] Starting round ${roundCount}: ${name}`)
+      console.log(`[DataMode] Starting round ${roundCount}: ${name}`)
 
-      // 2. Create CPU cellular automata (headless - null canvas)
+      // 2. Create CPU cellular automata (no canvas for data mode)
       const ca = new CellularAutomata(null, {
         gridRows: GRID_ROWS,
         gridCols: GRID_COLS,
@@ -211,7 +211,7 @@ export async function runHeadlessLoop(
         entitiesAlive: recentStats.entitiesAlive,
         entitiesDied: recentStats.entitiesDied,
         interestScore,
-        simVersion: 'v0.1.0-headless',
+        simVersion: 'v0.1.0-datamode',
         engineCommit: undefined,
         extraScores: undefined,
       }
@@ -231,14 +231,14 @@ export async function runHeadlessLoop(
       })
 
       console.log(
-        `[Headless] Round ${roundCount} complete: ${name} (score: ${interestScore.toFixed(1)}, ${computeTimeMs.toFixed(0)}ms)`,
+        `[DataMode] Round ${roundCount} complete: ${name} (score: ${interestScore.toFixed(1)}, ${computeTimeMs.toFixed(0)}ms)`,
       )
 
       // 10. Small delay to prevent browser freezing
       await delay(DELAY_BETWEEN_RUNS_MS)
     }
 
-    console.log('[Headless] Loop stopped')
+    console.log('[DataMode] Loop stopped')
   })()
 
   // Return stop function
