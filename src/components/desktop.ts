@@ -951,7 +951,7 @@ export async function setupDesktopLayout(
         // Create phone frame
         const phoneFrame = document.createElement('div')
         phoneFrame.className =
-          'w-[390px] max-h-[844px] overflow-y-auto bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] relative flex flex-col'
+          'w-[390px] max-h-[844px] overflow-y-auto bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] relative flex flex-col border-2 border-purple-500'
 
         // Create return button
         const returnButton = document.createElement('button')
