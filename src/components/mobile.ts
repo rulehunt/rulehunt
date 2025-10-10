@@ -829,8 +829,9 @@ export async function setupMobileLayout(
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-radius: 9999px;
-      padding: 14px 32px;
+      padding: 14px 40px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      white-space: nowrap;
     }
     @media (prefers-color-scheme: dark) {
       .instruction-oval {
