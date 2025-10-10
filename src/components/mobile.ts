@@ -24,11 +24,13 @@ import {
 } from '../utils.ts'
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 
+import { fetchStarredPattern } from '../api/starred.ts'
 import {
   parseURLRuleset,
   parseURLState,
   updateURLWithoutReload,
 } from '../urlState.ts'
+import { hexToC4Ruleset } from '../utils.ts'
 import { createAutoFadeContainer } from './buttonContainer.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
 import { createRoundButton } from './roundButton.ts'
@@ -38,6 +40,7 @@ import { createStarButton } from './starButton.ts'
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 60
 const TARGET_GRID_SIZE = 600_000
+const STARRED_PATTERN_PROBABILITY = 0.2 // 20% starred, 80% random
 
 const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1
 const SWIPE_COMMIT_MIN_DISTANCE = 50
@@ -75,11 +78,13 @@ export type CleanupFunction = () => void
 
 // Runtime rule container used only on mobile.ts.
 // Combines a C4 or expanded ruleset plus optional cached expansion.
+// For starred patterns, also includes the saved seed for exact reproduction.
 export type RuleData = {
   name: string
   hex: string
   ruleset: C4Ruleset | Ruleset
   expanded?: Ruleset
+  seed?: number // Saved seed from starred pattern (for exact reproduction)
 }
 
 // --- Cellular Automata Engine  ----------------------------------------------
@@ -522,11 +527,50 @@ function generateRandomRule(): RuleData {
   }
 }
 
+/**
+ * Exploration/Exploitation Strategy:
+ * 20% of the time, load a starred pattern from the database (exploitation)
+ * 80% of the time, generate a new random rule (exploration)
+ */
+async function generateNextRule(): Promise<RuleData> {
+  const shouldUseStarred = Math.random() < STARRED_PATTERN_PROBABILITY
+
+  if (shouldUseStarred) {
+    try {
+      const starred = await fetchStarredPattern()
+      if (starred) {
+        console.log(
+          '[generateNextRule] Using starred pattern:',
+          starred.ruleset_name,
+          'seed:',
+          starred.seed,
+        )
+        const ruleset = hexToC4Ruleset(starred.ruleset_hex)
+        return {
+          name: starred.ruleset_name,
+          hex: starred.ruleset_hex,
+          ruleset,
+          seed: starred.seed, // Include saved seed for exact reproduction
+        }
+      }
+    } catch (err) {
+      console.warn(
+        '[generateNextRule] Failed to fetch starred pattern, falling back to random:',
+        err,
+      )
+    }
+  }
+
+  // Fallback to random rule (either by design or if starred fetch failed)
+  return generateRandomRule()
+}
+
 // --- Explicit rule setup and play functions ---------------------------------
 
 /**
  * Prepare a CA with the given rule and seed, paused and rendered.
  * All operations are explicit - no hidden side effects.
+ * If the rule contains a saved seed (from starred pattern), apply it for exact reproduction.
  */
 function prepareAutomata(
   cellularAutomata: ICellularAutomata,
@@ -536,6 +580,13 @@ function prepareAutomata(
 ): void {
   cellularAutomata.pause()
   cellularAutomata.clearGrid()
+
+  // If rule has a saved seed (starred pattern), apply it for exact reproduction
+  if (rule.seed !== undefined) {
+    cellularAutomata.setSeed(rule.seed)
+    console.log('[prepareAutomata] Applied saved seed:', rule.seed)
+  }
+
   cellularAutomata.patchSeed(seedPercentage)
 
   if (!rule.expanded && (rule.ruleset as number[]).length === 140) {
@@ -916,7 +967,8 @@ export async function setupMobileLayout(
     }
   }
 
-  let offScreenRule = generateRandomRule()
+  // Use exploration/exploitation strategy for initial offscreen rule
+  let offScreenRule = await generateNextRule()
 
   // Apply URL seed if provided (only on initial load)
   if (urlState.seed !== undefined) {
@@ -1103,14 +1155,15 @@ export async function setupMobileLayout(
       updateHeaderColor(col)
 
       // Defer CA operations by one frame to let layout settle
-      setTimeout(() => {
+      setTimeout(async () => {
         initializeRunStats(onScreenCA, onScreenRule)
 
         // Start the newly visible CA and render
         startAutomata(onScreenCA, onScreenRule)
 
         // Prepare offscreen CA for the next swipe with explicit render
-        offScreenRule = generateRandomRule()
+        // Use exploration/exploitation strategy (80% random, 20% starred)
+        offScreenRule = await generateNextRule()
         prepareAutomata(offScreenCA, offScreenRule, lookup, 50)
         offscreenReady = true
 
