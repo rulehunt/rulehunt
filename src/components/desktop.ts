@@ -946,29 +946,25 @@ export async function setupDesktopLayout(
         const mobileWrapper = document.createElement('div')
         mobileWrapper.id = 'mobile-preview-wrapper'
         mobileWrapper.className =
-          'fixed inset-0 z-40 flex justify-center items-center bg-black/20 backdrop-blur-sm'
+          'fixed inset-0 z-40 flex flex-col justify-center items-center gap-4 bg-black/20 backdrop-blur-sm p-8'
+
+        // Create return button (outside phone frame)
+        const returnButton = document.createElement('button')
+        returnButton.className =
+          'px-6 py-3 bg-black/80 dark:bg-white/80 text-white dark:text-black rounded-lg cursor-pointer hover:bg-black/90 dark:hover:bg-white/90 transition-colors font-medium shadow-lg'
+        returnButton.textContent = '← Return to Desktop'
+        returnButton.onclick = toggleMobilePreview
 
         // Create phone frame with fixed height
         const phoneFrame = document.createElement('div')
         phoneFrame.className =
-          'w-[390px] h-[844px] bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] relative flex flex-col border-2 border-purple-500 overflow-hidden'
+          'w-[390px] h-[844px] bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] flex flex-col border-2 border-purple-500 overflow-hidden'
 
-        // Create return button
-        const returnButton = document.createElement('button')
-        returnButton.className =
-          'sticky top-0 z-50 w-full bg-black/80 dark:bg-white/80 text-white dark:text-black py-3 px-4 text-center cursor-pointer hover:bg-black/90 dark:hover:bg-white/90 transition-colors font-medium'
-        returnButton.textContent = '← Return to Desktop'
-        returnButton.onclick = toggleMobilePreview
+        // Mobile app root fills the entire phone frame
+        phoneFrame.innerHTML =
+          '<div id="mobile-app-root" style="width: 100%; height: 100%; position: relative;"></div>'
 
-        // Create mobile content container that fills remaining space
-        const mobileContent = document.createElement('div')
-        mobileContent.className = 'flex-1 overflow-hidden relative'
-        // Mobile app root will fill the mobileContent container
-        mobileContent.innerHTML =
-          '<div id="mobile-app-root" style="width: 100%; height: 100%; position: absolute; inset: 0;"></div>'
-
-        phoneFrame.appendChild(returnButton)
-        phoneFrame.appendChild(mobileContent)
+        mobileWrapper.appendChild(returnButton)
         mobileWrapper.appendChild(phoneFrame)
 
         // Hide desktop content and show mobile preview
