@@ -93,7 +93,7 @@ function calculateStdDev(values: number[]): number {
  * Run a single benchmark iteration for CPU implementation
  */
 function benchmarkCPU(
-  canvas: HTMLCanvasElement,
+  canvas: HTMLCanvasElement | null,
   rows: number,
   cols: number,
   ruleset: C4Ruleset,
@@ -128,7 +128,7 @@ function benchmarkCPU(
  * Run a single benchmark iteration for GPU implementation
  */
 function benchmarkGPU(
-  canvas: HTMLCanvasElement,
+  canvas: HTMLCanvasElement | null,
   rows: number,
   cols: number,
   ruleset: C4Ruleset,
@@ -173,20 +173,14 @@ export async function runBenchmarkSuite(
   const results: BenchmarkResult[] = []
   const ruleset = makeC4Ruleset(conwayRule, orbitLookup)
 
-  // Create offscreen canvas for testing
-  const canvas = document.createElement('canvas')
-
   const totalTests = config.gridSizes.length * 2 // CPU + GPU for each size
   let currentTest = 0
 
   for (const { rows, cols, name, cells } of config.gridSizes) {
-    canvas.width = cols
-    canvas.height = rows
-
-    // Run CPU test
+    // Run CPU test (headless - no canvas)
     onProgress?.(currentTest++, totalTests, `CPU ${name}`)
     const cpuTime = benchmarkCPU(
-      canvas,
+      null,
       rows,
       cols,
       ruleset,
@@ -197,10 +191,10 @@ export async function runBenchmarkSuite(
     // Small delay to prevent blocking UI
     await new Promise((resolve) => setTimeout(resolve, 10))
 
-    // Run GPU test
+    // Run GPU test (headless - no canvas)
     onProgress?.(currentTest++, totalTests, `GPU ${name}`)
     const gpuTime = benchmarkGPU(
-      canvas,
+      null,
       rows,
       cols,
       ruleset,
