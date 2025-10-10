@@ -17,6 +17,10 @@ import {
   Title,
   Tooltip,
 } from 'chart.js'
+import {
+  LineWithErrorBarsController,
+  PointWithErrorBar,
+} from 'chartjs-chart-error-bars'
 import { CellularAutomata as CellularAutomataCPU } from '../cellular-automata-cpu'
 import { GPUCellularAutomata as CellularAutomataGPU } from '../cellular-automata-gpu'
 import type { C4Ruleset } from '../schema'
@@ -32,6 +36,8 @@ Chart.register(
   Tooltip,
   Legend,
   CategoryScale,
+  LineWithErrorBarsController,
+  PointWithErrorBar,
 )
 
 export interface BenchmarkResult {
@@ -51,11 +57,16 @@ export interface BenchmarkConfig {
 
 const DEFAULT_CONFIG: BenchmarkConfig = {
   gridSizes: [
+    // Square grids
     { rows: 100, cols: 100, name: '100x100', cells: 10_000 },
     { rows: 200, cols: 200, name: '200x200', cells: 40_000 },
     { rows: 300, cols: 300, name: '300x300', cells: 90_000 },
     { rows: 500, cols: 500, name: '500x500', cells: 250_000 },
     { rows: 700, cols: 700, name: '700x700', cells: 490_000 },
+    // Rectangular grids
+    { rows: 200, cols: 300, name: '200x300', cells: 60_000 },
+    { rows: 300, cols: 500, name: '300x500', cells: 150_000 },
+    { rows: 500, cols: 700, name: '500x700', cells: 350_000 },
   ],
   warmupSteps: 3, // Minimal warmup to get GPU/CPU caches warm
   stepsPerTest: 10, // Single measurement per grid per round
@@ -65,6 +76,17 @@ interface AccumulatedBenchmarkResult extends BenchmarkResult {
   cpuSamples: number[] // SPS samples for CPU
   gpuSamples: number[] // SPS samples for GPU
   sampleCount: number
+}
+
+/**
+ * Calculate standard deviation of an array of numbers
+ */
+function calculateStdDev(values: number[]): number {
+  if (values.length <= 1) return 0
+  const mean = values.reduce((a, b) => a + b, 0) / values.length
+  const squaredDiffs = values.map((value) => (value - mean) ** 2)
+  const variance = squaredDiffs.reduce((a, b) => a + b, 0) / values.length
+  return Math.sqrt(variance)
 }
 
 /**
@@ -399,7 +421,7 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
     const gridColor = isDarkMode ? '#4b5563' : '#d1d5db'
 
     performanceChart = new Chart(ctx, {
-      type: 'line',
+      type: 'lineWithErrorBars',
       data: {
         labels: [],
         datasets: [
@@ -411,6 +433,11 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
             tension: 0.1,
             showLine: true,
             pointRadius: 4,
+            errorBarLineWidth: 1.5,
+            errorBarColor: '#2196F3',
+            errorBarWhiskerLineWidth: 1,
+            errorBarWhiskerColor: '#2196F3',
+            errorBarWhiskerSize: 6,
           },
           {
             label: 'GPU (SPS)',
@@ -420,6 +447,11 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
             tension: 0.1,
             showLine: true,
             pointRadius: 4,
+            errorBarLineWidth: 1.5,
+            errorBarColor: '#4CAF50',
+            errorBarWhiskerLineWidth: 1,
+            errorBarWhiskerColor: '#4CAF50',
+            errorBarWhiskerSize: 6,
           },
         ],
       },
@@ -528,8 +560,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 							<tr class="border-b border-gray-200 dark:border-gray-700">
 								<td class="p-2 text-gray-700 dark:text-gray-300">${r.gridSize}</td>
 								<td class="p-2 text-right text-gray-700 dark:text-gray-300">${r.cells.toLocaleString()}</td>
-								<td class="p-2 text-right ${cpuWinnerClass}">${r.cpuSPS.toFixed(0)}</td>
-								<td class="p-2 text-right ${gpuWinnerClass}">${r.gpuSPS.toFixed(0)}</td>
+								<td class="p-2 text-right ${cpuWinnerClass}">${r.cpuSPS.toFixed(2)}</td>
+								<td class="p-2 text-right ${gpuWinnerClass}">${r.gpuSPS.toFixed(2)}</td>
 								<td class="p-2 text-center uppercase font-bold text-gray-900 dark:text-gray-100">${r.winner}</td>
 								<td class="p-2 text-right text-gray-700 dark:text-gray-300">${r.speedup.toFixed(2)}x</td>
 								${sampleCell}
@@ -546,14 +578,39 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
     const sortedResults = [...results].sort((a, b) => a.cells - b.cells)
 
     if (performanceChart) {
-      // Update existing chart
+      // Update existing chart with error bars
       performanceChart.data.labels = sortedResults.map((r) => r.cells)
-      performanceChart.data.datasets[0].data = sortedResults.map(
-        (r) => r.cpuSPS,
-      )
-      performanceChart.data.datasets[1].data = sortedResults.map(
-        (r) => r.gpuSPS,
-      )
+
+      // CPU data with error bars (±1 std dev)
+      performanceChart.data.datasets[0].data = sortedResults.map((r) => {
+        const accResult = accumulatedResults.get(r.gridSize)
+        if (!accResult || accResult.sampleCount <= 1) {
+          return { x: r.cells, y: r.cpuSPS, yMin: r.cpuSPS, yMax: r.cpuSPS }
+        }
+        const stdDev = calculateStdDev(accResult.cpuSamples)
+        return {
+          x: r.cells,
+          y: r.cpuSPS,
+          yMin: Math.max(0, r.cpuSPS - stdDev),
+          yMax: r.cpuSPS + stdDev,
+        }
+      })
+
+      // GPU data with error bars (±1 std dev)
+      performanceChart.data.datasets[1].data = sortedResults.map((r) => {
+        const accResult = accumulatedResults.get(r.gridSize)
+        if (!accResult || accResult.sampleCount <= 1) {
+          return { x: r.cells, y: r.gpuSPS, yMin: r.gpuSPS, yMax: r.gpuSPS }
+        }
+        const stdDev = calculateStdDev(accResult.gpuSamples)
+        return {
+          x: r.cells,
+          y: r.gpuSPS,
+          yMin: Math.max(0, r.gpuSPS - stdDev),
+          yMax: r.gpuSPS + stdDev,
+        }
+      })
+
       performanceChart.update()
     } else {
       // Create new chart
@@ -565,27 +622,71 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
         const gridColor = isDarkMode ? '#4b5563' : '#d1d5db'
 
         const config: ChartConfiguration = {
-          type: 'line',
+          type: 'lineWithErrorBars',
           data: {
             labels: sortedResults.map((r) => r.cells),
             datasets: [
               {
                 label: 'CPU (SPS)',
-                data: sortedResults.map((r) => r.cpuSPS),
+                data: sortedResults.map((r) => {
+                  const accResult = accumulatedResults.get(r.gridSize)
+                  if (!accResult || accResult.sampleCount <= 1) {
+                    return {
+                      x: r.cells,
+                      y: r.cpuSPS,
+                      yMin: r.cpuSPS,
+                      yMax: r.cpuSPS,
+                    }
+                  }
+                  const stdDev = calculateStdDev(accResult.cpuSamples)
+                  return {
+                    x: r.cells,
+                    y: r.cpuSPS,
+                    yMin: Math.max(0, r.cpuSPS - stdDev),
+                    yMax: r.cpuSPS + stdDev,
+                  }
+                }),
                 borderColor: '#2196F3',
                 backgroundColor: 'rgba(33, 150, 243, 0.1)',
                 tension: 0.1,
                 showLine: true,
                 pointRadius: 4,
+                errorBarLineWidth: 1.5,
+                errorBarColor: '#2196F3',
+                errorBarWhiskerLineWidth: 1,
+                errorBarWhiskerColor: '#2196F3',
+                errorBarWhiskerSize: 6,
               },
               {
                 label: 'GPU (SPS)',
-                data: sortedResults.map((r) => r.gpuSPS),
+                data: sortedResults.map((r) => {
+                  const accResult = accumulatedResults.get(r.gridSize)
+                  if (!accResult || accResult.sampleCount <= 1) {
+                    return {
+                      x: r.cells,
+                      y: r.gpuSPS,
+                      yMin: r.gpuSPS,
+                      yMax: r.gpuSPS,
+                    }
+                  }
+                  const stdDev = calculateStdDev(accResult.gpuSamples)
+                  return {
+                    x: r.cells,
+                    y: r.gpuSPS,
+                    yMin: Math.max(0, r.gpuSPS - stdDev),
+                    yMax: r.gpuSPS + stdDev,
+                  }
+                }),
                 borderColor: '#4CAF50',
                 backgroundColor: 'rgba(76, 175, 80, 0.1)',
                 tension: 0.1,
                 showLine: true,
                 pointRadius: 4,
+                errorBarLineWidth: 1.5,
+                errorBarColor: '#4CAF50',
+                errorBarWhiskerLineWidth: 1,
+                errorBarWhiskerColor: '#4CAF50',
+                errorBarWhiskerSize: 6,
               },
             ],
           },
