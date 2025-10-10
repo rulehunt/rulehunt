@@ -60,4 +60,12 @@ export class CellularAutomata
   protected cleanup() {
     this.nextGrid = new Uint8Array(this.gridArea)
   }
+
+  /**
+   * No-op for CPU (grid is always in sync).
+   * Exists for API compatibility with GPU implementation.
+   */
+  public syncToHost() {
+    // CPU grid is always synced - nothing to do
+  }
 }

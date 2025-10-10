@@ -9,6 +9,13 @@ Distributed exploration of 2^140 C4-symmetric cellular automata rules. TikTok-st
 - `pnpm run build` - Full production build (tsc + vite + copy resources)
 - `pnpm run dev` - Local Vite dev server
 
+## Development Workflow
+
+**IMPORTANT: Always use PRs instead of pushing directly to main**
+- Create feature branches for all changes: `git checkout -b feature/description`
+- Open PRs for review before merging to main
+- Exceptions: Only push to main for urgent hotfixes or documentation typos
+
 ## PR Reviews with Claude Code
 
 RuleHunt uses custom slash commands to streamline PR reviews with
@@ -202,7 +209,8 @@ scripts/
 
 ## Conventions
 
-**Commits:** `feat:`, `fix:`, `chore:` + Claude Code footer
+**Workflow:** Always create PRs for changes - avoid pushing directly to main
+**Commits:** `feat:`, `fix:`, `chore:`, `docs:` + Claude Code footer
 **PRs:** Title matches commit convention, link issues with `Resolves #N`
 **TypeScript:** Strict mode, no `any` types, explicit return types on exported functions
 **Formatting:** Biome with single quotes, semicolons optional, 80 char line width, 2-space indent
