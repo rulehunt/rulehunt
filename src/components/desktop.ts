@@ -955,10 +955,10 @@ export async function setupDesktopLayout(
         returnButton.textContent = '← Return to Desktop'
         returnButton.onclick = toggleMobilePreview
 
-        // Create phone frame with fixed height - re-enable pointer events
+        // Create phone frame with fixed height - re-enable pointer events and cursor
         const phoneFrame = document.createElement('div')
         phoneFrame.className =
-          'w-[390px] h-[844px] bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] flex flex-col border-2 border-purple-500 overflow-hidden pointer-events-auto'
+          'w-[390px] h-[844px] bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] flex flex-col border-2 border-purple-500 overflow-hidden pointer-events-auto cursor-pointer'
 
         // Mobile app root fills the entire phone frame
         phoneFrame.innerHTML =

@@ -447,16 +447,60 @@ function setupDualCanvasSwipe(
     void handleTouchEndCore(true)
   }
 
+  // Mouse event handlers (for desktop testing)
+  const handleMouseDown = (e: MouseEvent) => {
+    // Convert mouse event to touch-like event
+    const fakeTouch = {
+      ...e,
+      touches: [
+        {
+          clientX: e.clientX,
+          clientY: e.clientY,
+        } as Touch,
+      ] as unknown as TouchList,
+    } as unknown as TouchEvent
+    handleTouchStart(fakeTouch)
+  }
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!dragging) return
+    const fakeTouch = {
+      ...e,
+      touches: [
+        {
+          clientX: e.clientX,
+          clientY: e.clientY,
+        } as Touch,
+      ] as unknown as TouchList,
+    } as unknown as TouchEvent
+    handleTouchMove(fakeTouch)
+  }
+
+  const handleMouseUp = (e: MouseEvent) => {
+    if (!dragging) return
+    const fakeTouch = e as unknown as TouchEvent
+    handleTouchEnd(fakeTouch)
+  }
+
+  // Add both touch and mouse event listeners
   wrapper.addEventListener('touchstart', handleTouchStart, { passive: true })
   wrapper.addEventListener('touchmove', handleTouchMove, { passive: true })
   wrapper.addEventListener('touchend', handleTouchEnd, { passive: true })
   wrapper.addEventListener('touchcancel', handleTouchCancel, { passive: true })
+
+  wrapper.addEventListener('mousedown', handleMouseDown)
+  window.addEventListener('mousemove', handleMouseMove)
+  window.addEventListener('mouseup', handleMouseUp)
 
   return () => {
     wrapper.removeEventListener('touchstart', handleTouchStart)
     wrapper.removeEventListener('touchmove', handleTouchMove)
     wrapper.removeEventListener('touchend', handleTouchEnd)
     wrapper.removeEventListener('touchcancel', handleTouchCancel)
+
+    wrapper.removeEventListener('mousedown', handleMouseDown)
+    window.removeEventListener('mousemove', handleMouseMove)
+    window.removeEventListener('mouseup', handleMouseUp)
   }
 }
 
