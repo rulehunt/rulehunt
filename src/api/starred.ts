@@ -1,37 +1,17 @@
 // src/api/starred.ts
-import { z } from 'zod'
+import { type StarredPattern, StarredResponse } from '../schema'
 
-// ---------------------------------------------------------------------------
-// Schema: matches the Cloudflare Worker JSON response
-// ---------------------------------------------------------------------------
-export const StarredPattern = z.object({
-  ruleset_name: z.string(),
-  ruleset_hex: z.string(),
-  seed: z.number(),
-  seed_type: z.enum(['center', 'random', 'patch']),
-  seed_percentage: z.number().nullable(),
-})
-
-export type StarredPattern = z.infer<typeof StarredPattern>
-
-export const StarredResponse = z.object({
-  ok: z.boolean(),
-  pattern: StarredPattern.nullable(),
-})
-
-export type StarredResponse = z.infer<typeof StarredResponse>
-
-// ---------------------------------------------------------------------------
-// API: fetchStarredPattern
-// ---------------------------------------------------------------------------
 /**
- * Frontend helper to fetch a random starred pattern.
- * Returns null if no starred patterns exist.
+ * Fetch a random starred pattern from the database.
+ * Returns null if no starred patterns exist or on error.
+ * Validates and parses response using shared Zod schema.
+ *
+ * @returns StarredPattern with ruleset and seed for exact reproduction, or null
  */
 export async function fetchStarredPattern(): Promise<StarredPattern | null> {
-  try {
-    console.log('[fetchStarredPattern] 📤 Fetching starred pattern...')
+  console.log('[fetchStarredPattern] 📤 Fetching random starred pattern...')
 
+  try {
     const res = await fetch('/api/starred', {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
@@ -41,22 +21,24 @@ export async function fetchStarredPattern(): Promise<StarredPattern | null> {
     console.log('[fetchStarredPattern] 📥 Response:', {
       status: res.status,
       ok: res.ok,
-      body: responseText,
+      bodyPreview: responseText.substring(0, 200),
     })
 
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${responseText}`)
+      throw new Error(`HTTP ${res.status} ${res.statusText}`)
     }
 
     const json = JSON.parse(responseText)
-    const result = StarredResponse.parse(json) // ✅ schema-validated
+    const data = StarredResponse.parse(json) // ✅ schema-validated
 
-    if (result.ok && result.pattern) {
-      console.log(
-        '[fetchStarredPattern] ✅ Success:',
-        result.pattern.ruleset_name,
-      )
-      return result.pattern
+    if (data.ok && data.pattern) {
+      console.log('[fetchStarredPattern] ✅ Success:', {
+        rulesetName: data.pattern.ruleset_name,
+        rulesetHex: data.pattern.ruleset_hex,
+        seed: data.pattern.seed,
+        seedType: data.pattern.seed_type,
+      })
+      return data.pattern
     }
 
     console.log('[fetchStarredPattern] ℹ️  No starred patterns found')
