@@ -493,8 +493,9 @@ function setupDualCanvasSwipe(
   }
 
   // Add both touch and mouse event listeners
+  // touchstart passive for performance, touchmove NOT passive so we can preventDefault()
   wrapper.addEventListener('touchstart', handleTouchStart, { passive: true })
-  wrapper.addEventListener('touchmove', handleTouchMove, { passive: true })
+  wrapper.addEventListener('touchmove', handleTouchMove, { passive: false })
   wrapper.addEventListener('touchend', handleTouchEnd, { passive: true })
   wrapper.addEventListener('touchcancel', handleTouchCancel, { passive: true })
 
