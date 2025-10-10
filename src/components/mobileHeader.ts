@@ -15,7 +15,7 @@ export function createMobileHeader(): {
 } {
   const root = document.createElement('header')
   root.className =
-    'fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-300/50 dark:border-gray-600/50 transition-opacity duration-500'
+    'w-full bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-300/50 dark:border-gray-600/50 transition-opacity duration-500'
   root.style.opacity = '1'
 
   root.innerHTML = `
@@ -44,8 +44,9 @@ export function createMobileHeader(): {
   const infoOverlay = document.createElement('div')
   infoOverlay.id = 'info-overlay'
   infoOverlay.className =
-    'fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4'
+    'absolute inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4'
   infoOverlay.style.display = 'none'
+  infoOverlay.style.pointerEvents = 'none' // Initially disabled
 
   infoOverlay.innerHTML = `
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto">
@@ -146,7 +147,8 @@ export function createMobileHeader(): {
     </div>
   `
 
-  document.body.appendChild(infoOverlay)
+  // Note: infoOverlay is NOT appended here - it will be appended by the caller
+  // This allows it to be positioned correctly within mobile preview or standalone mobile
 
   const elements: MobileHeaderElements = {
     titleElement: root.querySelector('#rulehunt-title') as HTMLHeadingElement,
@@ -161,6 +163,7 @@ export function createMobileHeader(): {
 export function setupMobileHeader(
   elements: MobileHeaderElements,
   headerRoot: HTMLElement,
+  overlayWrapper?: HTMLElement,
 ): { cleanup: CleanupFunction; resetFade: () => void } {
   const { infoButton, infoOverlay, closeButton } = elements
 
@@ -175,12 +178,20 @@ export function setupMobileHeader(
 
   const showOverlay = () => {
     infoOverlay.style.display = 'flex'
+    infoOverlay.style.pointerEvents = 'auto' // Re-enable pointer events when shown
+    if (overlayWrapper) {
+      overlayWrapper.style.pointerEvents = 'auto' // Also enable wrapper
+    }
     // Prevent body scrolling when overlay is open
     document.body.style.overflow = 'hidden'
   }
 
   const hideOverlay = () => {
     infoOverlay.style.display = 'none'
+    infoOverlay.style.pointerEvents = 'none' // Disable pointer events when hidden
+    if (overlayWrapper) {
+      overlayWrapper.style.pointerEvents = 'none' // Also disable wrapper
+    }
     // Restore body scrolling
     document.body.style.overflow = ''
   }
@@ -219,10 +230,7 @@ export function setupMobileHeader(
       closeButton.removeEventListener('click', closeHandler)
       infoOverlay.removeEventListener('click', overlayClickHandler)
 
-      // Clean up overlay from DOM
-      if (infoOverlay.parentNode) {
-        infoOverlay.parentNode.removeChild(infoOverlay)
-      }
+      // Note: infoOverlay is managed by the parent container, not removed here
 
       // Restore body scroll in case it was locked
       document.body.style.overflow = ''

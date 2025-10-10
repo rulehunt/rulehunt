@@ -111,9 +111,17 @@ function createCA(
 }
 
 // --- Helpers ----------------------------------------------------------------
-function computeAdaptiveGrid(maxCells = TARGET_GRID_SIZE) {
-  const screenWidth = window.innerWidth
-  const screenHeight = window.innerHeight
+function computeAdaptiveGrid(
+  maxCells = TARGET_GRID_SIZE,
+  containerElement?: HTMLElement,
+) {
+  // Use container dimensions if provided (for mobile preview), otherwise use window
+  const screenWidth = containerElement
+    ? containerElement.clientWidth
+    : window.innerWidth
+  const screenHeight = containerElement
+    ? containerElement.clientHeight
+    : window.innerHeight
 
   let cellSize = 1
   let gridCols = screenWidth
@@ -439,16 +447,70 @@ function setupDualCanvasSwipe(
     void handleTouchEndCore(true)
   }
 
+  // Mouse event handlers (for desktop testing)
+  const handleMouseDown = (e: MouseEvent) => {
+    // Check if clicking on button or other interactive element (same as touch handler)
+    const target = e.target as HTMLElement | null
+    if (
+      target?.closest(
+        '[data-swipe-ignore="true"], button, a, input, select, textarea',
+      )
+    ) {
+      return
+    }
+
+    // Convert mouse event to touch-like event
+    const fakeTouch = {
+      ...e,
+      touches: [
+        {
+          clientX: e.clientX,
+          clientY: e.clientY,
+        } as Touch,
+      ] as unknown as TouchList,
+    } as unknown as TouchEvent
+    handleTouchStart(fakeTouch)
+  }
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!dragging) return
+    const fakeTouch = {
+      ...e,
+      touches: [
+        {
+          clientX: e.clientX,
+          clientY: e.clientY,
+        } as Touch,
+      ] as unknown as TouchList,
+    } as unknown as TouchEvent
+    handleTouchMove(fakeTouch)
+  }
+
+  const handleMouseUp = (e: MouseEvent) => {
+    if (!dragging) return
+    const fakeTouch = e as unknown as TouchEvent
+    handleTouchEnd(fakeTouch)
+  }
+
+  // Add both touch and mouse event listeners
   wrapper.addEventListener('touchstart', handleTouchStart, { passive: true })
   wrapper.addEventListener('touchmove', handleTouchMove, { passive: true })
   wrapper.addEventListener('touchend', handleTouchEnd, { passive: true })
   wrapper.addEventListener('touchcancel', handleTouchCancel, { passive: true })
+
+  wrapper.addEventListener('mousedown', handleMouseDown)
+  window.addEventListener('mousemove', handleMouseMove)
+  window.addEventListener('mouseup', handleMouseUp)
 
   return () => {
     wrapper.removeEventListener('touchstart', handleTouchStart)
     wrapper.removeEventListener('touchmove', handleTouchMove)
     wrapper.removeEventListener('touchend', handleTouchEnd)
     wrapper.removeEventListener('touchcancel', handleTouchCancel)
+
+    wrapper.removeEventListener('mousedown', handleMouseDown)
+    window.removeEventListener('mousemove', handleMouseMove)
+    window.removeEventListener('mouseup', handleMouseUp)
   }
 }
 
@@ -706,8 +768,6 @@ function createStatsButton(
 // --- Soft Reset Button (new random initial conditions) -------------------------------------------------
 function createSoftResetButton(
   onSoftReset: () => void,
-  visibleCanvas: HTMLCanvasElement,
-  hiddenCanvas: HTMLCanvasElement,
   onResetFade?: () => void,
 ): { button: HTMLButtonElement; cleanup: () => void } {
   const { button, cleanup: cleanupButton } = createRoundButton(
@@ -720,29 +780,8 @@ function createSoftResetButton(
       title: 'Reload simulation',
       onClick: () => {
         if (isTransitioning) return
-        isTransitioning = true
-
         onSoftReset()
         onResetFade?.()
-
-        // Hide the off-screen canvas during animation to prevent visual glitches
-        const prevVis = hiddenCanvas.style.visibility
-        hiddenCanvas.style.visibility = 'hidden'
-
-        const cleanup = () => {
-          visibleCanvas.style.transition = ''
-          visibleCanvas.removeEventListener('transitionend', cleanup)
-          hiddenCanvas.style.visibility = prevVis || ''
-          isTransitioning = false
-        }
-
-        visibleCanvas.addEventListener('transitionend', cleanup)
-        void visibleCanvas.offsetWidth // force layout
-        visibleCanvas.style.transition = 'transform 0.15s ease'
-        visibleCanvas.style.transform = 'scale(0.96)'
-        setTimeout(() => {
-          visibleCanvas.style.transform = 'scale(1)'
-        }, 15)
       },
     },
     () => isTransitioning,
@@ -805,13 +844,27 @@ export async function setupMobileLayout(
   appRoot: HTMLDivElement,
 ): Promise<CleanupFunction> {
   const container = document.createElement('div')
+  // Use absolute positioning instead of fixed to work correctly inside preview frame
   container.className =
-    'fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 overflow-hidden'
+    'absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 overflow-hidden'
 
+  // Create mobile header and wrap in positioned container
   const { root: headerRoot, elements: headerElements } = createMobileHeader()
+  const headerWrapper = document.createElement('div')
+  headerWrapper.className = 'absolute top-0 left-0 right-0 z-50'
+  headerWrapper.appendChild(headerRoot)
+
+  // Wrap info overlay in positioned container for mobile preview compatibility
+  // Use pointer-events-none so it doesn't block clicks when overlay is hidden
+  // z-[1001] to be above instruction overlay (z-1000)
+  const overlayWrapper = document.createElement('div')
+  overlayWrapper.className = 'absolute inset-0 z-[1001] pointer-events-none'
+  overlayWrapper.appendChild(headerElements.infoOverlay)
+  container.appendChild(overlayWrapper)
+
   const { cleanup: cleanupHeader, resetFade: resetHeaderFade } =
-    setupMobileHeader(headerElements, headerRoot)
-  container.appendChild(headerRoot)
+    setupMobileHeader(headerElements, headerRoot, overlayWrapper)
+  container.appendChild(headerWrapper)
 
   // Helper function to update header title color and reset fade
   const updateHeaderColor = (color: string) => {
@@ -824,20 +877,14 @@ export async function setupMobileLayout(
   const bgColor = isDark ? '#1e1e1e' : '#ffffff'
   let colorIndex = Math.floor(Math.random() * palette.length)
 
-  const size = Math.min(window.innerWidth, window.innerHeight)
   const wrapper = document.createElement('div')
   wrapper.className = 'relative overflow-hidden'
-  wrapper.style.width = `${size}px`
-  wrapper.style.height = `${size}px`
 
   // Create both canvases with semantic initial roles
+  // Sizes will be set after appRoot is appended and we can measure its dimensions
   const createCanvas = () => {
     const c = document.createElement('canvas')
-    c.width = size
-    c.height = size
     c.className = 'absolute inset-0 touch-none'
-    c.style.width = `${size}px`
-    c.style.height = `${size}px`
     c.style.willChange = 'transform'
     return c
   }
@@ -845,13 +892,12 @@ export async function setupMobileLayout(
   let onScreenCanvas = createCanvas()
   let offScreenCanvas = createCanvas()
 
-  onScreenCanvas.style.zIndex = '2'
-  onScreenCanvas.style.pointerEvents = 'auto'
+  onScreenCanvas.style.zIndex = '1' // Behind buttons (z-10)
+  onScreenCanvas.style.pointerEvents = 'none' // Let events fall through to wrapper for swipe handling
   onScreenCanvas.style.visibility = 'visible'
 
-  offScreenCanvas.style.zIndex = '1'
+  offScreenCanvas.style.zIndex = '1' // Same level as onscreen
   offScreenCanvas.style.pointerEvents = 'none'
-  offScreenCanvas.style.transform = `translateY(${size}px)`
   offScreenCanvas.style.visibility = 'visible'
 
   wrapper.appendChild(onScreenCanvas)
@@ -903,10 +949,17 @@ export async function setupMobileLayout(
   container.appendChild(instruction)
   appRoot.appendChild(container)
 
+  // Wait for layout to complete so dimensions are available
+  await new Promise((resolve) => requestAnimationFrame(resolve))
+
   const res = await fetch('./resources/c4-orbits.json')
   const orbits: C4OrbitsData = await res.json()
   const lookup = buildOrbitLookup(orbits)
 
+  // Compute grid size
+  // Use appRoot dimensions only if it has valid size (for desktop preview)
+  // Otherwise use window dimensions (for actual mobile)
+  const useContainer = appRoot.clientWidth > 0 && appRoot.clientHeight > 0
   const {
     gridCols,
     gridRows,
@@ -914,7 +967,7 @@ export async function setupMobileLayout(
     totalCells,
     screenWidth,
     screenHeight,
-  } = computeAdaptiveGrid()
+  } = computeAdaptiveGrid(TARGET_GRID_SIZE, useContainer ? appRoot : undefined)
 
   console.log(
     `[grid] ${gridCols}×${gridRows} = ${totalCells.toLocaleString()} cells @ cellSize=${cellSize}px`,
@@ -929,6 +982,9 @@ export async function setupMobileLayout(
     canvas.style.width = `${screenWidth}px`
     canvas.style.height = `${screenHeight}px`
   }
+
+  // Set initial offscreen transform
+  offScreenCanvas.style.transform = `translateY(${screenHeight}px)`
 
   // Create cellular automata instances
   let onScreenCA = createCA(onScreenCanvas, {
@@ -1088,15 +1144,10 @@ export async function setupMobileLayout(
     onResetFade: resetControlFade,
     isTransitioning: () => isTransitioning,
   })
-  let softResetButton = createSoftResetButton(
-    () => {
-      softResetAutomata(onScreenCA)
-      startAutomata(onScreenCA, onScreenRule)
-    },
-    onScreenCanvas,
-    offScreenCanvas,
-    resetControlFade,
-  )
+  let softResetButton = createSoftResetButton(() => {
+    softResetAutomata(onScreenCA)
+    startAutomata(onScreenCA, onScreenRule)
+  }, resetControlFade)
 
   controlContainer.appendChild(softResetButton.button)
   controlContainer.appendChild(starBtn.button)
@@ -1136,11 +1187,11 @@ export async function setupMobileLayout(
 
       // Update z-index and positioning explicitly
       const h = onScreenCanvas.height
-      onScreenCanvas.style.zIndex = '2'
-      onScreenCanvas.style.pointerEvents = 'auto'
+      onScreenCanvas.style.zIndex = '1' // Behind buttons (z-10)
+      onScreenCanvas.style.pointerEvents = 'none' // Let events fall through to wrapper
       onScreenCanvas.style.transform = 'translateY(0)'
 
-      offScreenCanvas.style.zIndex = '1'
+      offScreenCanvas.style.zIndex = '1' // Same level
       offScreenCanvas.style.pointerEvents = 'none'
       offScreenCanvas.style.transform = `translateY(${h}px)`
 
@@ -1195,15 +1246,10 @@ export async function setupMobileLayout(
         onResetFade: resetControlFade,
         isTransitioning: () => isTransitioning,
       })
-      softResetButton = createSoftResetButton(
-        () => {
-          softResetAutomata(onScreenCA)
-          startAutomata(onScreenCA, onScreenRule)
-        },
-        onScreenCanvas,
-        offScreenCanvas,
-        resetControlFade,
-      )
+      softResetButton = createSoftResetButton(() => {
+        softResetAutomata(onScreenCA)
+        startAutomata(onScreenCA, onScreenRule)
+      }, resetControlFade)
 
       controlContainer.innerHTML = ''
       controlContainer.appendChild(softResetButton.button)
@@ -1224,7 +1270,7 @@ export async function setupMobileLayout(
     if (isTransitioning) return
 
     const { gridCols, gridRows, cellSize, screenWidth, screenHeight } =
-      computeAdaptiveGrid()
+      computeAdaptiveGrid(TARGET_GRID_SIZE, appRoot)
 
     wrapper.style.width = `${screenWidth}px`
     wrapper.style.height = `${screenHeight}px`

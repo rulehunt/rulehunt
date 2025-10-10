@@ -942,43 +942,42 @@ export async function setupDesktopLayout(
         // Enter mobile preview mode
         mobilePreviewActive = true
 
-        // Create mobile preview wrapper
+        // Create mobile preview wrapper with pointer-events-none to let touches pass through
         const mobileWrapper = document.createElement('div')
         mobileWrapper.id = 'mobile-preview-wrapper'
         mobileWrapper.className =
-          'fixed inset-0 z-40 flex justify-center items-center bg-black/20 backdrop-blur-sm'
+          'fixed inset-0 z-40 flex flex-col justify-center items-center gap-4 bg-black/20 backdrop-blur-sm p-8 pointer-events-none'
 
-        // Create phone frame
-        const phoneFrame = document.createElement('div')
-        phoneFrame.className =
-          'w-[390px] max-h-[844px] overflow-y-auto bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] relative flex flex-col'
-
-        // Create return button
+        // Create return button (outside phone frame) - re-enable pointer events
         const returnButton = document.createElement('button')
         returnButton.className =
-          'sticky top-0 z-50 w-full bg-black/80 dark:bg-white/80 text-white dark:text-black py-3 px-4 text-center cursor-pointer hover:bg-black/90 dark:hover:bg-white/90 transition-colors font-medium'
+          'px-6 py-3 bg-black/80 dark:bg-white/80 text-white dark:text-black rounded-lg cursor-pointer hover:bg-black/90 dark:hover:bg-white/90 transition-colors font-medium shadow-lg pointer-events-auto'
         returnButton.textContent = '← Return to Desktop'
         returnButton.onclick = toggleMobilePreview
 
-        // Clone and append main content
-        const mobileContent = document.createElement('div')
-        mobileContent.className = 'flex-1 overflow-auto'
-        // Replace the entire appRoot content with mobile layout
-        mobileContent.innerHTML = '<div id="mobile-app-root"></div>'
+        // Create phone frame with fixed height - re-enable pointer events and cursor
+        const phoneFrame = document.createElement('div')
+        phoneFrame.className =
+          'w-[390px] h-[844px] bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] flex flex-col border-2 border-purple-500 overflow-hidden pointer-events-auto cursor-pointer'
 
-        phoneFrame.appendChild(returnButton)
-        phoneFrame.appendChild(mobileContent)
+        // Mobile app root fills the entire phone frame
+        phoneFrame.innerHTML =
+          '<div id="mobile-app-root" style="width: 100%; height: 100%; position: relative;"></div>'
+
+        mobileWrapper.appendChild(returnButton)
         mobileWrapper.appendChild(phoneFrame)
 
         // Hide desktop content and show mobile preview
         appRoot.style.display = 'none'
         document.body.appendChild(mobileWrapper)
 
-        // Initialize mobile layout in the phone frame
+        // Initialize mobile layout in the phone frame after layout completes
         const mobileAppRoot = document.getElementById(
           'mobile-app-root',
         ) as HTMLDivElement
         ;(async () => {
+          // Wait for layout to complete so dimensions are available
+          await new Promise((resolve) => requestAnimationFrame(resolve))
           const { setupMobileLayout } = await import('./mobile.ts')
           await setupMobileLayout(mobileAppRoot)
         })()
