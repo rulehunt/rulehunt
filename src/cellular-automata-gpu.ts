@@ -129,8 +129,9 @@ export class GPUCellularAutomata
   /**
    * Force GPU→CPU sync for external access to grid state.
    * Called automatically by render(), or manually when CPU needs current state.
+   * Public method to allow benchmarks to force GPU execution completion.
    */
-  syncToHost() {
+  public syncToHost() {
     if (!this.needsSync) return
 
     const output = (this.grid2D as Texture).toArray() as number[][]
