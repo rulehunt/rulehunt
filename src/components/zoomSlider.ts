@@ -31,19 +31,19 @@ export function createZoomSlider(options: ZoomSliderOptions = {}): {
 
   const root = document.createElement('div')
   root.className =
-    'flex flex-col items-center justify-between h-80 lg:h-96 p-3 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm'
+    'flex flex-col items-center justify-between h-80 lg:h-96 py-4 px-3 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm'
 
   root.innerHTML = `
     <button
       id="zoom-plus"
-      class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-bold text-xl"
+      class="w-10 h-10 mb-3 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-bold text-xl"
       title="Zoom in"
       aria-label="Zoom in"
     >
       +
     </button>
 
-    <div class="flex flex-col items-center flex-1 justify-center gap-2">
+    <div class="flex flex-col items-center flex-1 justify-center gap-2 my-2">
       <input
         type="range"
         id="zoom-slider"
@@ -67,7 +67,7 @@ export function createZoomSlider(options: ZoomSliderOptions = {}): {
 
     <button
       id="zoom-minus"
-      class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-bold text-xl"
+      class="w-10 h-10 mt-3 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-bold text-xl"
       title="Zoom out"
       aria-label="Zoom out"
     >
