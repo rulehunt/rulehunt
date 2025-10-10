@@ -45,6 +45,7 @@ export interface BenchmarkResult {
 
 export interface BenchmarkConfig {
   gridSizes: Array<{ rows: number; cols: number; name: string; cells: number }>
+  warmupSteps: number
   stepsPerTest: number
   iterations: number
 }
@@ -61,8 +62,9 @@ const DEFAULT_CONFIG: BenchmarkConfig = {
     { rows: 1000, cols: 500, name: '1000x500 (rect)', cells: 500_000 },
     { rows: 1000, cols: 2000, name: '1000x2000 (rect)', cells: 2_000_000 },
   ],
-  stepsPerTest: 50, // Reduced from 100 for faster browser testing
-  iterations: 5, // Will run 5 iterations per round
+  warmupSteps: 10, // Warmup to get GPU/CPU caches warm
+  stepsPerTest: 10, // Fast iterations for quick feedback
+  iterations: 3, // Fewer iterations for faster rounds
 }
 
 interface AccumulatedBenchmarkResult extends BenchmarkResult {
@@ -79,6 +81,7 @@ function benchmarkCPU(
   rows: number,
   cols: number,
   ruleset: C4Ruleset,
+  warmupSteps: number,
   steps: number,
 ): number {
   const ca = new CellularAutomataCPU(canvas, {
@@ -90,6 +93,12 @@ function benchmarkCPU(
 
   ca.randomSeed(50) // Use consistent seed for fair comparison
 
+  // Warmup: run steps to warm up CPU caches
+  for (let i = 0; i < warmupSteps; i++) {
+    ca.step(ruleset)
+  }
+
+  // Actual benchmark
   const start = performance.now()
   for (let i = 0; i < steps; i++) {
     ca.step(ruleset)
@@ -107,6 +116,7 @@ function benchmarkGPU(
   rows: number,
   cols: number,
   ruleset: C4Ruleset,
+  warmupSteps: number,
   steps: number,
 ): number {
   const ca = new CellularAutomataGPU(canvas, {
@@ -118,6 +128,12 @@ function benchmarkGPU(
 
   ca.randomSeed(50) // Use consistent seed for fair comparison
 
+  // Warmup: run steps to warm up GPU pipeline and transfer buffers
+  for (let i = 0; i < warmupSteps; i++) {
+    ca.step(ruleset)
+  }
+
+  // Actual benchmark
   const start = performance.now()
   for (let i = 0; i < steps; i++) {
     ca.step(ruleset)
@@ -144,45 +160,58 @@ export async function runBenchmarkSuite(
   // Create offscreen canvas for testing
   const canvas = document.createElement('canvas')
 
-  const totalTests = config.gridSizes.length * 2 // CPU + GPU for each size
+  const totalTests = config.gridSizes.length * config.iterations * 2 // CPU + GPU for each iteration of each size
   let currentTest = 0
 
   for (const { rows, cols, name, cells } of config.gridSizes) {
     canvas.width = cols
     canvas.height = rows
 
-    // Run CPU benchmark
-    onProgress?.(currentTest++, totalTests, `CPU ${name}`)
     const cpuTimes: number[] = []
-    for (let i = 0; i < config.iterations; i++) {
-      const time = benchmarkCPU(
-        canvas,
-        rows,
-        cols,
-        ruleset,
-        config.stepsPerTest,
-      )
-      cpuTimes.push(time)
-      // Small delay to prevent blocking UI
-      await new Promise((resolve) => setTimeout(resolve, 10))
-    }
-    const cpuAvg = cpuTimes.reduce((a, b) => a + b, 0) / cpuTimes.length
-
-    // Run GPU benchmark
-    onProgress?.(currentTest++, totalTests, `GPU ${name}`)
     const gpuTimes: number[] = []
+
+    // Alternate CPU and GPU for each iteration for faster feedback
     for (let i = 0; i < config.iterations; i++) {
-      const time = benchmarkGPU(
+      // Run CPU test
+      onProgress?.(
+        currentTest++,
+        totalTests,
+        `CPU ${name} (${i + 1}/${config.iterations})`,
+      )
+      const cpuTime = benchmarkCPU(
         canvas,
         rows,
         cols,
         ruleset,
+        config.warmupSteps,
         config.stepsPerTest,
       )
-      gpuTimes.push(time)
+      cpuTimes.push(cpuTime)
+
+      // Small delay to prevent blocking UI
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      // Run GPU test
+      onProgress?.(
+        currentTest++,
+        totalTests,
+        `GPU ${name} (${i + 1}/${config.iterations})`,
+      )
+      const gpuTime = benchmarkGPU(
+        canvas,
+        rows,
+        cols,
+        ruleset,
+        config.warmupSteps,
+        config.stepsPerTest,
+      )
+      gpuTimes.push(gpuTime)
+
       // Small delay to prevent blocking UI
       await new Promise((resolve) => setTimeout(resolve, 10))
     }
+
+    const cpuAvg = cpuTimes.reduce((a, b) => a + b, 0) / cpuTimes.length
     const gpuAvg = gpuTimes.reduce((a, b) => a + b, 0) / gpuTimes.length
 
     // Determine winner and speedup
@@ -485,7 +514,7 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
                 display: true,
                 title: {
                   display: true,
-                  text: 'Time (ms) for 50 steps',
+                  text: 'Time (ms) for 10 steps',
                   color: textColor,
                 },
                 ticks: {
