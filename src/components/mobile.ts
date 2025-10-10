@@ -29,7 +29,9 @@ import {
   parseURLState,
   updateURLWithoutReload,
 } from '../urlState.ts'
+import { createAutoFadeContainer } from './buttonContainer.ts'
 import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
+import { createRoundButton } from './roundButton.ts'
 
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
@@ -451,58 +453,60 @@ function createZoomButtons(
   getCAs: () => [ICellularAutomata, ICellularAutomata],
 ): CleanupFunction {
   const zoomFactor = 3
-  const zoomContainer = document.createElement('div')
-  zoomContainer.className =
-    'absolute bottom-4 left-4 flex flex-col space-y-2 z-10 transition-opacity duration-500'
-  zoomContainer.style.opacity = '1'
 
-  let fadeTimer: number | null = null
-  const resetFade = () => {
-    if (fadeTimer) clearTimeout(fadeTimer)
-    zoomContainer.style.opacity = '1'
-    fadeTimer = window.setTimeout(() => {
-      zoomContainer.style.opacity = '0.3'
-    }, 3000)
-  }
+  // Create auto-fade container for zoom controls
+  const {
+    container,
+    resetFade,
+    cleanup: cleanupContainer,
+  } = createAutoFadeContainer({
+    position: { bottom: '16px', left: '16px' },
+    fadeAfterMs: 3000,
+    fadedOpacity: 0.3,
+    className: 'flex flex-col space-y-2',
+  })
 
-  const makeBtn = (label: string, title: string, onClick: () => void) => {
-    const btn = document.createElement('button')
-    btn.setAttribute('data-swipe-ignore', 'true')
-    btn.style.touchAction = 'manipulation'
-    btn.textContent = label
-    btn.title = title
-    btn.className =
-      'w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white text-lg shadow-md hover:bg-gray-700 active:scale-95 transition'
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      onClick()
+  // Create zoom in button
+  const zoomInBtn = createRoundButton({
+    icon: '+',
+    title: 'Zoom in',
+    className:
+      'w-10 h-10 flex items-center justify-center text-lg active:scale-95',
+    onClick: () => {
+      const [ca1, ca2] = getCAs()
+      const current = ca1.getZoom?.() ?? 1
+      const newZoom = Math.min(100, current * zoomFactor)
+      ca1.setZoom(newZoom)
+      ca2.setZoom(newZoom)
       resetFade()
-    })
-    zoomContainer.appendChild(btn)
-  }
-
-  makeBtn('+', 'Zoom in', () => {
-    const [ca1, ca2] = getCAs()
-    const current = ca1.getZoom?.() ?? 1
-    const newZoom = Math.min(100, current * zoomFactor)
-    ca1.setZoom(newZoom)
-    ca2.setZoom(newZoom)
+    },
   })
 
-  makeBtn('–', 'Zoom out', () => {
-    const [ca1, ca2] = getCAs()
-    const current = ca1.getZoom?.() ?? 1
-    const newZoom = Math.max(1, current / zoomFactor)
-    ca1.setZoom(newZoom)
-    ca2.setZoom(newZoom)
+  // Create zoom out button
+  const zoomOutBtn = createRoundButton({
+    icon: '–',
+    title: 'Zoom out',
+    className:
+      'w-10 h-10 flex items-center justify-center text-lg active:scale-95',
+    onClick: () => {
+      const [ca1, ca2] = getCAs()
+      const current = ca1.getZoom?.() ?? 1
+      const newZoom = Math.max(1, current / zoomFactor)
+      ca1.setZoom(newZoom)
+      ca2.setZoom(newZoom)
+      resetFade()
+    },
   })
 
-  parent.appendChild(zoomContainer)
+  container.appendChild(zoomInBtn.button)
+  container.appendChild(zoomOutBtn.button)
+  parent.appendChild(container)
   resetFade()
 
   return () => {
-    if (fadeTimer) clearTimeout(fadeTimer)
-    zoomContainer.remove()
+    zoomInBtn.cleanup()
+    zoomOutBtn.cleanup()
+    cleanupContainer()
   }
 }
 
@@ -622,159 +626,124 @@ function saveRunStatistics(
 
 // --- Stats Button -----------------------------------------------------------
 function createStatsButton(
-  parent: HTMLElement,
   onShowStats: () => void,
-): HTMLButtonElement {
-  const btn = document.createElement('button')
-  btn.setAttribute('data-swipe-ignore', 'true')
-  btn.style.touchAction = 'manipulation' // avoids 300ms delay on iOS
+  onResetFade?: () => void,
+): { button: HTMLButtonElement; cleanup: () => void } {
+  const { button, cleanup } = createRoundButton(
+    {
+      icon: `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+             fill="currentColor" class="w-6 h-6">
+          <path d="M3 13h2v8H3v-8zm4-4h2v12H7V9zm4-4h2v16h-2V5zm4 2h2v14h-2V7z"/>
+        </svg>`,
+      title: 'View statistics',
+      onClick: () => {
+        onShowStats()
+        onResetFade?.()
+      },
+      preventTransition: true,
+    },
+    () => isTransitioning,
+  )
 
-  btn.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-         fill="currentColor" class="w-6 h-6">
-      <path d="M3 13h2v8H3v-8zm4-4h2v12H7V9zm4-4h2v16h-2V5zm4 2h2v14h-2V7z"/>
-    </svg>`
-  btn.className =
-    'absolute bottom-4 right-20 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition z-10'
-  btn.title = 'View statistics'
-
-  // Swallow events so they don't reach the wrapper
-  const swallow = (e: Event) => e.stopPropagation()
-  btn.addEventListener('pointerdown', swallow)
-  btn.addEventListener('pointerup', swallow)
-  btn.addEventListener('mousedown', swallow)
-  btn.addEventListener('mouseup', swallow)
-  btn.addEventListener('touchstart', swallow, { passive: true })
-  btn.addEventListener('touchmove', swallow, { passive: true })
-  btn.addEventListener('touchend', swallow, { passive: true })
-  btn.addEventListener('touchcancel', swallow, { passive: true })
-
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation()
-    if (isTransitioning) return
-    onShowStats()
-  })
-
-  parent.appendChild(btn)
-  return btn
+  return { button, cleanup }
 }
 
 // --- Soft Reset Button (new random initial conditions) -------------------------------------------------
 function createSoftResetButton(
-  parent: HTMLElement,
   onSoftReset: () => void,
   visibleCanvas: HTMLCanvasElement,
   hiddenCanvas: HTMLCanvasElement,
-) {
-  const btn = document.createElement('button')
-  btn.setAttribute('data-swipe-ignore', 'true')
-  btn.style.touchAction = 'manipulation' // avoids 300ms delay on iOS
+  onResetFade?: () => void,
+): { button: HTMLButtonElement; cleanup: () => void } {
+  const { button, cleanup: cleanupButton } = createRoundButton(
+    {
+      icon: `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+             fill="currentColor" class="w-6 h-6">
+          <path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/>
+        </svg>`,
+      title: 'Reload simulation',
+      onClick: () => {
+        if (isTransitioning) return
+        isTransitioning = true
 
-  btn.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-         fill="currentColor" class="w-6 h-6">
-      <path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/>
-    </svg>`
-  btn.className =
-    'absolute bottom-4 right-4 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition z-10'
-  btn.title = 'Reload simulation'
+        onSoftReset()
+        onResetFade?.()
 
-  // Swallow events so they don't reach the wrapper
-  const swallow = (e: Event) => e.stopPropagation()
-  btn.addEventListener('pointerdown', swallow)
-  btn.addEventListener('pointerup', swallow)
-  btn.addEventListener('mousedown', swallow)
-  btn.addEventListener('mouseup', swallow)
-  btn.addEventListener('touchstart', swallow, { passive: true })
-  btn.addEventListener('touchmove', swallow, { passive: true })
-  btn.addEventListener('touchend', swallow, { passive: true })
-  btn.addEventListener('touchcancel', swallow, { passive: true })
+        // Hide the off-screen canvas during animation to prevent visual glitches
+        const prevVis = hiddenCanvas.style.visibility
+        hiddenCanvas.style.visibility = 'hidden'
 
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation()
-    if (isTransitioning) return
-    isTransitioning = true
+        const cleanup = () => {
+          visibleCanvas.style.transition = ''
+          visibleCanvas.removeEventListener('transitionend', cleanup)
+          hiddenCanvas.style.visibility = prevVis || ''
+          isTransitioning = false
+        }
 
-    onSoftReset()
+        visibleCanvas.addEventListener('transitionend', cleanup)
+        void visibleCanvas.offsetWidth // force layout
+        visibleCanvas.style.transition = 'transform 0.15s ease'
+        visibleCanvas.style.transform = 'scale(0.96)'
+        setTimeout(() => {
+          visibleCanvas.style.transform = 'scale(1)'
+        }, 15)
+      },
+    },
+    () => isTransitioning,
+  )
 
-    // Hide the off-screen canvas during animation to prevent visual glitches
-    const prevVis = hiddenCanvas.style.visibility
-    hiddenCanvas.style.visibility = 'hidden'
-
-    const cleanup = () => {
-      visibleCanvas.style.transition = ''
-      visibleCanvas.removeEventListener('transitionend', cleanup)
-      hiddenCanvas.style.visibility = prevVis || ''
-      isTransitioning = false
-    }
-
-    visibleCanvas.addEventListener('transitionend', cleanup)
-    void visibleCanvas.offsetWidth // force layout
-    visibleCanvas.style.transition = 'transform 0.15s ease'
-    visibleCanvas.style.transform = 'scale(0.96)'
-    setTimeout(() => {
-      visibleCanvas.style.transform = 'scale(1)'
-    }, 15)
-  })
-
-  parent.appendChild(btn)
-  return btn
+  return { button, cleanup: cleanupButton }
 }
 
 // --- Share Button (copy shareable link to clipboard) -----------------------
-function createShareButton(parent: HTMLElement): HTMLButtonElement {
-  const btn = document.createElement('button')
-  btn.setAttribute('data-swipe-ignore', 'true')
-  btn.style.touchAction = 'manipulation' // avoids 300ms delay on iOS
-
-  btn.innerHTML = `
+function createShareButton(onResetFade?: () => void): {
+  button: HTMLButtonElement
+  cleanup: () => void
+} {
+  const linkIcon = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
          fill="currentColor" class="w-6 h-6">
       <path d="M13.544 10.456a4.368 4.368 0 0 0-6.176 0l-3.089 3.088a4.367 4.367 0 1 0 6.177 6.177L12 18.177a1 1 0 0 1 1.414 1.414l-1.544 1.544a6.368 6.368 0 0 1-9.005-9.005l3.089-3.088a6.367 6.367 0 0 1 9.005 0 1 1 0 1 1-1.415 1.414zm6.911-6.911a6.367 6.367 0 0 1 0 9.005l-3.089 3.088a6.367 6.367 0 0 1-9.005 0 1 1 0 1 1 1.415-1.414 4.368 4.368 0 0 0 6.176 0l3.089-3.088a4.367 4.367 0 1 0-6.177-6.177L12 6.503a1 1 0 0 1-1.414-1.414l1.544-1.544a6.367 6.367 0 0 1 9.005 0z"/>
     </svg>`
-  btn.className =
-    'absolute bottom-4 right-36 p-3 rounded-full bg-gray-800 text-white shadow-md hover:bg-gray-700 transition z-10'
-  btn.title = 'Copy shareable link'
 
-  // Swallow events so they don't reach the wrapper
-  const swallow = (e: Event) => e.stopPropagation()
-  btn.addEventListener('pointerdown', swallow)
-  btn.addEventListener('pointerup', swallow)
-  btn.addEventListener('mousedown', swallow)
-  btn.addEventListener('mouseup', swallow)
-  btn.addEventListener('touchstart', swallow, { passive: true })
-  btn.addEventListener('touchmove', swallow, { passive: true })
-  btn.addEventListener('touchend', swallow, { passive: true })
-  btn.addEventListener('touchcancel', swallow, { passive: true })
+  const checkIcon = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+         fill="currentColor" class="w-6 h-6">
+      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+    </svg>`
 
-  btn.addEventListener('click', async (e) => {
-    e.stopPropagation()
-    if (isTransitioning) return
+  const { button, cleanup } = createRoundButton(
+    {
+      icon: linkIcon,
+      title: 'Copy shareable link',
+      onClick: async () => {
+        if (isTransitioning) return
 
-    // URL is kept in sync automatically by PR #35, just copy current URL
-    const shareURL = window.location.href
+        onResetFade?.()
 
-    try {
-      await navigator.clipboard.writeText(shareURL)
-      console.log('[share] Copied link to clipboard:', shareURL)
+        // URL is kept in sync automatically by PR #35, just copy current URL
+        const shareURL = window.location.href
 
-      // Visual feedback - briefly change the button appearance
-      const originalHTML = btn.innerHTML
-      btn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-             fill="currentColor" class="w-6 h-6">
-          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-        </svg>`
-      setTimeout(() => {
-        btn.innerHTML = originalHTML
-      }, 1500)
-    } catch (err) {
-      console.error('[share] Failed to copy link:', err)
-    }
-  })
+        try {
+          await navigator.clipboard.writeText(shareURL)
+          console.log('[share] Copied link to clipboard:', shareURL)
 
-  parent.appendChild(btn)
-  return btn
+          // Visual feedback - briefly change the button appearance
+          button.innerHTML = checkIcon
+          setTimeout(() => {
+            button.innerHTML = linkIcon
+          }, 1500)
+        } catch (err) {
+          console.error('[share] Failed to copy link:', err)
+        }
+      },
+    },
+    () => isTransitioning,
+  )
+
+  return { button, cleanup }
 }
 
 // --- Main -------------------------------------------------------------------
@@ -835,15 +804,46 @@ export async function setupMobileLayout(
   wrapper.appendChild(offScreenCanvas)
   container.appendChild(wrapper)
 
-  // Instruction
+  // Instruction - positioned at 20% from bottom, centered horizontally
   const instruction = document.createElement('div')
   instruction.className =
-    'fixed bottom-8 left-0 right-0 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none transition-opacity duration-300'
-  instruction.style.opacity = '0.7'
+    'fixed left-1/2 -translate-x-1/2 text-center text-gray-700 dark:text-gray-300 text-sm pointer-events-none transition-opacity duration-300'
+  instruction.style.opacity = '0.9'
   instruction.style.zIndex = '1000'
   instruction.style.transition = 'opacity 0.6s ease'
-  instruction.innerHTML = `<div class="flex flex-col items-center gap-2">
-      <svg class="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  instruction.style.bottom = '20%'
+
+  // Custom animation for gentle vertical pulse
+  const style = document.createElement('style')
+  style.textContent = `
+    @keyframes arrow-pulse {
+      0%, 100% { transform: scaleY(1) translateY(0); }
+      50% { transform: scaleY(1.15) translateY(-2px); }
+    }
+    .arrow-pulse {
+      animation: arrow-pulse 2s ease-in-out infinite;
+      transform-origin: bottom center;
+    }
+    .instruction-oval {
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 9999px;
+      padding: 14px 40px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      white-space: nowrap;
+    }
+    @media (prefers-color-scheme: dark) {
+      .instruction-oval {
+        background: rgba(31, 41, 55, 0.5);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+    }
+  `
+  document.head.appendChild(style)
+
+  instruction.innerHTML = `<div class="instruction-oval flex flex-col items-center gap-2">
+      <svg class="w-6 h-6 arrow-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
       </svg><span>Swipe up for new rule</span></div>`
   container.appendChild(instruction)
@@ -1005,22 +1005,38 @@ export async function setupMobileLayout(
     }
   }
 
-  // Create buttons
-  let shareBtn = createShareButton(wrapper)
+  // Create control buttons with auto-fade container
+  const {
+    container: controlContainer,
+    resetFade: resetControlFade,
+    cleanup: cleanupControlContainer,
+  } = createAutoFadeContainer({
+    position: { bottom: '16px', right: '16px' },
+    fadeAfterMs: 3000,
+    fadedOpacity: 0.3,
+    className: 'flex flex-row-reverse space-x-reverse space-x-2',
+  })
 
-  let statsBtn = createStatsButton(wrapper, () =>
-    showStats(getCurrentRunData()),
+  let shareBtn = createShareButton(resetControlFade)
+  let statsBtn = createStatsButton(
+    () => showStats(getCurrentRunData()),
+    resetControlFade,
   )
-
   let softResetButton = createSoftResetButton(
-    wrapper,
     () => {
       softResetAutomata(onScreenCA)
       startAutomata(onScreenCA, onScreenRule)
     },
     onScreenCanvas,
     offScreenCanvas,
+    resetControlFade,
   )
+
+  controlContainer.appendChild(softResetButton.button)
+  controlContainer.appendChild(statsBtn.button)
+  controlContainer.appendChild(shareBtn.button)
+  wrapper.appendChild(controlContainer)
+  resetControlFade()
 
   let hasSwipedOnce = false
   const cleanupSwipe = setupDualCanvasSwipe(
@@ -1084,25 +1100,31 @@ export async function setupMobileLayout(
         })
       }, 16)
 
-      shareBtn.remove()
-      softResetButton.remove()
-      statsBtn.remove()
+      // Recreate buttons after swipe
+      shareBtn.cleanup()
+      softResetButton.cleanup()
+      statsBtn.cleanup()
 
-      shareBtn = createShareButton(wrapper)
-
-      statsBtn = createStatsButton(wrapper, () =>
-        showStats(getCurrentRunData()),
+      shareBtn = createShareButton(resetControlFade)
+      statsBtn = createStatsButton(
+        () => showStats(getCurrentRunData()),
+        resetControlFade,
       )
-
       softResetButton = createSoftResetButton(
-        wrapper,
         () => {
           softResetAutomata(onScreenCA)
           startAutomata(onScreenCA, onScreenRule)
         },
         onScreenCanvas,
         offScreenCanvas,
+        resetControlFade,
       )
+
+      controlContainer.innerHTML = ''
+      controlContainer.appendChild(softResetButton.button)
+      controlContainer.appendChild(statsBtn.button)
+      controlContainer.appendChild(shareBtn.button)
+      resetControlFade()
 
       console.log(`Switched to: ${onScreenRule.name}`)
     },
@@ -1157,6 +1179,7 @@ export async function setupMobileLayout(
     offScreenCA.pause()
     cleanupSwipe()
     cleanupZoomButtons()
+    cleanupControlContainer()
     cleanupHeader()
     cleanupStatsOverlay()
     window.removeEventListener('resize', handleResize)
