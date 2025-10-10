@@ -27,6 +27,7 @@ import { generateSimulationMetricsHTML } from './shared/simulationInfo.ts'
 import { generateStatsHTML, getInterestColorClass } from './shared/stats.ts'
 import { createSimulationPanel } from './simulation.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
+import { createZoomSlider } from './zoomSlider.ts'
 
 const PROGRESS_BAR_STEPS = 500
 const GRID_ROWS = 400
@@ -296,9 +297,18 @@ export async function setupDesktopLayout(
   const leftColumn = document.createElement('div')
   leftColumn.className = 'flex flex-col items-center gap-3'
 
+  // Create simulation canvas container with zoom slider
+  const simulationContainer = document.createElement('div')
+  simulationContainer.className = 'flex items-start gap-4'
+
   const simulationPanel = createSimulationPanel()
+  const zoomSlider = createZoomSlider({ initial: 1, min: 1, max: 100 })
+
+  simulationContainer.appendChild(simulationPanel.root)
+  simulationContainer.appendChild(zoomSlider.root)
+
   const summaryPanel = createSummaryPanel()
-  leftColumn.appendChild(simulationPanel.root)
+  leftColumn.appendChild(simulationContainer)
   leftColumn.appendChild(summaryPanel.root)
 
   const rightColumn = document.createElement('div')
@@ -794,6 +804,25 @@ export async function setupDesktopLayout(
     if (initialConditionType === 'random' || initialConditionType === 'patch') {
       applyInitialCondition()
     }
+  })
+
+  // Zoom slider events
+  addEventListener(zoomSlider.elements.slider, 'input', () => {
+    const zoomLevel = zoomSlider.value()
+    cellularAutomata.setZoom(zoomLevel)
+    cellularAutomata.render()
+  })
+
+  addEventListener(zoomSlider.elements.plusButton, 'click', () => {
+    const zoomLevel = zoomSlider.value()
+    cellularAutomata.setZoom(zoomLevel)
+    cellularAutomata.render()
+  })
+
+  addEventListener(zoomSlider.elements.minusButton, 'click', () => {
+    const zoomLevel = zoomSlider.value()
+    cellularAutomata.setZoom(zoomLevel)
+    cellularAutomata.render()
   })
 
   // Save button click handler
