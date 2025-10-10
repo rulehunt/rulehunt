@@ -93,7 +93,7 @@ function calculateStdDev(values: number[]): number {
  * Run a single benchmark iteration for CPU implementation
  */
 function benchmarkCPU(
-  canvas: HTMLCanvasElement,
+  canvas: HTMLCanvasElement | null,
   rows: number,
   cols: number,
   ruleset: C4Ruleset,
@@ -128,7 +128,7 @@ function benchmarkCPU(
  * Run a single benchmark iteration for GPU implementation
  */
 function benchmarkGPU(
-  canvas: HTMLCanvasElement,
+  canvas: HTMLCanvasElement | null,
   rows: number,
   cols: number,
   ruleset: C4Ruleset,
@@ -154,6 +154,8 @@ function benchmarkGPU(
   for (let i = 0; i < steps; i++) {
     ca.step(ruleset)
   }
+  // Force GPU execution to complete before stopping timer
+  ca.syncToHost()
   const end = performance.now()
 
   // Clean up GPU resources
@@ -173,20 +175,14 @@ export async function runBenchmarkSuite(
   const results: BenchmarkResult[] = []
   const ruleset = makeC4Ruleset(conwayRule, orbitLookup)
 
-  // Create offscreen canvas for testing
-  const canvas = document.createElement('canvas')
-
   const totalTests = config.gridSizes.length * 2 // CPU + GPU for each size
   let currentTest = 0
 
   for (const { rows, cols, name, cells } of config.gridSizes) {
-    canvas.width = cols
-    canvas.height = rows
-
-    // Run CPU test
+    // Run CPU test (headless - no canvas)
     onProgress?.(currentTest++, totalTests, `CPU ${name}`)
     const cpuTime = benchmarkCPU(
-      canvas,
+      null,
       rows,
       cols,
       ruleset,
@@ -197,10 +193,10 @@ export async function runBenchmarkSuite(
     // Small delay to prevent blocking UI
     await new Promise((resolve) => setTimeout(resolve, 10))
 
-    // Run GPU test
+    // Run GPU test (headless - no canvas)
     onProgress?.(currentTest++, totalTests, `GPU ${name}`)
     const gpuTime = benchmarkGPU(
-      canvas,
+      null,
       rows,
       cols,
       ruleset,
@@ -212,12 +208,24 @@ export async function runBenchmarkSuite(
     await new Promise((resolve) => setTimeout(resolve, 10))
 
     // Convert milliseconds to steps per second
-    const cpuSPS = (config.stepsPerTest / cpuTime) * 1000
-    const gpuSPS = (config.stepsPerTest / gpuTime) * 1000
+    // Handle edge case where time might be 0 or very small
+    const cpuSPS =
+      cpuTime > 0
+        ? (config.stepsPerTest / cpuTime) * 1000
+        : Number.MAX_SAFE_INTEGER
+    const gpuSPS =
+      gpuTime > 0
+        ? (config.stepsPerTest / gpuTime) * 1000
+        : Number.MAX_SAFE_INTEGER
 
     // Determine winner and speedup (higher SPS is better)
     const winner = cpuSPS > gpuSPS ? 'cpu' : 'gpu'
-    const speedup = winner === 'gpu' ? gpuSPS / cpuSPS : cpuSPS / gpuSPS
+    const speedup =
+      winner === 'gpu' && cpuSPS > 0
+        ? gpuSPS / cpuSPS
+        : cpuSPS > 0 && gpuSPS > 0
+          ? cpuSPS / gpuSPS
+          : 1
 
     results.push({
       gridSize: name,
