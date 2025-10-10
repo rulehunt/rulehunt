@@ -925,6 +925,96 @@ export async function setupDesktopLayout(
     })
   }
 
+  // Mobile preview toggle
+  if (header.elements.mobilePreviewButton) {
+    let mobilePreviewActive = false
+
+    const toggleMobilePreview = () => {
+      if (!mobilePreviewActive) {
+        // Enter mobile preview mode
+        mobilePreviewActive = true
+
+        // Create mobile preview wrapper
+        const mobileWrapper = document.createElement('div')
+        mobileWrapper.id = 'mobile-preview-wrapper'
+        mobileWrapper.className =
+          'fixed inset-0 z-40 flex justify-center items-center bg-black/20 backdrop-blur-sm'
+
+        // Create phone frame
+        const phoneFrame = document.createElement('div')
+        phoneFrame.className =
+          'w-[390px] max-h-[844px] overflow-y-auto bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] relative flex flex-col'
+
+        // Create return button
+        const returnButton = document.createElement('button')
+        returnButton.className =
+          'sticky top-0 z-50 w-full bg-black/80 dark:bg-white/80 text-white dark:text-black py-3 px-4 text-center cursor-pointer hover:bg-black/90 dark:hover:bg-white/90 transition-colors font-medium'
+        returnButton.textContent = '← Return to Desktop'
+        returnButton.onclick = toggleMobilePreview
+
+        // Clone and append main content
+        const mobileContent = document.createElement('div')
+        mobileContent.className = 'flex-1 overflow-auto'
+        // Replace the entire appRoot content with mobile layout
+        mobileContent.innerHTML = '<div id="mobile-app-root"></div>'
+
+        phoneFrame.appendChild(returnButton)
+        phoneFrame.appendChild(mobileContent)
+        mobileWrapper.appendChild(phoneFrame)
+
+        // Hide desktop content and show mobile preview
+        appRoot.style.display = 'none'
+        document.body.appendChild(mobileWrapper)
+
+        // Initialize mobile layout in the phone frame
+        const mobileAppRoot = document.getElementById(
+          'mobile-app-root',
+        ) as HTMLDivElement
+        ;(async () => {
+          const { setupMobileLayout } = await import('./mobile.ts')
+          await setupMobileLayout(mobileAppRoot)
+        })()
+
+        console.log('[desktop] Mobile preview activated')
+      } else {
+        // Exit mobile preview mode
+        mobilePreviewActive = false
+
+        // Remove mobile preview wrapper
+        const wrapper = document.getElementById('mobile-preview-wrapper')
+        if (wrapper) {
+          wrapper.remove()
+        }
+
+        // Restore desktop content
+        appRoot.style.display = ''
+
+        console.log('[desktop] Mobile preview deactivated')
+      }
+    }
+
+    addEventListener(
+      header.elements.mobilePreviewButton,
+      'click',
+      toggleMobilePreview,
+    )
+
+    // Add ESC key handler
+    const escKeyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mobilePreviewActive) {
+        toggleMobilePreview()
+      }
+    }
+    window.addEventListener('keydown', escKeyHandler)
+
+    // Add ESC cleanup to the cleanup function below
+    eventListeners.push({
+      element: window,
+      event: 'keydown',
+      handler: escKeyHandler as EventListener,
+    })
+  }
+
   // Auto-start simulation
   btnPlay.click()
 

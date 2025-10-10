@@ -9,6 +9,7 @@ export interface ThemeToggleElements {
 export interface HeaderElements {
   themeToggle: ThemeToggleElements
   githubLink: HTMLAnchorElement
+  mobilePreviewButton?: HTMLButtonElement
 }
 
 export type Theme = 'light' | 'dark' | 'system'
@@ -34,8 +35,18 @@ export function createHeader(): {
         </span>
       </div>
 
-      <!-- Right: GitHub + Theme Toggle -->
+      <!-- Right: Mobile Preview + GitHub + Theme Toggle -->
       <div class="flex items-center gap-4">
+        <!-- Mobile Preview Button (hidden on actual mobile) -->
+        <button
+          id="mobile-preview-button"
+          class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm"
+          title="Preview mobile version"
+        >
+          <span class="text-lg">📱</span>
+          <span class="hidden lg:inline">Mobile Preview</span>
+        </button>
+
         <!-- GitHub Link -->
         <a
           id="github-link"
@@ -68,6 +79,9 @@ export function createHeader(): {
       system: root.querySelector('#theme-system') as HTMLButtonElement,
     },
     githubLink: root.querySelector('#github-link') as HTMLAnchorElement,
+    mobilePreviewButton: root.querySelector(
+      '#mobile-preview-button',
+    ) as HTMLButtonElement,
   }
 
   return { root, elements }
