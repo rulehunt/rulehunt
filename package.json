@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:worker": "wrangler dev",
-    "build": "tsc -b && vite build && pnpm run copy:resources",
+    "build": "node scripts/generate-build-info.cjs && tsc -b && vite build && pnpm run copy:resources",
     "copy:resources": "mkdir -p dist/resources && cp resources/c4-orbits.json dist/resources/",
     "preview": "pnpm run build && vite preview",
     "deploy": "wrangler pages deploy dist --project-name=rulehunt",
