@@ -1,6 +1,6 @@
 // src/components/mobile.ts
 import { GPU } from 'gpu.js'
-import { saveRun } from '../api/save'
+import { formatRulesetName, saveRun } from '../api/save'
 import { CellularAutomata } from '../cellular-automata-cpu.ts'
 import { GPUCellularAutomata } from '../cellular-automata-gpu.ts'
 import type {
@@ -521,7 +521,7 @@ function generateRandomRule(): RuleData {
   const density = Math.random() * 0.6 + 0.2
   const ruleset = randomC4RulesetByDensity(density, FORCE_RULE_ZERO_OFF)
   return {
-    name: `Random (${Math.round(density * 100)}%)`,
+    name: formatRulesetName('random', density * 100),
     hex: c4RulesetToHex(ruleset),
     ruleset,
   }
