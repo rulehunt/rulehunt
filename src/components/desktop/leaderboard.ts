@@ -1,4 +1,4 @@
-import { fetchLeaderboard } from '../api/leaderboard'
+import { fetchLeaderboard } from '../../api/leaderboard'
 
 export interface LeaderboardElements {
   tableBody: HTMLTableSectionElement

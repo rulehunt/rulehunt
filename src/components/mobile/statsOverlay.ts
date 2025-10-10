@@ -1,15 +1,15 @@
 // src/components/statsOverlay.ts
 
-import type { RunSubmission } from '../schema.ts'
+import type { RunSubmission } from '../../schema.ts'
 import {
   generateSimulationMetricsHTML,
   updateSimulationMetricsFields,
-} from './shared/simulationInfo.ts'
+} from '../shared/simulationInfo.ts'
 import {
   copyToClipboard,
   generateStatsHTML,
   updateStatsFields,
-} from './shared/stats.ts'
+} from '../shared/stats.ts'
 
 export interface StatsOverlayElements {
   overlay: HTMLDivElement

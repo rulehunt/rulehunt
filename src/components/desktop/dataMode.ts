@@ -1,16 +1,16 @@
 // src/components/dataMode.ts
 
-import type { DataModeState } from '../dataRunner'
-import { runDataLoop } from '../dataRunner'
+import type { DataModeState } from '../../dataRunner'
+import { runDataLoop } from '../../dataRunner'
 import {
   clearDataStats,
   formatDuration,
   formatTimeAgo,
   loadDataStats,
-} from '../dataStorage'
-import type { C4OrbitsData } from '../schema'
-import { buildOrbitLookup } from '../utils'
-import { createHeader, setupTheme } from './desktopHeader'
+} from '../../dataStorage'
+import type { C4OrbitsData } from '../../schema'
+import { buildOrbitLookup } from '../../utils'
+import { createHeader, setupTheme } from './header'
 import { createProgressBar } from './progressBar'
 
 export type CleanupFunction = () => void

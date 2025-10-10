@@ -21,10 +21,10 @@ import {
   LineWithErrorBarsController,
   PointWithErrorBar,
 } from 'chartjs-chart-error-bars'
-import { CellularAutomata as CellularAutomataCPU } from '../cellular-automata-cpu'
-import { GPUCellularAutomata as CellularAutomataGPU } from '../cellular-automata-gpu'
-import type { C4Ruleset } from '../schema'
-import { conwayRule, makeC4Ruleset } from '../utils'
+import { CellularAutomata as CellularAutomataCPU } from '../../cellular-automata-cpu'
+import { GPUCellularAutomata as CellularAutomataGPU } from '../../cellular-automata-gpu'
+import type { C4Ruleset } from '../../schema'
+import { conwayRule, makeC4Ruleset } from '../../utils'
 
 // Register Chart.js components
 Chart.register(
