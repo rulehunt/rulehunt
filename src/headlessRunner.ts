@@ -155,8 +155,8 @@ export async function runHeadlessLoop(
 
         ca.step(expandedRuleset)
 
-        // Update UI every 50 steps
-        if (step % 50 === 0 || step === PROGRESS_BAR_STEPS - 1) {
+        // Update UI and yield to browser every 10 steps
+        if (step % 10 === 0 || step === PROGRESS_BAR_STEPS - 1) {
           const currentStats = ca.getStatistics()
           const interestScore = currentStats.calculateInterestScore()
 
@@ -168,6 +168,9 @@ export async function runHeadlessLoop(
             totalSteps: PROGRESS_BAR_STEPS,
             interestScore,
           })
+
+          // Yield to browser event loop to keep UI responsive
+          await delay(0)
         }
       }
 
