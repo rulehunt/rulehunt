@@ -804,14 +804,14 @@ export async function setupMobileLayout(
   wrapper.appendChild(offScreenCanvas)
   container.appendChild(wrapper)
 
-  // Instruction - positioned above control button group, centered horizontally
+  // Instruction - positioned at 20% from bottom, centered horizontally
   const instruction = document.createElement('div')
   instruction.className =
     'fixed left-1/2 -translate-x-1/2 text-center text-gray-700 dark:text-gray-300 text-sm pointer-events-none transition-opacity duration-300'
   instruction.style.opacity = '0.9'
   instruction.style.zIndex = '1000'
   instruction.style.transition = 'opacity 0.6s ease'
-  instruction.style.bottom = '88px' // Position above control buttons (16px bottom + ~56px button height + 16px gap)
+  instruction.style.bottom = '20%'
 
   // Custom animation for gentle vertical pulse
   const style = document.createElement('style')
