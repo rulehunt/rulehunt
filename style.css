@@ -16,8 +16,6 @@ canvas {
 
 html {
   background-color: var(--bg-light);
-  margin: 0;
-  padding: 0;
 }
 
 html.dark {
