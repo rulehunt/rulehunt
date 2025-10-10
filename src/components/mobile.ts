@@ -805,13 +805,17 @@ export async function setupMobileLayout(
   appRoot: HTMLDivElement,
 ): Promise<CleanupFunction> {
   const container = document.createElement('div')
+  // Use absolute positioning instead of fixed to work correctly inside preview frame
   container.className =
-    'fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 overflow-hidden'
+    'absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 overflow-hidden'
 
   const { root: headerRoot, elements: headerElements } = createMobileHeader()
   const { cleanup: cleanupHeader, resetFade: resetHeaderFade } =
     setupMobileHeader(headerElements, headerRoot)
   container.appendChild(headerRoot)
+
+  // Append info overlay to container instead of document.body for mobile preview compatibility
+  container.appendChild(headerElements.infoOverlay)
 
   // Helper function to update header title color and reset fade
   const updateHeaderColor = (color: string) => {

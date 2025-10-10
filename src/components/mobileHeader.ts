@@ -146,7 +146,8 @@ export function createMobileHeader(): {
     </div>
   `
 
-  document.body.appendChild(infoOverlay)
+  // Note: infoOverlay is NOT appended here - it will be appended by the caller
+  // This allows it to be positioned correctly within mobile preview or standalone mobile
 
   const elements: MobileHeaderElements = {
     titleElement: root.querySelector('#rulehunt-title') as HTMLHeadingElement,
@@ -219,10 +220,7 @@ export function setupMobileHeader(
       closeButton.removeEventListener('click', closeHandler)
       infoOverlay.removeEventListener('click', overlayClickHandler)
 
-      // Clean up overlay from DOM
-      if (infoOverlay.parentNode) {
-        infoOverlay.parentNode.removeChild(infoOverlay)
-      }
+      // Note: infoOverlay is managed by the parent container, not removed here
 
       // Restore body scroll in case it was locked
       document.body.style.overflow = ''
