@@ -1,6 +1,6 @@
 // src/dataRunner.ts
 
-import { saveRun } from './api/save'
+import { formatRulesetName, saveRun } from './api/save'
 import { CellularAutomata } from './cellular-automata-cpu'
 import {
   incrementSaveErrorCount,
@@ -47,7 +47,7 @@ function generateNextRuleset(
     const ruleset = makeC4Ruleset(conwayRule, orbitLookup)
     return {
       ruleset,
-      name: 'Conway',
+      name: formatRulesetName('conway'),
       hex: c4RulesetToHex(ruleset),
     }
   }
@@ -56,7 +56,7 @@ function generateNextRuleset(
     const ruleset = makeC4Ruleset(outlierRule, orbitLookup)
     return {
       ruleset,
-      name: 'Outlier',
+      name: formatRulesetName('outlier'),
       hex: c4RulesetToHex(ruleset),
     }
   }
@@ -71,7 +71,7 @@ function generateNextRuleset(
 
   return {
     ruleset,
-    name: `Random ${Math.round(density * 100)}%`,
+    name: formatRulesetName('random', density * 100),
     hex,
   }
 }

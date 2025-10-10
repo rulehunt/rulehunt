@@ -69,3 +69,31 @@ export async function saveRun(
     return { ok: false }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Ruleset Naming Utilities
+// ---------------------------------------------------------------------------
+/**
+ * Generate consistent ruleset names across desktop/mobile/data mode.
+ *
+ * Examples:
+ * - formatRulesetName('conway') → 'Conway'
+ * - formatRulesetName('outlier') → 'Outlier'
+ * - formatRulesetName('random', 45) → 'Random 45%'
+ */
+export function formatRulesetName(
+  type: 'conway' | 'outlier' | 'random',
+  densityPercent?: number,
+): string {
+  switch (type) {
+    case 'conway':
+      return 'Conway'
+    case 'outlier':
+      return 'Outlier'
+    case 'random':
+      if (densityPercent === undefined) {
+        throw new Error('densityPercent required for random rulesets')
+      }
+      return `Random ${Math.round(densityPercent)}%`
+  }
+}
