@@ -47,7 +47,6 @@ export interface BenchmarkConfig {
   gridSizes: Array<{ rows: number; cols: number; name: string; cells: number }>
   warmupSteps: number
   stepsPerTest: number
-  iterations: number
 }
 
 const DEFAULT_CONFIG: BenchmarkConfig = {
@@ -63,8 +62,7 @@ const DEFAULT_CONFIG: BenchmarkConfig = {
     { rows: 1000, cols: 2000, name: '1000x2000 (rect)', cells: 2_000_000 },
   ],
   warmupSteps: 10, // Warmup to get GPU/CPU caches warm
-  stepsPerTest: 10, // Fast iterations for quick feedback
-  iterations: 3, // Fewer iterations for faster rounds
+  stepsPerTest: 10, // Single measurement per grid per round
 }
 
 interface AccumulatedBenchmarkResult extends BenchmarkResult {
@@ -261,7 +259,11 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   closeBtn.textContent = '×'
   closeBtn.className =
     'border-none bg-transparent text-4xl cursor-pointer p-0 w-8 h-8 leading-8 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100'
+
+  // Will set this later after runBenchmark is defined
+  let stopBenchmarks: (() => void) | null = null
   closeBtn.onclick = () => {
+    stopBenchmarks?.()
     overlay.style.display = 'none'
   }
 
@@ -274,36 +276,22 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 
   // Button container
   const buttonContainer = document.createElement('div')
-  buttonContainer.className = 'flex gap-3 mb-4'
+  buttonContainer.className = 'flex gap-3 mb-4 items-center'
 
-  // Start button
-  const startBtn = document.createElement('button')
-  startBtn.textContent = 'Run Benchmark'
-  startBtn.className =
-    'bg-green-600 hover:bg-green-700 text-white border-none px-6 py-3 text-base rounded cursor-pointer'
+  // Clear data button
+  const clearBtn = document.createElement('button')
+  clearBtn.textContent = 'Clear Data'
+  clearBtn.className =
+    'bg-orange-600 hover:bg-orange-700 text-white border-none px-6 py-3 text-base rounded cursor-pointer'
 
-  // Stop button
-  const stopBtn = document.createElement('button')
-  stopBtn.textContent = 'Stop'
-  stopBtn.className =
-    'bg-red-600 hover:bg-red-700 text-white border-none px-6 py-3 text-base rounded cursor-pointer'
-  stopBtn.style.display = 'none' // Use inline style for dynamic show/hide
+  // Info text
+  const infoText = document.createElement('div')
+  infoText.className = 'text-sm text-gray-600 dark:text-gray-400'
+  infoText.textContent =
+    'Benchmarks run continuously while modal is open. Data saved to localStorage.'
 
-  // Continuous mode checkbox
-  const continuousLabel = document.createElement('label')
-  continuousLabel.className =
-    'flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300'
-  const continuousCheckbox = document.createElement('input')
-  continuousCheckbox.type = 'checkbox'
-  continuousCheckbox.id = 'continuous-mode'
-  const continuousText = document.createElement('span')
-  continuousText.textContent = 'Continuous mode (accumulate statistics)'
-  continuousLabel.appendChild(continuousCheckbox)
-  continuousLabel.appendChild(continuousText)
-
-  buttonContainer.appendChild(startBtn)
-  buttonContainer.appendChild(stopBtn)
-  buttonContainer.appendChild(continuousLabel)
+  buttonContainer.appendChild(clearBtn)
+  buttonContainer.appendChild(infoText)
 
   // Progress area
   const progressArea = document.createElement('div')
@@ -351,14 +339,76 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   // Click outside to close
   overlay.onclick = (e) => {
     if (e.target === overlay) {
+      stopBenchmarks?.()
       overlay.style.display = 'none'
+    }
+  }
+
+  // localStorage key for persistent results
+  const STORAGE_KEY = 'rulehunt-benchmark-results'
+
+  // Load accumulated results from localStorage
+  function loadFromStorage(): {
+    results: Map<string, AccumulatedBenchmarkResult>
+    roundCount: number
+  } {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) {
+        const data = JSON.parse(stored)
+        const resultsMap = new Map<string, AccumulatedBenchmarkResult>()
+        for (const [key, value] of Object.entries(data.results)) {
+          resultsMap.set(key, value as AccumulatedBenchmarkResult)
+        }
+        return {
+          results: resultsMap,
+          roundCount: data.roundCount || 0,
+        }
+      }
+    } catch (error) {
+      console.error(
+        'Failed to load benchmark results from localStorage:',
+        error,
+      )
+    }
+    return { results: new Map(), roundCount: 0 }
+  }
+
+  // Save accumulated results to localStorage
+  function saveToStorage(
+    results: Map<string, AccumulatedBenchmarkResult>,
+    roundCount: number,
+  ) {
+    try {
+      const data = {
+        results: Object.fromEntries(results),
+        roundCount,
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    } catch (error) {
+      console.error('Failed to save benchmark results to localStorage:', error)
+    }
+  }
+
+  // Clear stored results
+  function clearStorage() {
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch (error) {
+      console.error(
+        'Failed to clear benchmark results from localStorage:',
+        error,
+      )
     }
   }
 
   // State for continuous benchmarking
   let shouldStop = false
-  const accumulatedResults: Map<string, AccumulatedBenchmarkResult> = new Map()
-  let roundCount = 0
+  const { results: storedResults, roundCount: storedRoundCount } =
+    loadFromStorage()
+  const accumulatedResults: Map<string, AccumulatedBenchmarkResult> =
+    storedResults
+  let roundCount = storedRoundCount
   let performanceChart: Chart | null = null
 
   // Helper to render results table
@@ -369,17 +419,11 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
     // Round info
     const roundInfo = document.createElement('div')
     roundInfo.className = 'mb-3 text-sm text-gray-600 dark:text-gray-400'
-    roundInfo.textContent = `Round ${roundNumber} complete${continuousCheckbox.checked ? ' (continuous mode active)' : ''}`
+    roundInfo.textContent = `Round ${roundNumber} complete`
     resultsArea.appendChild(roundInfo)
 
     const table = document.createElement('table')
     table.className = 'w-full border-collapse mt-2'
-
-    // Add iteration count column for accumulated results
-    const showIterations = continuousCheckbox.checked && roundNumber > 1
-    const iterationHeader = showIterations
-      ? '<th class="p-2 text-right text-gray-900 dark:text-gray-100">Iterations</th>'
-      : ''
 
     table.innerHTML = `
 			<thead>
@@ -390,7 +434,7 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 					<th class="p-2 text-right text-gray-900 dark:text-gray-100">GPU (ms)</th>
 					<th class="p-2 text-center text-gray-900 dark:text-gray-100">Winner</th>
 					<th class="p-2 text-right text-gray-900 dark:text-gray-100">Speedup</th>
-					${iterationHeader}
+					<th class="p-2 text-right text-gray-900 dark:text-gray-100">Samples</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -399,10 +443,9 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
             const accResult = accumulatedResults.get(r.gridSize) as
               | AccumulatedBenchmarkResult
               | undefined
-            const iterationCell =
-              showIterations && accResult
-                ? `<td class="p-2 text-right text-gray-700 dark:text-gray-300">${accResult.iterationCount}</td>`
-                : ''
+            const iterationCell = accResult
+              ? `<td class="p-2 text-right text-gray-700 dark:text-gray-300">${accResult.iterationCount}</td>`
+              : '<td class="p-2 text-right text-gray-700 dark:text-gray-300">-</td>'
 
             const cpuWinnerClass =
               r.winner === 'cpu'
@@ -556,21 +599,10 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
     }
   }
 
-  // Main benchmark runner
+  // Main benchmark runner - runs continuously until stopped
   async function runBenchmark() {
     shouldStop = false
-    startBtn.style.display = 'none'
-    stopBtn.style.display = 'block'
     progressBar.style.display = 'block'
-    continuousCheckbox.disabled = true
-
-    const isContinuous = continuousCheckbox.checked
-
-    if (!isContinuous) {
-      // Reset accumulated results for single run
-      accumulatedResults.clear()
-      roundCount = 0
-    }
 
     try {
       do {
@@ -619,6 +651,9 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
           }
         }
 
+        // Save to localStorage after each round
+        saveToStorage(accumulatedResults, roundCount)
+
         // Render accumulated results
         const displayResults = Array.from(accumulatedResults.values()).sort(
           (a, b) => a.cells - b.cells,
@@ -627,40 +662,55 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 
         progressText.textContent = `Round ${roundCount} complete!`
 
-        // Small delay before next round in continuous mode
-        if (isContinuous && !shouldStop) {
+        // Small delay before next round
+        if (!shouldStop) {
           await new Promise((resolve) => setTimeout(resolve, 1000))
         }
-      } while (isContinuous && !shouldStop)
+      } while (!shouldStop)
     } catch (error) {
       resultsArea.innerHTML = `
 				<div class="text-red-700 dark:text-red-400 p-3 bg-red-50 dark:bg-red-900/30 rounded">
 					<strong>Error:</strong> ${error instanceof Error ? error.message : 'Unknown error occurred'}
 				</div>
 			`
-    } finally {
-      startBtn.style.display = 'block'
-      stopBtn.style.display = 'none'
-      continuousCheckbox.disabled = false
     }
   }
 
-  // Start benchmark
-  startBtn.onclick = () => {
-    runBenchmark()
+  // Stop benchmarks function
+  stopBenchmarks = () => {
+    shouldStop = true
   }
 
-  // Stop benchmark
-  stopBtn.onclick = () => {
-    shouldStop = true
-    progressText.textContent = 'Stopping after current round...'
+  // Clear data button handler
+  clearBtn.onclick = () => {
+    if (confirm('Clear all benchmark data? This cannot be undone.')) {
+      accumulatedResults.clear()
+      roundCount = 0
+      clearStorage()
+      resultsArea.innerHTML = ''
+      chartContainer.style.display = 'none'
+      progressText.textContent = 'Data cleared. Reopen modal to start fresh.'
+      shouldStop = true
+    }
   }
 
   return {
     show: () => {
       overlay.style.display = 'flex'
+
+      // Render existing data if available
+      if (accumulatedResults.size > 0) {
+        const displayResults = Array.from(accumulatedResults.values()).sort(
+          (a, b) => a.cells - b.cells,
+        )
+        renderResults(displayResults, roundCount)
+      }
+
+      // Auto-start benchmarks
+      runBenchmark()
     },
     cleanup: () => {
+      shouldStop = true
       overlay.remove()
     },
   }
