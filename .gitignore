@@ -32,3 +32,6 @@ tsconfig.tsbuildinfo
 # Cloudflare Wrangler local state (D1, KV, R2, etc.)
 .wrangler/
 d1-dump.csv
+
+# Auto-generated build info
+src/buildInfo.ts

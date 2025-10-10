@@ -493,7 +493,9 @@ function setupDualCanvasSwipe(
   }
 
   // Add both touch and mouse event listeners
-  wrapper.addEventListener('touchstart', handleTouchStart, { passive: true })
+  // touchstart NOT passive so we can preventDefault() during swipe lock
+  // touchmove CAN be passive since we never preventDefault() on it
+  wrapper.addEventListener('touchstart', handleTouchStart, { passive: false })
   wrapper.addEventListener('touchmove', handleTouchMove, { passive: true })
   wrapper.addEventListener('touchend', handleTouchEnd, { passive: true })
   wrapper.addEventListener('touchcancel', handleTouchCancel, { passive: true })
@@ -847,6 +849,7 @@ export async function setupMobileLayout(
   // Use absolute positioning instead of fixed to work correctly inside preview frame
   container.className =
     'absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 overflow-hidden'
+  container.style.touchAction = 'none' // Prevent all default touch behaviors including scroll
 
   // Create mobile header and wrap in positioned container
   const { root: headerRoot, elements: headerElements } = createMobileHeader()
@@ -907,7 +910,7 @@ export async function setupMobileLayout(
   // Instruction - positioned at 20% from bottom, centered horizontally
   const instruction = document.createElement('div')
   instruction.className =
-    'fixed left-1/2 -translate-x-1/2 text-center text-gray-700 dark:text-gray-300 text-sm pointer-events-none transition-opacity duration-300'
+    'absolute left-1/2 -translate-x-1/2 text-center text-gray-700 dark:text-gray-300 text-sm pointer-events-none transition-opacity duration-300'
   instruction.style.opacity = '0.9'
   instruction.style.zIndex = '1000'
   instruction.style.transition = 'opacity 0.6s ease'

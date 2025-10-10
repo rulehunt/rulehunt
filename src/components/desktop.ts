@@ -348,6 +348,41 @@ export async function setupDesktopLayout(
   mainContent.appendChild(mainContainer)
   appRoot.appendChild(mainContent)
 
+  // Create footer with build info
+  const footer = document.createElement('footer')
+  footer.className =
+    'w-full px-6 py-3 border-t border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900'
+
+  const footerContent = document.createElement('div')
+  footerContent.className =
+    'max-w-7xl mx-auto flex justify-center items-center gap-4 text-xs text-gray-500 dark:text-gray-400'
+
+  // Dynamically import build info
+  let buildInfoHTML = '<span>Build info unavailable</span>'
+  try {
+    const { BUILD_INFO } = await import('../buildInfo.ts')
+    const buildDate = new Date(BUILD_INFO.buildTime)
+    const formattedDate = buildDate.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    })
+    buildInfoHTML = `
+      <span>Build: <code class="font-mono text-gray-700 dark:text-gray-300">${BUILD_INFO.commitHash}</code></span>
+      <span class="text-gray-300 dark:text-gray-600">|</span>
+      <span>${formattedDate}</span>
+    `
+  } catch (e) {
+    console.warn('[footer] Build info not available:', e)
+  }
+
+  footerContent.innerHTML = buildInfoHTML
+  footer.appendChild(footerContent)
+  appRoot.appendChild(footer)
+
   // Extract elements
   const {
     canvas: simCanvas,
