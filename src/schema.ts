@@ -183,11 +183,12 @@ const ISODateString = z
     'must be a valid ISO 8601 datetime string',
   )
 
-// Full database record as it’s inserted into D1
+// Full database record as its inserted into D1
 export const RunRecord = z
   .object({
     runId: z.string().optional(),
     submittedAt: ISODateString.optional(),
+    isStarred: z.boolean().optional().default(false),
     ...UserIdentity.shape,
     ...SimulationInfo.shape,
     ...Scores.shape,
@@ -195,10 +196,13 @@ export const RunRecord = z
   })
   .strict()
 
-// When saving from the frontend, you’ll usually send this shape:
+// When saving from the frontend, you'll usually send this shape:
 export const RunSubmission = RunRecord.omit({
   runId: true,
   submittedAt: true,
+}).extend({
+  // Make isStarred explicitly optional in submissions (defaults to false if omitted)
+  isStarred: z.boolean().optional(),
 })
 
 export const RunQuery = z.object({
@@ -207,6 +211,7 @@ export const RunQuery = z.object({
     .string()
     .regex(/^[0-9a-f]{35}$/i)
     .optional(),
+  isStarred: z.boolean().optional(),
   limit: z.number().int().positive().max(100).default(20),
   sortBy: z
     .enum(['submittedAt', 'interestScore', 'entropy4x4'])
@@ -238,6 +243,23 @@ export const LeaderboardResponse = z.object({
 })
 
 // ============================================================================
+// Starred pattern types
+// ============================================================================
+
+export const StarredPattern = z.object({
+  ruleset_name: z.string(),
+  ruleset_hex: z.string().regex(/^[0-9a-f]{35}$/i),
+  seed: z.number().int(),
+  seed_type: SeedType,
+  seed_percentage: z.number().nullable(),
+})
+
+export const StarredResponse = z.object({
+  ok: z.boolean(),
+  pattern: StarredPattern.nullable(),
+})
+
+// ============================================================================
 // Type exports
 // ============================================================================
 export type RunSubmission = z.infer<typeof RunSubmission>
@@ -261,3 +283,5 @@ export type Ruleset = z.infer<typeof Ruleset>
 export type C4Ruleset = z.infer<typeof C4Ruleset>
 export type LeaderboardEntry = z.infer<typeof LeaderboardEntry>
 export type LeaderboardResponse = z.infer<typeof LeaderboardResponse>
+export type StarredPattern = z.infer<typeof StarredPattern>
+export type StarredResponse = z.infer<typeof StarredResponse>
