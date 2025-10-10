@@ -297,15 +297,16 @@ export async function setupDesktopLayout(
   const leftColumn = document.createElement('div')
   leftColumn.className = 'flex flex-col items-center gap-3'
 
-  // Create simulation canvas container with zoom slider
+  // Create simulation canvas container with zoom slider on the left
   const simulationContainer = document.createElement('div')
   simulationContainer.className = 'flex items-start gap-4'
 
   const simulationPanel = createSimulationPanel()
   const zoomSlider = createZoomSlider({ initial: 1, min: 1, max: 100 })
 
-  simulationContainer.appendChild(simulationPanel.root)
+  // Add zoom slider first (left side), then simulation panel
   simulationContainer.appendChild(zoomSlider.root)
+  simulationContainer.appendChild(simulationPanel.root)
 
   const summaryPanel = createSummaryPanel()
   leftColumn.appendChild(simulationContainer)
