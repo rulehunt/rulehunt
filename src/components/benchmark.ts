@@ -294,10 +294,9 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   progressArea.appendChild(progressBar)
   progressArea.appendChild(progressText)
 
-  // Chart area
+  // Chart area - always visible
   const chartContainer = document.createElement('div')
   chartContainer.className = 'mb-6 border-4 border-blue-500 p-4 rounded'
-  chartContainer.style.display = 'none' // Use inline style for dynamic show/hide
   const chartCanvas = document.createElement('canvas')
   chartCanvas.id = 'benchmark-chart'
   chartCanvas.className = 'max-h-[400px]'
@@ -392,10 +391,98 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
   let roundCount = storedRoundCount
   let performanceChart: Chart | null = null
 
+  // Initialize empty chart immediately
+  const ctx = chartCanvas.getContext('2d')
+  if (ctx) {
+    const isDarkMode = document.documentElement.classList.contains('dark')
+    const textColor = isDarkMode ? '#e5e7eb' : '#374151'
+    const gridColor = isDarkMode ? '#4b5563' : '#d1d5db'
+
+    performanceChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'CPU (SPS)',
+            data: [],
+            borderColor: '#2196F3',
+            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+            tension: 0.1,
+            showLine: true,
+            pointRadius: 4,
+          },
+          {
+            label: 'GPU (SPS)',
+            data: [],
+            borderColor: '#4CAF50',
+            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+            tension: 0.1,
+            showLine: true,
+            pointRadius: 4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          title: {
+            display: true,
+            text: 'CPU vs GPU Performance Scaling',
+            color: textColor,
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+          },
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: textColor,
+            },
+          },
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            display: true,
+            title: {
+              display: true,
+              text: 'Grid Area (cells)',
+              color: textColor,
+            },
+            ticks: {
+              color: textColor,
+            },
+            grid: {
+              color: gridColor,
+            },
+          },
+          y: {
+            display: true,
+            title: {
+              display: true,
+              text: 'Steps per Second',
+              color: textColor,
+            },
+            ticks: {
+              color: textColor,
+            },
+            grid: {
+              color: gridColor,
+            },
+            beginAtZero: true,
+          },
+        },
+      },
+    })
+  }
+
   // Helper to render results table
   function renderResults(results: BenchmarkResult[], roundNumber: number) {
     resultsArea.innerHTML = ''
-    chartContainer.style.display = 'block'
 
     // Round info
     const roundInfo = document.createElement('div')
@@ -674,7 +761,15 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
       roundCount = 0
       clearStorage()
       resultsArea.innerHTML = ''
-      chartContainer.style.display = 'none'
+
+      // Reset chart to empty state instead of hiding it
+      if (performanceChart) {
+        performanceChart.data.labels = []
+        performanceChart.data.datasets[0].data = []
+        performanceChart.data.datasets[1].data = []
+        performanceChart.update()
+      }
+
       progressText.textContent = 'Data cleared. Reopen modal to start fresh.'
       shouldStop = true
     }
