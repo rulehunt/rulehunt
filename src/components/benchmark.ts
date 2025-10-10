@@ -37,8 +37,8 @@ Chart.register(
 export interface BenchmarkResult {
   gridSize: string
   cells: number
-  cpuTime: number
-  gpuTime: number
+  cpuSPS: number // Steps per second for CPU
+  gpuSPS: number // Steps per second for GPU
   winner: 'cpu' | 'gpu'
   speedup: number
 }
@@ -53,22 +53,18 @@ const DEFAULT_CONFIG: BenchmarkConfig = {
   gridSizes: [
     { rows: 100, cols: 100, name: '100x100', cells: 10_000 },
     { rows: 200, cols: 200, name: '200x200', cells: 40_000 },
+    { rows: 300, cols: 300, name: '300x300', cells: 90_000 },
     { rows: 500, cols: 500, name: '500x500', cells: 250_000 },
-    { rows: 1000, cols: 1000, name: '1000x1000', cells: 1_000_000 },
-    { rows: 2000, cols: 2000, name: '2000x2000', cells: 4_000_000 },
-    // Rectangular grids to test scaling with area
-    { rows: 500, cols: 1000, name: '500x1000 (rect)', cells: 500_000 },
-    { rows: 1000, cols: 500, name: '1000x500 (rect)', cells: 500_000 },
-    { rows: 1000, cols: 2000, name: '1000x2000 (rect)', cells: 2_000_000 },
+    { rows: 700, cols: 700, name: '700x700', cells: 490_000 },
   ],
-  warmupSteps: 10, // Warmup to get GPU/CPU caches warm
+  warmupSteps: 3, // Minimal warmup to get GPU/CPU caches warm
   stepsPerTest: 10, // Single measurement per grid per round
 }
 
 interface AccumulatedBenchmarkResult extends BenchmarkResult {
-  cpuTimes: number[]
-  gpuTimes: number[]
-  iterationCount: number
+  cpuSamples: number[] // SPS samples for CPU
+  gpuSamples: number[] // SPS samples for GPU
+  sampleCount: number
 }
 
 /**
@@ -158,69 +154,54 @@ export async function runBenchmarkSuite(
   // Create offscreen canvas for testing
   const canvas = document.createElement('canvas')
 
-  const totalTests = config.gridSizes.length * config.iterations * 2 // CPU + GPU for each iteration of each size
+  const totalTests = config.gridSizes.length * 2 // CPU + GPU for each size
   let currentTest = 0
 
   for (const { rows, cols, name, cells } of config.gridSizes) {
     canvas.width = cols
     canvas.height = rows
 
-    const cpuTimes: number[] = []
-    const gpuTimes: number[] = []
+    // Run CPU test
+    onProgress?.(currentTest++, totalTests, `CPU ${name}`)
+    const cpuTime = benchmarkCPU(
+      canvas,
+      rows,
+      cols,
+      ruleset,
+      config.warmupSteps,
+      config.stepsPerTest,
+    )
 
-    // Alternate CPU and GPU for each iteration for faster feedback
-    for (let i = 0; i < config.iterations; i++) {
-      // Run CPU test
-      onProgress?.(
-        currentTest++,
-        totalTests,
-        `CPU ${name} (${i + 1}/${config.iterations})`,
-      )
-      const cpuTime = benchmarkCPU(
-        canvas,
-        rows,
-        cols,
-        ruleset,
-        config.warmupSteps,
-        config.stepsPerTest,
-      )
-      cpuTimes.push(cpuTime)
+    // Small delay to prevent blocking UI
+    await new Promise((resolve) => setTimeout(resolve, 10))
 
-      // Small delay to prevent blocking UI
-      await new Promise((resolve) => setTimeout(resolve, 10))
+    // Run GPU test
+    onProgress?.(currentTest++, totalTests, `GPU ${name}`)
+    const gpuTime = benchmarkGPU(
+      canvas,
+      rows,
+      cols,
+      ruleset,
+      config.warmupSteps,
+      config.stepsPerTest,
+    )
 
-      // Run GPU test
-      onProgress?.(
-        currentTest++,
-        totalTests,
-        `GPU ${name} (${i + 1}/${config.iterations})`,
-      )
-      const gpuTime = benchmarkGPU(
-        canvas,
-        rows,
-        cols,
-        ruleset,
-        config.warmupSteps,
-        config.stepsPerTest,
-      )
-      gpuTimes.push(gpuTime)
+    // Small delay to prevent blocking UI
+    await new Promise((resolve) => setTimeout(resolve, 10))
 
-      // Small delay to prevent blocking UI
-      await new Promise((resolve) => setTimeout(resolve, 10))
-    }
+    // Convert milliseconds to steps per second
+    const cpuSPS = (config.stepsPerTest / cpuTime) * 1000
+    const gpuSPS = (config.stepsPerTest / gpuTime) * 1000
 
-    const cpuAvg = cpuTimes.reduce((a, b) => a + b, 0) / cpuTimes.length
-    const gpuAvg = gpuTimes.reduce((a, b) => a + b, 0) / gpuTimes.length
-
-    // Determine winner and speedup
-    const winner = cpuAvg < gpuAvg ? 'cpu' : 'gpu'
-    const speedup = winner === 'gpu' ? cpuAvg / gpuAvg : gpuAvg / cpuAvg
+    // Determine winner and speedup (higher SPS is better)
+    const winner = cpuSPS > gpuSPS ? 'cpu' : 'gpu'
+    const speedup = winner === 'gpu' ? gpuSPS / cpuSPS : cpuSPS / gpuSPS
 
     results.push({
       gridSize: name,
       cells,
-      cpuTime: cpuAvg,
-      gpuTime: gpuAvg,
+      cpuSPS,
+      gpuSPS,
       winner,
       speedup,
     })
@@ -315,7 +296,7 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 
   // Chart area
   const chartContainer = document.createElement('div')
-  chartContainer.className = 'mb-6'
+  chartContainer.className = 'mb-6 border-4 border-blue-500 p-4 rounded'
   chartContainer.style.display = 'none' // Use inline style for dynamic show/hide
   const chartCanvas = document.createElement('canvas')
   chartCanvas.id = 'benchmark-chart'
@@ -430,8 +411,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 				<tr class="border-b-2 border-gray-300 dark:border-gray-600">
 					<th class="p-2 text-left text-gray-900 dark:text-gray-100">Grid Size</th>
 					<th class="p-2 text-right text-gray-900 dark:text-gray-100">Cells</th>
-					<th class="p-2 text-right text-gray-900 dark:text-gray-100">CPU (ms)</th>
-					<th class="p-2 text-right text-gray-900 dark:text-gray-100">GPU (ms)</th>
+					<th class="p-2 text-right text-gray-900 dark:text-gray-100">CPU (SPS)</th>
+					<th class="p-2 text-right text-gray-900 dark:text-gray-100">GPU (SPS)</th>
 					<th class="p-2 text-center text-gray-900 dark:text-gray-100">Winner</th>
 					<th class="p-2 text-right text-gray-900 dark:text-gray-100">Speedup</th>
 					<th class="p-2 text-right text-gray-900 dark:text-gray-100">Samples</th>
@@ -443,8 +424,8 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
             const accResult = accumulatedResults.get(r.gridSize) as
               | AccumulatedBenchmarkResult
               | undefined
-            const iterationCell = accResult
-              ? `<td class="p-2 text-right text-gray-700 dark:text-gray-300">${accResult.iterationCount}</td>`
+            const sampleCell = accResult
+              ? `<td class="p-2 text-right text-gray-700 dark:text-gray-300">${accResult.sampleCount}</td>`
               : '<td class="p-2 text-right text-gray-700 dark:text-gray-300">-</td>'
 
             const cpuWinnerClass =
@@ -460,11 +441,11 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 							<tr class="border-b border-gray-200 dark:border-gray-700">
 								<td class="p-2 text-gray-700 dark:text-gray-300">${r.gridSize}</td>
 								<td class="p-2 text-right text-gray-700 dark:text-gray-300">${r.cells.toLocaleString()}</td>
-								<td class="p-2 text-right ${cpuWinnerClass}">${r.cpuTime.toFixed(2)}</td>
-								<td class="p-2 text-right ${gpuWinnerClass}">${r.gpuTime.toFixed(2)}</td>
+								<td class="p-2 text-right ${cpuWinnerClass}">${r.cpuSPS.toFixed(0)}</td>
+								<td class="p-2 text-right ${gpuWinnerClass}">${r.gpuSPS.toFixed(0)}</td>
 								<td class="p-2 text-center uppercase font-bold text-gray-900 dark:text-gray-100">${r.winner}</td>
 								<td class="p-2 text-right text-gray-700 dark:text-gray-300">${r.speedup.toFixed(2)}x</td>
-								${iterationCell}
+								${sampleCell}
 							</tr>
 						`
           })
@@ -479,12 +460,12 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
 
     if (performanceChart) {
       // Update existing chart
-      performanceChart.data.labels = sortedResults.map((r) => r.gridSize)
+      performanceChart.data.labels = sortedResults.map((r) => r.cells)
       performanceChart.data.datasets[0].data = sortedResults.map(
-        (r) => r.cpuTime,
+        (r) => r.cpuSPS,
       )
       performanceChart.data.datasets[1].data = sortedResults.map(
-        (r) => r.gpuTime,
+        (r) => r.gpuSPS,
       )
       performanceChart.update()
     } else {
@@ -499,21 +480,25 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
         const config: ChartConfiguration = {
           type: 'line',
           data: {
-            labels: sortedResults.map((r) => r.gridSize),
+            labels: sortedResults.map((r) => r.cells),
             datasets: [
               {
-                label: 'CPU Time (ms)',
-                data: sortedResults.map((r) => r.cpuTime),
+                label: 'CPU (SPS)',
+                data: sortedResults.map((r) => r.cpuSPS),
                 borderColor: '#2196F3',
                 backgroundColor: 'rgba(33, 150, 243, 0.1)',
                 tension: 0.1,
+                showLine: true,
+                pointRadius: 4,
               },
               {
-                label: 'GPU Time (ms)',
-                data: sortedResults.map((r) => r.gpuTime),
+                label: 'GPU (SPS)',
+                data: sortedResults.map((r) => r.gpuSPS),
                 borderColor: '#4CAF50',
                 backgroundColor: 'rgba(76, 175, 80, 0.1)',
                 tension: 0.1,
+                showLine: true,
+                pointRadius: 4,
               },
             ],
           },
@@ -540,10 +525,11 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
             },
             scales: {
               x: {
+                type: 'linear',
                 display: true,
                 title: {
                   display: true,
-                  text: 'Grid Size',
+                  text: 'Grid Area (cells)',
                   color: textColor,
                 },
                 ticks: {
@@ -557,7 +543,7 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
                 display: true,
                 title: {
                   display: true,
-                  text: 'Time (ms) for 10 steps',
+                  text: 'Steps per Second',
                   color: textColor,
                 },
                 ticks: {
@@ -623,30 +609,30 @@ export function setupBenchmarkModal(orbitLookup: Uint8Array): {
         for (const result of roundResults) {
           const existing = accumulatedResults.get(result.gridSize)
           if (existing) {
-            // Add new times to existing arrays
-            existing.cpuTimes.push(result.cpuTime)
-            existing.gpuTimes.push(result.gpuTime)
-            existing.iterationCount = existing.cpuTimes.length
+            // Add new SPS samples to existing arrays
+            existing.cpuSamples.push(result.cpuSPS)
+            existing.gpuSamples.push(result.gpuSPS)
+            existing.sampleCount = existing.cpuSamples.length
 
             // Recalculate averages
             const cpuAvg =
-              existing.cpuTimes.reduce((a, b) => a + b, 0) /
-              existing.cpuTimes.length
+              existing.cpuSamples.reduce((a, b) => a + b, 0) /
+              existing.cpuSamples.length
             const gpuAvg =
-              existing.gpuTimes.reduce((a, b) => a + b, 0) /
-              existing.gpuTimes.length
-            existing.cpuTime = cpuAvg
-            existing.gpuTime = gpuAvg
-            existing.winner = cpuAvg < gpuAvg ? 'cpu' : 'gpu'
+              existing.gpuSamples.reduce((a, b) => a + b, 0) /
+              existing.gpuSamples.length
+            existing.cpuSPS = cpuAvg
+            existing.gpuSPS = gpuAvg
+            existing.winner = cpuAvg > gpuAvg ? 'cpu' : 'gpu' // Higher SPS is better
             existing.speedup =
-              existing.winner === 'gpu' ? cpuAvg / gpuAvg : gpuAvg / cpuAvg
+              existing.winner === 'gpu' ? gpuAvg / cpuAvg : cpuAvg / gpuAvg
           } else {
             // First time seeing this grid size
             accumulatedResults.set(result.gridSize, {
               ...result,
-              cpuTimes: [result.cpuTime],
-              gpuTimes: [result.gpuTime],
-              iterationCount: 1,
+              cpuSamples: [result.cpuSPS],
+              gpuSamples: [result.gpuSPS],
+              sampleCount: 1,
             })
           }
         }
