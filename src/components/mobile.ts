@@ -817,13 +817,21 @@ export async function setupMobileLayout(
   container.className =
     'absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 overflow-hidden'
 
+  // Create mobile header and wrap in positioned container
   const { root: headerRoot, elements: headerElements } = createMobileHeader()
+  const headerWrapper = document.createElement('div')
+  headerWrapper.className = 'absolute top-0 left-0 right-0 z-50'
+  headerWrapper.appendChild(headerRoot)
+
   const { cleanup: cleanupHeader, resetFade: resetHeaderFade } =
     setupMobileHeader(headerElements, headerRoot)
-  container.appendChild(headerRoot)
+  container.appendChild(headerWrapper)
 
-  // Append info overlay to container instead of document.body for mobile preview compatibility
-  container.appendChild(headerElements.infoOverlay)
+  // Wrap info overlay in positioned container for mobile preview compatibility
+  const overlayWrapper = document.createElement('div')
+  overlayWrapper.className = 'absolute inset-0 z-[100]'
+  overlayWrapper.appendChild(headerElements.infoOverlay)
+  container.appendChild(overlayWrapper)
 
   // Helper function to update header title color and reset fade
   const updateHeaderColor = (color: string) => {
