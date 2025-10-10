@@ -964,7 +964,7 @@ export async function setupDesktopLayout(
         const mobileContent = document.createElement('div')
         mobileContent.className = 'flex-1 overflow-auto'
         // Replace the entire appRoot content with mobile layout
-        mobileContent.innerHTML = '<div id="mobile-app-root"></div>'
+        mobileContent.innerHTML = '<div id="mobile-app-root" style="width: 100%; height: 100%; position: relative;"></div>'
 
         phoneFrame.appendChild(returnButton)
         phoneFrame.appendChild(mobileContent)
@@ -974,11 +974,13 @@ export async function setupDesktopLayout(
         appRoot.style.display = 'none'
         document.body.appendChild(mobileWrapper)
 
-        // Initialize mobile layout in the phone frame
+        // Initialize mobile layout in the phone frame after layout completes
         const mobileAppRoot = document.getElementById(
           'mobile-app-root',
         ) as HTMLDivElement
         ;(async () => {
+          // Wait for layout to complete so dimensions are available
+          await new Promise(resolve => requestAnimationFrame(resolve))
           const { setupMobileLayout } = await import('./mobile.ts')
           await setupMobileLayout(mobileAppRoot)
         })()
