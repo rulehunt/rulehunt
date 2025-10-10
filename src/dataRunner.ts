@@ -107,6 +107,7 @@ export async function runDataLoop(
   orbitLookup: Uint8Array,
   onProgress: DataProgressCallback,
   pauseCheck: () => boolean,
+  getStepsPerSecond: () => number,
 ): Promise<() => void> {
   let shouldStop = false
   const stats = loadDataStats()
@@ -147,16 +148,24 @@ export async function runDataLoop(
       // 4. Expand ruleset once
       const expandedRuleset = expandC4Ruleset(ruleset, orbitLookup)
 
-      // 5. Run simulation with progress updates
+      // 5. Run simulation with progress updates and throttling
       const startTime = performance.now()
+      let lastProgressUpdate = startTime
+      let lastThrottleTime = startTime
 
       for (let step = 0; step < PROGRESS_BAR_STEPS; step++) {
         if (shouldStop) break
 
         ca.step(expandedRuleset)
 
-        // Update UI and yield to browser every 10 steps
-        if (step % 10 === 0 || step === PROGRESS_BAR_STEPS - 1) {
+        const now = performance.now()
+        const sps = getStepsPerSecond()
+
+        // Update UI every 100ms
+        if (
+          now - lastProgressUpdate >= 100 ||
+          step === PROGRESS_BAR_STEPS - 1
+        ) {
           const currentStats = ca.getStatistics()
           const interestScore = currentStats.calculateInterestScore()
 
@@ -169,8 +178,29 @@ export async function runDataLoop(
             interestScore,
           })
 
-          // Yield to browser event loop to keep UI responsive
-          await delay(0)
+          lastProgressUpdate = now
+        }
+
+        // Throttle if needed (sps === 0 means unlimited)
+        if (sps > 0) {
+          const targetDelayMs = 1000 / sps
+          const elapsedSinceLastThrottle = now - lastThrottleTime
+
+          if (elapsedSinceLastThrottle < targetDelayMs) {
+            await delay(targetDelayMs - elapsedSinceLastThrottle)
+            lastThrottleTime = performance.now()
+          } else {
+            lastThrottleTime = now
+            // Yield to browser even if not throttling
+            if (step % 10 === 0) {
+              await delay(0)
+            }
+          }
+        } else {
+          // Unlimited mode - still yield occasionally for UI updates
+          if (step % 10 === 0) {
+            await delay(0)
+          }
         }
       }
 

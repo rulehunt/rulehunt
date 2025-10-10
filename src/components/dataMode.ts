@@ -70,6 +70,11 @@ export async function setupDataModeLayout(
         <span class="text-gray-600 dark:text-gray-400">Hex:</span>
         <span id="current-hex" class="text-gray-900 dark:text-white font-mono text-xs truncate max-w-xs">--</span>
       </div>
+      <div class="flex items-center gap-3 text-sm">
+        <label for="speed-slider" class="min-w-16 text-right text-gray-600 dark:text-gray-400">Speed:</label>
+        <input type="range" id="speed-slider" min="10" max="1000" value="200" class="w-48 cursor-pointer" />
+        <span id="speed-value" class="min-w-20 text-gray-900 dark:text-white">200/sec</span>
+      </div>
       <div class="mt-4" id="progress-container"></div>
       <div class="flex justify-between">
         <span class="text-gray-600 dark:text-gray-400">Steps:</span>
@@ -160,10 +165,15 @@ export async function setupDataModeLayout(
   // State
   let stopLoop: (() => void) | null = null
   let isPaused = false
+  let stepsPerSecond = 200
 
   const btnStop = document.getElementById('btn-stop') as HTMLButtonElement
   const btnPause = document.getElementById('btn-pause') as HTMLButtonElement
   const btnClear = document.getElementById('btn-clear') as HTMLButtonElement
+  const speedSlider = document.getElementById(
+    'speed-slider',
+  ) as HTMLInputElement
+  const speedValue = document.getElementById('speed-value') as HTMLSpanElement
 
   // Update UI helper functions
   function updateCurrentRunDisplay(state: DataModeState) {
@@ -263,6 +273,20 @@ export async function setupDataModeLayout(
     }
   })
 
+  // Speed slider handler
+  speedSlider.addEventListener('input', () => {
+    const value = Number.parseInt(speedSlider.value, 10)
+    if (value >= 1000) {
+      stepsPerSecond = 0 // 0 means unlimited
+      speedValue.textContent = 'Unlimited'
+      console.log('[DataMode] Unlimited speed enabled')
+    } else {
+      stepsPerSecond = value
+      speedValue.textContent = `${value}/sec`
+      console.log(`[DataMode] Steps/sec set to ${stepsPerSecond}`)
+    }
+  })
+
   // Auto-refresh stats display
   const statsInterval = setInterval(() => {
     updateStatsDisplay()
@@ -283,6 +307,7 @@ export async function setupDataModeLayout(
       }
     },
     () => isPaused,
+    () => stepsPerSecond,
   )
 
   // Cleanup
