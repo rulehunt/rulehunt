@@ -569,6 +569,7 @@ function saveRunStatistics(
   cellularAutomata: ICellularAutomata,
   ruleName: string,
   ruleHex: string,
+  isStarred = false,
 ): void {
   const stats = cellularAutomata.getStatistics()
   const metadata = stats.getMetadata()
@@ -615,6 +616,7 @@ function saveRunStatistics(
     entitiesAlive: recent.entitiesAlive,
     entitiesDied: recent.entitiesDied,
     interestScore: stats.calculateInterestScore(),
+    isStarred,
     simVersion: 'v0.1.0',
     engineCommit: undefined,
     extraScores: undefined,
@@ -742,6 +744,76 @@ function createShareButton(onResetFade?: () => void): {
     },
     () => isTransitioning,
   )
+
+  return { button, cleanup }
+}
+
+// --- Star Button (toggle starred status) -----------------------------------
+function createStarButton(
+  getIsStarred: () => boolean,
+  onToggle: (isStarred: boolean) => void,
+  onResetFade?: () => void,
+): {
+  button: HTMLButtonElement
+  cleanup: () => void
+} {
+  const starFilledIcon = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+         fill="currentColor" class="w-6 h-6">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+    </svg>`
+
+  const starOutlineIcon = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor" stroke-width="2" class="w-6 h-6">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+    </svg>`
+
+  const updateButtonAppearance = (button: HTMLButtonElement) => {
+    const isStarred = getIsStarred()
+    button.innerHTML = isStarred ? starFilledIcon : starOutlineIcon
+
+    // Update background color
+    if (isStarred) {
+      button.className = button.className.replace(
+        /bg-gray-800 dark:bg-gray-700/,
+        'bg-yellow-500',
+      )
+      button.className = button.className.replace(
+        /hover:bg-gray-700 dark:hover:bg-gray-600/,
+        'hover:bg-yellow-400',
+      )
+    } else {
+      button.className = button.className.replace(
+        /bg-yellow-500/,
+        'bg-gray-800 dark:bg-gray-700',
+      )
+      button.className = button.className.replace(
+        /hover:bg-yellow-400/,
+        'hover:bg-gray-700 dark:hover:bg-gray-600',
+      )
+    }
+  }
+
+  const { button, cleanup } = createRoundButton(
+    {
+      icon: starOutlineIcon,
+      title: 'Star this simulation',
+      onClick: () => {
+        if (isTransitioning) return
+
+        const newStarredState = !getIsStarred()
+        onToggle(newStarredState)
+        updateButtonAppearance(button)
+        onResetFade?.()
+      },
+      preventTransition: true,
+    },
+    () => isTransitioning,
+  )
+
+  // Set initial appearance
+  updateButtonAppearance(button)
 
   return { button, cleanup }
 }
@@ -1005,6 +1077,9 @@ export async function setupMobileLayout(
     }
   }
 
+  // Track starred status (resets to false after each swipe)
+  let currentIsStarred = false
+
   // Create control buttons with auto-fade container
   const {
     container: controlContainer,
@@ -1022,6 +1097,13 @@ export async function setupMobileLayout(
     () => showStats(getCurrentRunData()),
     resetControlFade,
   )
+  let starBtn = createStarButton(
+    () => currentIsStarred,
+    (isStarred) => {
+      currentIsStarred = isStarred
+    },
+    resetControlFade,
+  )
   let softResetButton = createSoftResetButton(
     () => {
       softResetAutomata(onScreenCA)
@@ -1033,6 +1115,7 @@ export async function setupMobileLayout(
   )
 
   controlContainer.appendChild(softResetButton.button)
+  controlContainer.appendChild(starBtn.button)
   controlContainer.appendChild(statsBtn.button)
   controlContainer.appendChild(shareBtn.button)
   wrapper.appendChild(controlContainer)
@@ -1052,7 +1135,15 @@ export async function setupMobileLayout(
         instruction.style.opacity = '0'
         setTimeout(() => instruction.remove(), 300)
       }
-      saveRunStatistics(onScreenCA, onScreenRule.name, onScreenRule.hex)
+      saveRunStatistics(
+        onScreenCA,
+        onScreenRule.name,
+        onScreenRule.hex,
+        currentIsStarred,
+      )
+
+      // Reset starred status for next simulation
+      currentIsStarred = false
 
       // Swap references: incoming becomes onScreen, outgoing becomes offScreen
       ;[onScreenCanvas, offScreenCanvas] = [offScreenCanvas, onScreenCanvas]
@@ -1103,11 +1194,19 @@ export async function setupMobileLayout(
       // Recreate buttons after swipe
       shareBtn.cleanup()
       softResetButton.cleanup()
+      starBtn.cleanup()
       statsBtn.cleanup()
 
       shareBtn = createShareButton(resetControlFade)
       statsBtn = createStatsButton(
         () => showStats(getCurrentRunData()),
+        resetControlFade,
+      )
+      starBtn = createStarButton(
+        () => currentIsStarred,
+        (isStarred) => {
+          currentIsStarred = isStarred
+        },
         resetControlFade,
       )
       softResetButton = createSoftResetButton(
@@ -1122,6 +1221,7 @@ export async function setupMobileLayout(
 
       controlContainer.innerHTML = ''
       controlContainer.appendChild(softResetButton.button)
+      controlContainer.appendChild(starBtn.button)
       controlContainer.appendChild(statsBtn.button)
       controlContainer.appendChild(shareBtn.button)
       resetControlFade()
