@@ -942,23 +942,23 @@ export async function setupDesktopLayout(
         // Enter mobile preview mode
         mobilePreviewActive = true
 
-        // Create mobile preview wrapper
+        // Create mobile preview wrapper with pointer-events-none to let touches pass through
         const mobileWrapper = document.createElement('div')
         mobileWrapper.id = 'mobile-preview-wrapper'
         mobileWrapper.className =
-          'fixed inset-0 z-40 flex flex-col justify-center items-center gap-4 bg-black/20 backdrop-blur-sm p-8'
+          'fixed inset-0 z-40 flex flex-col justify-center items-center gap-4 bg-black/20 backdrop-blur-sm p-8 pointer-events-none'
 
-        // Create return button (outside phone frame)
+        // Create return button (outside phone frame) - re-enable pointer events
         const returnButton = document.createElement('button')
         returnButton.className =
-          'px-6 py-3 bg-black/80 dark:bg-white/80 text-white dark:text-black rounded-lg cursor-pointer hover:bg-black/90 dark:hover:bg-white/90 transition-colors font-medium shadow-lg'
+          'px-6 py-3 bg-black/80 dark:bg-white/80 text-white dark:text-black rounded-lg cursor-pointer hover:bg-black/90 dark:hover:bg-white/90 transition-colors font-medium shadow-lg pointer-events-auto'
         returnButton.textContent = '← Return to Desktop'
         returnButton.onclick = toggleMobilePreview
 
-        // Create phone frame with fixed height
+        // Create phone frame with fixed height - re-enable pointer events
         const phoneFrame = document.createElement('div')
         phoneFrame.className =
-          'w-[390px] h-[844px] bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] flex flex-col border-2 border-purple-500 overflow-hidden'
+          'w-[390px] h-[844px] bg-white dark:bg-gray-900 shadow-2xl rounded-[30px] flex flex-col border-2 border-purple-500 overflow-hidden pointer-events-auto'
 
         // Mobile app root fills the entire phone frame
         phoneFrame.innerHTML =
