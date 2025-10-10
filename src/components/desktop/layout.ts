@@ -1,7 +1,7 @@
-import { saveRun } from '../api/save'
-import { CellularAutomata } from '../cellular-automata-cpu.ts'
-import { outlierRule } from '../outlier-rule.ts'
-import type { C4OrbitsData, C4Ruleset, RunSubmission } from '../schema.ts'
+import { saveRun } from '../../api/save'
+import { CellularAutomata } from '../../cellular-automata-cpu.ts'
+import { outlierRule } from '../../outlier-rule.ts'
+import type { C4OrbitsData, C4Ruleset, RunSubmission } from '../../schema.ts'
 import {
   buildOrbitLookup,
   c4RulesetToHex,
@@ -11,16 +11,16 @@ import {
   expandC4Ruleset,
   makeC4Ruleset,
   randomC4RulesetByDensity,
-} from '../utils.ts'
+} from '../../utils.ts'
 
 import {
   parseURLRuleset,
   parseURLState,
   updateURLWithoutReload,
-} from '../urlState.ts'
+} from '../../urlState.ts'
 import { setupBenchmarkModal } from './benchmark.ts'
 import { setupDataModeLayout } from './dataMode.ts'
-import { createHeader, setupTheme } from './desktopHeader.ts'
+import { createHeader, setupTheme } from './header.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import {
   type PatternInspectorData,
@@ -28,8 +28,8 @@ import {
 } from './patternInspector.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
-import { generateSimulationMetricsHTML } from './shared/simulationInfo.ts'
-import { generateStatsHTML, getInterestColorClass } from './shared/stats.ts'
+import { generateSimulationMetricsHTML } from '../shared/simulationInfo.ts'
+import { generateStatsHTML, getInterestColorClass } from '../shared/stats.ts'
 import { createSimulationPanel } from './simulation.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
 import { createZoomSlider } from './zoomSlider.ts'
@@ -360,7 +360,7 @@ export async function setupDesktopLayout(
   // Dynamically import build info
   let buildInfoHTML = '<span>Build info unavailable</span>'
   try {
-    const { BUILD_INFO } = await import('../buildInfo.ts')
+    const { BUILD_INFO } = await import('../../buildInfo.ts')
     const buildDate = new Date(BUILD_INFO.buildTime)
     const formattedDate = buildDate.toLocaleString('en-US', {
       year: 'numeric',
@@ -1013,7 +1013,7 @@ export async function setupDesktopLayout(
         ;(async () => {
           // Wait for layout to complete so dimensions are available
           await new Promise((resolve) => requestAnimationFrame(resolve))
-          const { setupMobileLayout } = await import('./mobile.ts')
+          const { setupMobileLayout } = await import('../mobile/layout.ts')
           await setupMobileLayout(mobileAppRoot)
         })()
 

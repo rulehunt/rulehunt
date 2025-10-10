@@ -1,19 +1,19 @@
 // src/components/mobile.ts
 import { GPU } from 'gpu.js'
-import { formatRulesetName, saveRun } from '../api/save'
-import { CellularAutomata } from '../cellular-automata-cpu.ts'
-import { GPUCellularAutomata } from '../cellular-automata-gpu.ts'
+import { formatRulesetName, saveRun } from '../../api/save'
+import { CellularAutomata } from '../../cellular-automata-cpu.ts'
+import { GPUCellularAutomata } from '../../cellular-automata-gpu.ts'
 import type {
   CellularAutomataOptions,
   ICellularAutomata,
-} from '../cellular-automata-interface.ts'
-import { getUserIdentity } from '../identity.ts'
+} from '../../cellular-automata-interface.ts'
+import { getUserIdentity } from '../../identity.ts'
 import type {
   C4OrbitsData,
   C4Ruleset,
   Ruleset,
   RunSubmission,
-} from '../schema.ts'
+} from '../../schema.ts'
 import {
   buildOrbitLookup,
   c4RulesetToHex,
@@ -21,18 +21,18 @@ import {
   expandC4Ruleset,
   makeC4Ruleset,
   randomC4RulesetByDensity,
-} from '../utils.ts'
+} from '../../utils.ts'
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 
-import { fetchStarredPattern } from '../api/starred.ts'
+import { fetchStarredPattern } from '../../api/starred.ts'
 import {
   parseURLRuleset,
   parseURLState,
   updateURLWithoutReload,
-} from '../urlState.ts'
-import { hexToC4Ruleset } from '../utils.ts'
+} from '../../urlState.ts'
+import { hexToC4Ruleset } from '../../utils.ts'
 import { createAutoFadeContainer } from './buttonContainer.ts'
-import { createMobileHeader, setupMobileHeader } from './mobileHeader.ts'
+import { createMobileHeader, setupMobileHeader } from './header.ts'
 import { createRoundButton } from './roundButton.ts'
 import { createStarButton } from './starButton.ts'
 
