@@ -807,8 +807,8 @@ export async function setupMobileLayout(
   // Instruction - positioned above control button group, centered horizontally
   const instruction = document.createElement('div')
   instruction.className =
-    'fixed left-1/2 -translate-x-1/2 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none transition-opacity duration-300'
-  instruction.style.opacity = '0.7'
+    'fixed left-1/2 -translate-x-1/2 text-center text-gray-700 dark:text-gray-300 text-sm pointer-events-none transition-opacity duration-300'
+  instruction.style.opacity = '0.9'
   instruction.style.zIndex = '1000'
   instruction.style.transition = 'opacity 0.6s ease'
   instruction.style.bottom = '88px' // Position above control buttons (16px bottom + ~56px button height + 16px gap)
@@ -824,10 +824,24 @@ export async function setupMobileLayout(
       animation: arrow-pulse 2s ease-in-out infinite;
       transform-origin: bottom center;
     }
+    .instruction-oval {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 9999px;
+      padding: 12px 32px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      .instruction-oval {
+        background: rgba(31, 41, 55, 0.7);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+    }
   `
   document.head.appendChild(style)
 
-  instruction.innerHTML = `<div class="flex flex-col items-center gap-2">
+  instruction.innerHTML = `<div class="instruction-oval flex flex-col items-center gap-2">
       <svg class="w-6 h-6 arrow-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
       </svg><span>Swipe up for new rule</span></div>`
