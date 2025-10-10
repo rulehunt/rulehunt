@@ -626,8 +626,8 @@ function saveRunStatistics(
 
 // --- Stats Button -----------------------------------------------------------
 function createStatsButton(
-  parent: HTMLElement,
   onShowStats: () => void,
+  onResetFade?: () => void,
 ): { button: HTMLButtonElement; cleanup: () => void } {
   const { button, cleanup } = createRoundButton(
     {
@@ -637,28 +637,24 @@ function createStatsButton(
           <path d="M3 13h2v8H3v-8zm4-4h2v12H7V9zm4-4h2v16h-2V5zm4 2h2v14h-2V7z"/>
         </svg>`,
       title: 'View statistics',
-      onClick: onShowStats,
+      onClick: () => {
+        onShowStats()
+        onResetFade?.()
+      },
       preventTransition: true,
     },
     () => isTransitioning,
   )
 
-  // Position button using inline styles for dynamic placement
-  button.className += ' absolute'
-  button.style.bottom = '16px'
-  button.style.right = '80px'
-  button.style.zIndex = '10'
-
-  parent.appendChild(button)
   return { button, cleanup }
 }
 
 // --- Soft Reset Button (new random initial conditions) -------------------------------------------------
 function createSoftResetButton(
-  parent: HTMLElement,
   onSoftReset: () => void,
   visibleCanvas: HTMLCanvasElement,
   hiddenCanvas: HTMLCanvasElement,
+  onResetFade?: () => void,
 ): { button: HTMLButtonElement; cleanup: () => void } {
   const { button, cleanup: cleanupButton } = createRoundButton(
     {
@@ -673,6 +669,7 @@ function createSoftResetButton(
         isTransitioning = true
 
         onSoftReset()
+        onResetFade?.()
 
         // Hide the off-screen canvas during animation to prevent visual glitches
         const prevVis = hiddenCanvas.style.visibility
@@ -697,18 +694,11 @@ function createSoftResetButton(
     () => isTransitioning,
   )
 
-  // Position button using inline styles for dynamic placement
-  button.className += ' absolute'
-  button.style.bottom = '16px'
-  button.style.right = '16px'
-  button.style.zIndex = '10'
-
-  parent.appendChild(button)
   return { button, cleanup: cleanupButton }
 }
 
 // --- Share Button (copy shareable link to clipboard) -----------------------
-function createShareButton(parent: HTMLElement): {
+function createShareButton(onResetFade?: () => void): {
   button: HTMLButtonElement
   cleanup: () => void
 } {
@@ -731,6 +721,8 @@ function createShareButton(parent: HTMLElement): {
       onClick: async () => {
         if (isTransitioning) return
 
+        onResetFade?.()
+
         // URL is kept in sync automatically by PR #35, just copy current URL
         const shareURL = window.location.href
 
@@ -751,13 +743,6 @@ function createShareButton(parent: HTMLElement): {
     () => isTransitioning,
   )
 
-  // Position button using inline styles for dynamic placement
-  button.className += ' absolute'
-  button.style.bottom = '16px'
-  button.style.right = '144px'
-  button.style.zIndex = '10'
-
-  parent.appendChild(button)
   return { button, cleanup }
 }
 
@@ -819,15 +804,31 @@ export async function setupMobileLayout(
   wrapper.appendChild(offScreenCanvas)
   container.appendChild(wrapper)
 
-  // Instruction
+  // Instruction - positioned above control button group, centered horizontally
   const instruction = document.createElement('div')
   instruction.className =
-    'fixed top-1/2 left-0 right-0 -translate-y-1/2 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none transition-opacity duration-300'
+    'fixed left-1/2 -translate-x-1/2 text-center text-gray-500 dark:text-gray-400 text-sm pointer-events-none transition-opacity duration-300'
   instruction.style.opacity = '0.7'
   instruction.style.zIndex = '1000'
   instruction.style.transition = 'opacity 0.6s ease'
+  instruction.style.bottom = '88px' // Position above control buttons (16px bottom + ~56px button height + 16px gap)
+
+  // Custom animation for gentle vertical pulse
+  const style = document.createElement('style')
+  style.textContent = `
+    @keyframes arrow-pulse {
+      0%, 100% { transform: scaleY(1) translateY(0); }
+      50% { transform: scaleY(1.15) translateY(-2px); }
+    }
+    .arrow-pulse {
+      animation: arrow-pulse 2s ease-in-out infinite;
+      transform-origin: bottom center;
+    }
+  `
+  document.head.appendChild(style)
+
   instruction.innerHTML = `<div class="flex flex-col items-center gap-2">
-      <svg class="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="w-6 h-6 arrow-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
       </svg><span>Swipe up for new rule</span></div>`
   container.appendChild(instruction)
@@ -989,22 +990,38 @@ export async function setupMobileLayout(
     }
   }
 
-  // Create buttons
-  let shareBtn = createShareButton(wrapper)
+  // Create control buttons with auto-fade container
+  const {
+    container: controlContainer,
+    resetFade: resetControlFade,
+    cleanup: cleanupControlContainer,
+  } = createAutoFadeContainer({
+    position: { bottom: '16px', right: '16px' },
+    fadeAfterMs: 3000,
+    fadedOpacity: 0.3,
+    className: 'flex flex-row-reverse space-x-reverse space-x-2',
+  })
 
-  let statsBtn = createStatsButton(wrapper, () =>
-    showStats(getCurrentRunData()),
+  let shareBtn = createShareButton(resetControlFade)
+  let statsBtn = createStatsButton(
+    () => showStats(getCurrentRunData()),
+    resetControlFade,
   )
-
   let softResetButton = createSoftResetButton(
-    wrapper,
     () => {
       softResetAutomata(onScreenCA)
       startAutomata(onScreenCA, onScreenRule)
     },
     onScreenCanvas,
     offScreenCanvas,
+    resetControlFade,
   )
+
+  controlContainer.appendChild(softResetButton.button)
+  controlContainer.appendChild(statsBtn.button)
+  controlContainer.appendChild(shareBtn.button)
+  wrapper.appendChild(controlContainer)
+  resetControlFade()
 
   let hasSwipedOnce = false
   const cleanupSwipe = setupDualCanvasSwipe(
@@ -1068,25 +1085,31 @@ export async function setupMobileLayout(
         })
       }, 16)
 
+      // Recreate buttons after swipe
       shareBtn.cleanup()
       softResetButton.cleanup()
       statsBtn.cleanup()
 
-      shareBtn = createShareButton(wrapper)
-
-      statsBtn = createStatsButton(wrapper, () =>
-        showStats(getCurrentRunData()),
+      shareBtn = createShareButton(resetControlFade)
+      statsBtn = createStatsButton(
+        () => showStats(getCurrentRunData()),
+        resetControlFade,
       )
-
       softResetButton = createSoftResetButton(
-        wrapper,
         () => {
           softResetAutomata(onScreenCA)
           startAutomata(onScreenCA, onScreenRule)
         },
         onScreenCanvas,
         offScreenCanvas,
+        resetControlFade,
       )
+
+      controlContainer.innerHTML = ''
+      controlContainer.appendChild(softResetButton.button)
+      controlContainer.appendChild(statsBtn.button)
+      controlContainer.appendChild(shareBtn.button)
+      resetControlFade()
 
       console.log(`Switched to: ${onScreenRule.name}`)
     },
@@ -1141,6 +1164,7 @@ export async function setupMobileLayout(
     offScreenCA.pause()
     cleanupSwipe()
     cleanupZoomButtons()
+    cleanupControlContainer()
     cleanupHeader()
     cleanupStatsOverlay()
     window.removeEventListener('resize', handleResize)
