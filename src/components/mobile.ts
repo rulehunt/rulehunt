@@ -111,9 +111,17 @@ function createCA(
 }
 
 // --- Helpers ----------------------------------------------------------------
-function computeAdaptiveGrid(maxCells = TARGET_GRID_SIZE) {
-  const screenWidth = window.innerWidth
-  const screenHeight = window.innerHeight
+function computeAdaptiveGrid(
+  maxCells = TARGET_GRID_SIZE,
+  containerElement?: HTMLElement,
+) {
+  // Use container dimensions if provided (for mobile preview), otherwise use window
+  const screenWidth = containerElement
+    ? containerElement.clientWidth
+    : window.innerWidth
+  const screenHeight = containerElement
+    ? containerElement.clientHeight
+    : window.innerHeight
 
   let cellSize = 1
   let gridCols = screenWidth
@@ -828,20 +836,14 @@ export async function setupMobileLayout(
   const bgColor = isDark ? '#1e1e1e' : '#ffffff'
   let colorIndex = Math.floor(Math.random() * palette.length)
 
-  const size = Math.min(window.innerWidth, window.innerHeight)
   const wrapper = document.createElement('div')
   wrapper.className = 'relative overflow-hidden'
-  wrapper.style.width = `${size}px`
-  wrapper.style.height = `${size}px`
 
   // Create both canvases with semantic initial roles
+  // Sizes will be set after appRoot is appended and we can measure its dimensions
   const createCanvas = () => {
     const c = document.createElement('canvas')
-    c.width = size
-    c.height = size
     c.className = 'absolute inset-0 touch-none'
-    c.style.width = `${size}px`
-    c.style.height = `${size}px`
     c.style.willChange = 'transform'
     return c
   }
@@ -855,7 +857,6 @@ export async function setupMobileLayout(
 
   offScreenCanvas.style.zIndex = '1'
   offScreenCanvas.style.pointerEvents = 'none'
-  offScreenCanvas.style.transform = `translateY(${size}px)`
   offScreenCanvas.style.visibility = 'visible'
 
   wrapper.appendChild(onScreenCanvas)
@@ -911,6 +912,7 @@ export async function setupMobileLayout(
   const orbits: C4OrbitsData = await res.json()
   const lookup = buildOrbitLookup(orbits)
 
+  // Compute grid size based on the appRoot container dimensions (for preview compatibility)
   const {
     gridCols,
     gridRows,
@@ -918,7 +920,7 @@ export async function setupMobileLayout(
     totalCells,
     screenWidth,
     screenHeight,
-  } = computeAdaptiveGrid()
+  } = computeAdaptiveGrid(TARGET_GRID_SIZE, appRoot)
 
   console.log(
     `[grid] ${gridCols}×${gridRows} = ${totalCells.toLocaleString()} cells @ cellSize=${cellSize}px`,
@@ -933,6 +935,9 @@ export async function setupMobileLayout(
     canvas.style.width = `${screenWidth}px`
     canvas.style.height = `${screenHeight}px`
   }
+
+  // Set initial offscreen transform
+  offScreenCanvas.style.transform = `translateY(${screenHeight}px)`
 
   // Create cellular automata instances
   let onScreenCA = createCA(onScreenCanvas, {
@@ -1228,7 +1233,7 @@ export async function setupMobileLayout(
     if (isTransitioning) return
 
     const { gridCols, gridRows, cellSize, screenWidth, screenHeight } =
-      computeAdaptiveGrid()
+      computeAdaptiveGrid(TARGET_GRID_SIZE, appRoot)
 
     wrapper.style.width = `${screenWidth}px`
     wrapper.style.height = `${screenHeight}px`
