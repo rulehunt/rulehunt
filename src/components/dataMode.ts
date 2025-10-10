@@ -81,6 +81,10 @@ export async function setupDataModeLayout(
         <span id="current-steps" class="text-gray-900 dark:text-white font-semibold">0 / 500</span>
       </div>
       <div class="flex justify-between">
+        <span class="text-gray-600 dark:text-gray-400">Actual SPS:</span>
+        <span id="current-sps" class="text-gray-900 dark:text-white font-semibold">--</span>
+      </div>
+      <div class="flex justify-between">
         <span class="text-gray-600 dark:text-gray-400">Interest Score:</span>
         <span id="current-interest" class="text-gray-900 dark:text-white font-semibold">--</span>
       </div>
@@ -180,6 +184,7 @@ export async function setupDataModeLayout(
     const currentRuleset = document.getElementById('current-ruleset')
     const currentHex = document.getElementById('current-hex')
     const currentSteps = document.getElementById('current-steps')
+    const currentSps = document.getElementById('current-sps')
     const currentInterest = document.getElementById('current-interest')
 
     if (currentRuleset)
@@ -187,6 +192,10 @@ export async function setupDataModeLayout(
     if (currentHex) currentHex.textContent = state.rulesetHex
     if (currentSteps)
       currentSteps.textContent = `${state.currentStep} / ${state.totalSteps}`
+
+    if (currentSps && state.actualSps !== undefined) {
+      currentSps.textContent = `${Math.round(state.actualSps)}/sec`
+    }
 
     if (currentInterest && state.interestScore !== undefined) {
       currentInterest.textContent = state.interestScore.toFixed(1)

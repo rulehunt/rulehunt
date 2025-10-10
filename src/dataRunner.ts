@@ -30,6 +30,7 @@ export interface DataModeState {
   currentStep: number
   totalSteps: number
   interestScore?: number
+  actualSps?: number
 }
 
 export type DataProgressCallback = (state: DataModeState) => void
@@ -152,6 +153,7 @@ export async function runDataLoop(
       const startTime = performance.now()
       let lastProgressUpdate = startTime
       let lastThrottleTime = startTime
+      let stepsAtLastUpdate = 0
 
       for (let step = 0; step < PROGRESS_BAR_STEPS; step++) {
         if (shouldStop) break
@@ -169,6 +171,14 @@ export async function runDataLoop(
           const currentStats = ca.getStatistics()
           const interestScore = currentStats.calculateInterestScore()
 
+          // Calculate actual steps per second
+          const elapsedSinceUpdate = now - lastProgressUpdate
+          const stepsSinceUpdate = step - stepsAtLastUpdate
+          const actualSps =
+            elapsedSinceUpdate > 0
+              ? (stepsSinceUpdate / elapsedSinceUpdate) * 1000
+              : 0
+
           onProgress({
             roundCount,
             rulesetName: name,
@@ -176,9 +186,11 @@ export async function runDataLoop(
             currentStep: step + 1,
             totalSteps: PROGRESS_BAR_STEPS,
             interestScore,
+            actualSps,
           })
 
           lastProgressUpdate = now
+          stepsAtLastUpdate = step
         }
 
         // Throttle if needed (sps === 0 means unlimited)
