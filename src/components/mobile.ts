@@ -78,11 +78,13 @@ export type CleanupFunction = () => void
 
 // Runtime rule container used only on mobile.ts.
 // Combines a C4 or expanded ruleset plus optional cached expansion.
+// For starred patterns, also includes the saved seed for exact reproduction.
 export type RuleData = {
   name: string
   hex: string
   ruleset: C4Ruleset | Ruleset
   expanded?: Ruleset
+  seed?: number // Saved seed from starred pattern (for exact reproduction)
 }
 
 // --- Cellular Automata Engine  ----------------------------------------------
@@ -540,12 +542,15 @@ async function generateNextRule(): Promise<RuleData> {
         console.log(
           '[generateNextRule] Using starred pattern:',
           starred.ruleset_name,
+          'seed:',
+          starred.seed,
         )
         const ruleset = hexToC4Ruleset(starred.ruleset_hex)
         return {
           name: starred.ruleset_name,
           hex: starred.ruleset_hex,
           ruleset,
+          seed: starred.seed, // Include saved seed for exact reproduction
         }
       }
     } catch (err) {
@@ -565,6 +570,7 @@ async function generateNextRule(): Promise<RuleData> {
 /**
  * Prepare a CA with the given rule and seed, paused and rendered.
  * All operations are explicit - no hidden side effects.
+ * If the rule contains a saved seed (from starred pattern), apply it for exact reproduction.
  */
 function prepareAutomata(
   cellularAutomata: ICellularAutomata,
@@ -574,6 +580,13 @@ function prepareAutomata(
 ): void {
   cellularAutomata.pause()
   cellularAutomata.clearGrid()
+
+  // If rule has a saved seed (starred pattern), apply it for exact reproduction
+  if (rule.seed !== undefined) {
+    cellularAutomata.setSeed(rule.seed)
+    console.log('[prepareAutomata] Applied saved seed:', rule.seed)
+  }
+
   cellularAutomata.patchSeed(seedPercentage)
 
   if (!rule.expanded && (rule.ruleset as number[]).length === 140) {
