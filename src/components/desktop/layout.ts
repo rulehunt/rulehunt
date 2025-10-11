@@ -196,7 +196,10 @@ function handleCanvasClick(
   orbitLookup: Uint8Array,
   displayMode: DisplayMode,
   onPatternClick: (data: PatternInspectorData) => void,
-  onSelectionChange: (selection: { type: 'orbit' | 'pattern'; index: number }) => void,
+  onSelectionChange: (selection: {
+    type: 'orbit' | 'pattern'
+    index: number
+  }) => void,
 ) {
   const rect = canvas.getBoundingClientRect()
   const x = event.clientX - rect.left
@@ -463,8 +466,10 @@ export async function setupDesktopLayout(
     const leaderboardVisible = tabId === 'leaderboard'
 
     // Show/hide main containers based on tab
-    mainContainer.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
-    leftColumn.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
+    mainContainer.style.display =
+      exploreVisible || analyzeVisible ? 'flex' : 'none'
+    leftColumn.style.display =
+      exploreVisible || analyzeVisible ? 'flex' : 'none'
     rightColumn.style.display = exploreVisible ? 'flex' : 'none'
     leaderboardColumn.style.display = leaderboardVisible ? 'flex' : 'none'
 
@@ -1109,10 +1114,16 @@ export async function setupDesktopLayout(
         </svg>
         <span>Copied!</span>
       `
-      btn.className = btn.className.replace('bg-blue-600 hover:bg-blue-700', 'bg-green-600 hover:bg-green-700')
+      btn.className = btn.className.replace(
+        'bg-blue-600 hover:bg-blue-700',
+        'bg-green-600 hover:bg-green-700',
+      )
       setTimeout(() => {
         btn.innerHTML = originalHTML
-        btn.className = btn.className.replace('bg-green-600 hover:bg-green-700', 'bg-blue-600 hover:bg-blue-700')
+        btn.className = btn.className.replace(
+          'bg-green-600 hover:bg-green-700',
+          'bg-blue-600 hover:bg-blue-700',
+        )
       }, 2000)
     } catch (err) {
       console.error('Failed to copy JSON:', err)
@@ -1145,14 +1156,19 @@ export async function setupDesktopLayout(
       ['Entropy 8x8', (recent?.entropy8x8 ?? 0).toFixed(4)],
       ['Entity Count', (recent?.entityCount ?? 0).toString()],
       ['Entity Change', (recent?.entityChange ?? 0).toString()],
-      ['Total Entities Ever Seen', (recent?.totalEntitiesEverSeen ?? 0).toString()],
+      [
+        'Total Entities Ever Seen',
+        (recent?.totalEntitiesEverSeen ?? 0).toString(),
+      ],
       ['Unique Patterns', (recent?.uniquePatterns ?? 0).toString()],
       ['Entities Alive', (recent?.entitiesAlive ?? 0).toString()],
       ['Entities Died', (recent?.entitiesDied ?? 0).toString()],
       ['Interest Score', interestScore.toFixed(2)],
     ]
 
-    const csvContent = csvData.map(row => row.map(field => `"${field}"`).join(',')).join('\n')
+    const csvContent = csvData
+      .map((row) => row.map((field) => `"${field}"`).join(','))
+      .join('\n')
     const blob = new Blob([csvContent], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -1169,10 +1185,16 @@ export async function setupDesktopLayout(
       </svg>
       <span>Exported!</span>
     `
-    btn.className = btn.className.replace('bg-green-600 hover:bg-green-700', 'bg-blue-600 hover:bg-blue-700')
+    btn.className = btn.className.replace(
+      'bg-green-600 hover:bg-green-700',
+      'bg-blue-600 hover:bg-blue-700',
+    )
     setTimeout(() => {
       btn.innerHTML = originalHTML
-      btn.className = btn.className.replace('bg-blue-600 hover:bg-blue-700', 'bg-green-600 hover:bg-green-700')
+      btn.className = btn.className.replace(
+        'bg-blue-600 hover:bg-blue-700',
+        'bg-green-600 hover:bg-green-700',
+      )
     }, 2000)
   })
 

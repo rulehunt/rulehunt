@@ -69,11 +69,14 @@ export function createStatsBar(): {
     // Color-code interest score
     const interest = data.interestScore
     if (interest >= 8) {
-      elements.interest.className = 'font-mono font-bold text-lg text-green-600 dark:text-green-400'
+      elements.interest.className =
+        'font-mono font-bold text-lg text-green-600 dark:text-green-400'
     } else if (interest >= 5) {
-      elements.interest.className = 'font-mono font-bold text-lg text-yellow-600 dark:text-yellow-400'
+      elements.interest.className =
+        'font-mono font-bold text-lg text-yellow-600 dark:text-yellow-400'
     } else {
-      elements.interest.className = 'font-mono font-bold text-lg text-gray-600 dark:text-gray-400'
+      elements.interest.className =
+        'font-mono font-bold text-lg text-gray-600 dark:text-gray-400'
     }
   }
 

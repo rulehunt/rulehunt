@@ -48,7 +48,17 @@ export function createPatternInspector(): {
     // 0 1 2         2 5 8
     // 3 4 5   -->   1 4 7
     // 6 7 8         0 3 6
-    return [bits[2], bits[5], bits[8], bits[1], bits[4], bits[7], bits[0], bits[3], bits[6]]
+    return [
+      bits[2],
+      bits[5],
+      bits[8],
+      bits[1],
+      bits[4],
+      bits[7],
+      bits[0],
+      bits[3],
+      bits[6],
+    ]
   }
 
   function getRotatedBits(bits: number[], rotationDegrees: number): number[] {

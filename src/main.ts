@@ -2,8 +2,8 @@ import {
   type CleanupFunction,
   setupDesktopLayout,
 } from './components/desktop/layout.ts'
-import { setupMobileLayout } from './components/mobile/layout.ts'
 import { applyThemeFromStorage } from './components/desktop/theme'
+import { setupMobileLayout } from './components/mobile/layout.ts'
 
 function isMobile(): boolean {
   return window.innerWidth < 640
