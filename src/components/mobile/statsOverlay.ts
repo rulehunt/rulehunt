@@ -20,7 +20,7 @@ export interface StatsOverlayElements {
 
 export type CleanupFunction = () => void
 
-export function createStatsOverlay(): {
+export function createStatsOverlay(parentElement?: HTMLElement): {
   elements: StatsOverlayElements
   show: (data: RunSubmission) => void
   hide: () => void
@@ -28,19 +28,19 @@ export function createStatsOverlay(): {
 } {
   const overlay = document.createElement('div')
   overlay.className =
-    'fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4'
+    'absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 w-full h-full'
   overlay.style.display = 'none'
 
   const panel = document.createElement('div')
   panel.className =
-    'bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] overflow-hidden transform scale-95 transition-transform duration-300'
+    'bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-full max-h-[85%] overflow-hidden transform scale-95 transition-transform duration-300'
 
   const header = document.createElement('div')
   header.className =
     'sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-end'
   header.innerHTML = `
 
-    <button 
+    <button
       id="close-stats"
       class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
       aria-label="Close"
@@ -52,14 +52,17 @@ export function createStatsOverlay(): {
   `
 
   const content = document.createElement('div')
-  content.className = 'px-6 py-6 overflow-y-auto max-h-[calc(85vh-5rem)]'
+  content.className = 'px-6 py-6 overflow-y-auto max-h-[calc(85%-5rem)]'
 
   const closeButton = header.querySelector('#close-stats') as HTMLButtonElement
 
   panel.appendChild(header)
   panel.appendChild(content)
   overlay.appendChild(panel)
-  document.body.appendChild(overlay)
+
+  // Append to provided parent or document.body
+  const container = parentElement || document.body
+  container.appendChild(overlay)
 
   const elements: StatsOverlayElements = {
     overlay,
@@ -70,10 +73,6 @@ export function createStatsOverlay(): {
 
   const show = (data: RunSubmission) => {
     const jsonString = JSON.stringify(data, null, 2)
-
-    // Safe accessors with defaults
-    // const gridSize = data.gridSize ?? 0
-    // const actualSps = data.actualSps ?? 0
 
     content.innerHTML = `
       <div class="space-y-4">

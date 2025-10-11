@@ -1049,13 +1049,13 @@ export async function setupMobileLayout(
   // Set initial header color to match canvas
   updateHeaderColor(palette[colorIndex])
 
-  // Create stats overlay
+  // Create stats overlay - append to container for proper positioning in mobile preview
   const {
     elements: statsElements,
     show: showStats,
     hide: hideStats,
     update: updateStats,
-  } = createStatsOverlay()
+  } = createStatsOverlay(container)
 
   const cleanupStatsOverlay = setupStatsOverlay(
     statsElements,
