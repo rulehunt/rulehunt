@@ -24,36 +24,38 @@ export function createProgressBar(options: ProgressBarOptions = {}): {
   const root = document.createElement('div')
   root.className = 'w-full max-w-7xl mx-auto px-6 flex flex-col gap-2'
 
-  const buttonHTML = buttonLabel
-    ? `
-    <button 
-      id="progress-save-button"
-      disabled
-      class="mt-2 px-4 py-2 rounded-md font-medium transition-all
-             disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed
-             enabled:bg-blue-600 enabled:text-white enabled:hover:bg-blue-700 enabled:active:scale-95"
-    >
-      ${buttonLabel}
-    </button>
-  `
-    : ''
-
   root.innerHTML = `
     <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
       <span>Progress to save this simulation to the leaderboard</span>
       <span id="progress-label">${initialValue}%</span>
     </div>
-    <div
-      id="progress-root"
-      class="relative w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"
-      role="progressbar"
-      aria-valuemin="0"
-      aria-valuemax="100"
-      aria-valuenow="${initialValue}"
-    >
-      <div id="progress-bar" class="h-full bg-blue-600 dark:bg-blue-500 transition-[width] duration-300 ease-out" style="width: ${initialValue}%"></div>
+    <div class="flex items-center gap-2 w-full">
+      <div
+        id="progress-root"
+        class="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex-[9]"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="${initialValue}"
+      >
+        <div id="progress-bar" class="h-full bg-blue-600 dark:bg-blue-500 transition-[width] duration-300 ease-out" style="width: ${initialValue}%"></div>
+      </div>
+      ${
+        buttonLabel
+          ? `
+      <button
+        id="progress-save-button"
+        disabled
+        class="flex-1 px-2 py-1 rounded-md text-sm font-medium transition-all
+               disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed
+               enabled:bg-blue-600 enabled:text-white enabled:hover:bg-blue-700 enabled:active:scale-95"
+      >
+        ${buttonLabel}
+      </button>
+      `
+          : ''
+      }
     </div>
-    ${buttonHTML}
   `
 
   const elements: ProgressBarElements = {
