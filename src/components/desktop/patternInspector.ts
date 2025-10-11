@@ -40,8 +40,34 @@ export function createPatternInspector(): {
     container,
   }
 
-  function update(data: PatternInspectorData | null) {
-    if (!data) {
+  let currentData: PatternInspectorData | null = null
+  let rotation = 0 // 0, 90, 180, 270 degrees
+
+  // Rotate 3x3 grid 90 degrees clockwise
+  function rotateBits90(bits: number[]): number[] {
+    // Original:     After 90° CW:
+    // 0 1 2         6 3 0
+    // 3 4 5   -->   7 4 1
+    // 6 7 8         8 5 2
+    return [bits[6], bits[3], bits[0], bits[7], bits[4], bits[1], bits[8], bits[5], bits[2]]
+  }
+
+  function getRotatedBits(bits: number[], rotationDegrees: number): number[] {
+    let result = [...bits]
+    const rotations = (rotationDegrees / 90) % 4
+    for (let i = 0; i < rotations; i++) {
+      result = rotateBits90(result)
+    }
+    return result
+  }
+
+  function handleRotate() {
+    rotation = (rotation + 90) % 360
+    renderData()
+  }
+
+  function renderData() {
+    if (!currentData) {
       container.innerHTML = `
         <div class="text-gray-500 dark:text-gray-400 text-center py-8">
           Click on a pattern in the ruleset canvas to inspect
@@ -50,10 +76,11 @@ export function createPatternInspector(): {
       return
     }
 
-    const { type, index, output, bits } = data
+    const { type, index, output, bits } = currentData
+    const displayBits = getRotatedBits(bits, rotation)
 
     if (type === 'orbit') {
-      const { stabilizer, size } = data
+      const { stabilizer, size } = currentData
       container.innerHTML = `
         <div class="flex gap-4">
           <!-- Left side: numerical values -->
@@ -80,26 +107,39 @@ export function createPatternInspector(): {
             </div>
           </div>
 
-          <!-- Right side: kernel view with output -->
-          <div class="flex items-center gap-2">
-            <div class="grid grid-cols-3 gap-1 w-20 h-20">
-              ${bits
-                .map(
-                  (bit) =>
-                    `<div class="border ${bit === 1 ? 'bg-violet-600 dark:bg-violet-400' : 'bg-gray-100 dark:bg-gray-700'} border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs font-mono ${bit === 1 ? 'text-white' : 'text-gray-600 dark:text-gray-400'}">${bit}</div>`,
-                )
-                .join('')}
-            </div>
-            <div class="flex flex-col items-center">
-              <span class="text-xl text-gray-600 dark:text-gray-400">→</span>
-              <span class="text-xl font-bold ${output === 1 ? 'text-violet-600 dark:text-violet-400' : 'text-gray-600 dark:text-gray-400'}">${output}</span>
+          <!-- Right side: kernel view with output and rotate button -->
+          <div class="flex flex-col items-center gap-1 mx-12">
+            <button id="rotate-btn" class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" title="Rotate 90° (${rotation}°)">
+              <svg class="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <div class="flex items-center gap-2">
+              <div class="grid grid-cols-3 gap-1 w-20 h-20">
+                ${displayBits
+                  .map(
+                    (bit) =>
+                      `<div class="border ${bit === 1 ? 'bg-violet-600 dark:bg-violet-400' : 'bg-gray-100 dark:bg-gray-700'} border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs font-mono ${bit === 1 ? 'text-white' : 'text-gray-600 dark:text-gray-400'}">${bit}</div>`,
+                  )
+                  .join('')}
+              </div>
+              <div class="flex flex-row items-center">
+                <span class="text-xl text-gray-600 dark:text-gray-400">→</span>
+                <span class="text-xl font-bold ${output === 1 ? 'text-violet-600 dark:text-violet-400' : 'text-gray-600 dark:text-gray-400'}">${output}</span>
+              </div>
             </div>
           </div>
         </div>
       `
+
+      // Attach rotate button handler
+      const rotateBtn = container.querySelector('#rotate-btn')
+      if (rotateBtn) {
+        rotateBtn.addEventListener('click', handleRotate)
+      }
     } else {
-      // Pattern mode
-      const { orbitId } = data
+      // Pattern mode - no rotate button
+      const { orbitId } = currentData
       container.innerHTML = `
         <div class="flex gap-4">
           <!-- Left side: numerical values -->
@@ -122,10 +162,10 @@ export function createPatternInspector(): {
             </div>
           </div>
 
-          <!-- Right side: kernel view with output -->
+          <!-- Right side: kernel view with output (no rotate button for patterns) -->
           <div class="flex items-center gap-2">
             <div class="grid grid-cols-3 gap-1 w-20 h-20">
-              ${bits
+              ${displayBits
                 .map(
                   (bit) =>
                     `<div class="border ${bit === 1 ? 'bg-violet-600 dark:bg-violet-400' : 'bg-gray-100 dark:bg-gray-700'} border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs font-mono ${bit === 1 ? 'text-white' : 'text-gray-600 dark:text-gray-400'}">${bit}</div>`,
@@ -140,6 +180,12 @@ export function createPatternInspector(): {
         </div>
       `
     }
+  }
+
+  function update(data: PatternInspectorData | null) {
+    currentData = data
+    rotation = 0 // Reset rotation when new data is loaded
+    renderData()
   }
 
   return { root, elements, update }
