@@ -31,7 +31,9 @@ import { createRulesetPanel } from './ruleset.ts'
 import { generateSimulationMetricsHTML } from '../shared/simulationInfo.ts'
 import { generateStatsHTML, getInterestColorClass } from '../shared/stats.ts'
 import { createSimulationPanel } from './simulation.ts'
+import { createStatsBar } from './statsBar.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
+import { type TabId, createTabContainer } from './tabContainer.ts'
 import { createZoomSlider } from './zoomSlider.ts'
 
 const PROGRESS_BAR_STEPS = 500
@@ -109,6 +111,7 @@ function updateStatisticsDisplay(
   cellularAutomata: CellularAutomata,
   elements: SummaryPanelElements,
   progressBar: ReturnType<typeof createProgressBar>,
+  statsBarComponent?: ReturnType<typeof createStatsBar>,
 ) {
   const stats = cellularAutomata.getStatistics()
   const recentStats = stats.getRecentStats(1)
@@ -155,6 +158,16 @@ function updateStatisticsDisplay(
   )
   if (interestField) {
     interestField.className = `text-gray-900 dark:text-white font-semibold text-lg ${getInterestColorClass(interestScore)}`
+  }
+
+  // Update stats bar (for Explore tab)
+  if (statsBarComponent) {
+    statsBarComponent.update({
+      population: current.population,
+      activity: current.activity,
+      interestScore,
+      stepCount: metadata?.stepCount ?? 0,
+    })
   }
 }
 
@@ -330,22 +343,29 @@ export async function setupDesktopLayout(
   simulationContainer.appendChild(simulationPanel.root)
 
   const summaryPanel = createSummaryPanel()
+  const statsBar = createStatsBar()
   leftColumn.appendChild(simulationContainer)
   leftColumn.appendChild(summaryPanel.root)
+  leftColumn.appendChild(statsBar.root)
 
   const rightColumn = document.createElement('div')
   rightColumn.className = 'flex flex-col items-center gap-3'
 
   const rulesetPanel = createRulesetPanel()
   const patternInspector = createPatternInspector()
-  const leaderboardPanel = createLeaderboardPanel()
   rightColumn.appendChild(rulesetPanel.root)
   rightColumn.appendChild(patternInspector.root)
-  rightColumn.appendChild(leaderboardPanel.root)
+
+  // Leaderboard column (full-width for leaderboard tab)
+  const leaderboardColumn = document.createElement('div')
+  leaderboardColumn.className = 'flex flex-col items-center gap-3 w-full'
+  const leaderboardPanel = createLeaderboardPanel()
+  leaderboardColumn.appendChild(leaderboardPanel.root)
 
   mainContainer.appendChild(leftColumn)
   mainContainer.appendChild(rightColumn)
   mainContent.appendChild(mainContainer)
+  mainContent.appendChild(leaderboardColumn)
   appRoot.appendChild(mainContent)
 
   // Create footer with build info
@@ -414,6 +434,46 @@ export async function setupDesktopLayout(
 
   const ctx = ruleCanvas.getContext('2d') as CanvasRenderingContext2D
 
+  // Helper to show/hide elements based on active tab
+  function updateTabVisibility(tabId: TabId, caInstance?: CellularAutomata) {
+    const exploreVisible = tabId === 'explore'
+    const analyzeVisible = tabId === 'analyze'
+    const leaderboardVisible = tabId === 'leaderboard'
+
+    // Explore tab: show simulation + ruleset + stats bar, hide summary + pattern inspector + leaderboard
+    leftColumn.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
+    rightColumn.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
+    leaderboardColumn.style.display = leaderboardVisible ? 'flex' : 'none'
+
+    if (exploreVisible) {
+      // Explore: full simulation + full ruleset + stats bar
+      simulationContainer.style.display = 'flex'
+      summaryPanel.root.style.display = 'none'
+      statsBar.root.style.display = 'block'
+      rulesetPanel.root.style.display = 'flex'
+      patternInspector.root.style.display = 'none'
+      simCanvas.width = 400
+      simCanvas.height = 400
+      // Re-render if CA is initialized
+      if (caInstance) {
+        caInstance.render()
+      }
+    } else if (analyzeVisible) {
+      // Analyze: smaller preview + pattern inspector on left, full summary on right
+      simulationContainer.style.display = 'flex'
+      summaryPanel.root.style.display = 'flex'
+      statsBar.root.style.display = 'none'
+      rulesetPanel.root.style.display = 'none'
+      patternInspector.root.style.display = 'block'
+      simCanvas.width = 300
+      simCanvas.height = 300
+      // Re-render after canvas resize if CA is initialized
+      if (caInstance) {
+        caInstance.render()
+      }
+    }
+  }
+
   // Load orbit data
   const response = await fetch('./resources/c4-orbits.json')
   const orbitsData: C4OrbitsData = await response.json()
@@ -429,6 +489,19 @@ export async function setupDesktopLayout(
     fgColor: colors.fgColor,
     bgColor: colors.bgColor,
   })
+
+  // Create tab container (must be after cellularAutomata is initialized)
+  const tabContainer = createTabContainer({
+    onTabChange: (tabId) => {
+      updateTabVisibility(tabId, cellularAutomata)
+      // Auto-refresh leaderboard when entering that tab
+      if (tabId === 'leaderboard') {
+        leaderboardPanel.elements.refreshButton.click()
+      }
+    },
+  })
+  // Insert tab container after header
+  appRoot.insertBefore(tabContainer.root, appRoot.children[1])
 
   // Parse URL state for shareable links
   const urlState = parseURLState()
@@ -492,6 +565,7 @@ export async function setupDesktopLayout(
       cellularAutomata,
       summaryPanel.elements,
       progressBar,
+      statsBar,
     )
     initializeSimulationMetadata()
     updateURL()
@@ -610,6 +684,7 @@ export async function setupDesktopLayout(
       cellularAutomata,
       summaryPanel.elements,
       progressBar,
+      statsBar,
     )
     renderRule(
       currentRuleset,
@@ -786,6 +861,7 @@ export async function setupDesktopLayout(
       cellularAutomata,
       summaryPanel.elements,
       progressBar,
+      statsBar,
     )
   })
 
@@ -802,6 +878,7 @@ export async function setupDesktopLayout(
         cellularAutomata,
         summaryPanel.elements,
         progressBar,
+        statsBar,
       )
       initializeSimulationMetadata()
       updateURL()
@@ -842,6 +919,7 @@ export async function setupDesktopLayout(
           cellularAutomata,
           summaryPanel.elements,
           progressBar,
+          statsBar,
         )
       }, 100)
     }
@@ -868,6 +946,7 @@ export async function setupDesktopLayout(
           cellularAutomata,
           summaryPanel.elements,
           progressBar,
+          statsBar,
         )
       }, 100)
     }
@@ -1057,6 +1136,9 @@ export async function setupDesktopLayout(
     })
   }
 
+  // Initialize tab visibility
+  updateTabVisibility(tabContainer.getActiveTab(), cellularAutomata)
+
   // Auto-start simulation
   btnPlay.click()
 
@@ -1076,6 +1158,7 @@ export async function setupDesktopLayout(
     }
     cleanupTheme()
     benchmarkModal.cleanup()
+    tabContainer.cleanup()
     console.log('Desktop layout cleaned up')
   }
 }
