@@ -36,11 +36,13 @@ export function generateSimulationMetricsHTML(
         <span data-field="ruleset-name" class="text-gray-900 dark:text-gray-100 font-semibold">${data.rulesetName}</span>
       </div>
       
-      <div class="flex justify-between items-start">
-        <span class="text-gray-600 dark:text-gray-400 text-xs">Hex:</span>
-        <span data-field="ruleset-hex" class="text-gray-900 dark:text-gray-100 text-right text-xs break-all">${data.rulesetHex}</span>
+      <div class="flex flex-col justify-between items-start">
+        <span class="text-gray-600 dark:text-gray-400 text-xs">C4 Ruleset Hex:</span>
+        <div class="mt-1 p-2 w-full text-right bg-gray-100 dark:bg-gray-900 rounded text-xs break-all text-gray-900 dark:text-white">
+          ${data.rulesetHex}
+        </div>
       </div>
-      
+
       <div class="flex justify-between items-center">
         <span class="text-gray-600 dark:text-gray-400 text-xs">Seed:</span>
         <span data-field="seed-type" class="text-gray-900 dark:text-gray-100">

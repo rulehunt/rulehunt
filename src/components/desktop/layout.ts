@@ -18,6 +18,8 @@ import {
   parseURLState,
   updateURLWithoutReload,
 } from '../../urlState.ts'
+import { generateSimulationMetricsHTML } from '../shared/simulationInfo.ts'
+import { generateStatsHTML, getInterestColorClass } from '../shared/stats.ts'
 import { setupBenchmarkModal } from './benchmark.ts'
 import { setupDataModeLayout } from './dataMode.ts'
 import { createHeader, setupTheme } from './header.ts'
@@ -28,8 +30,6 @@ import {
 } from './patternInspector.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
-import { generateSimulationMetricsHTML } from '../shared/simulationInfo.ts'
-import { generateStatsHTML, getInterestColorClass } from '../shared/stats.ts'
 import { createSimulationPanel } from './simulation.ts'
 import { createStatsBar } from './statsBar.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'

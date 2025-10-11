@@ -16,29 +16,27 @@ export function createSummaryPanel(): {
 } {
   const root = document.createElement('div')
   root.className =
-    'w-full border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 mt-4'
+    'w-full border flex flex-col border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 mt-4 w-[80vw]'
 
   root.innerHTML = `
     <!-- Row 1: Full width title -->
-    <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Simulation Summary</h3>
+    <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Active Simulation</h3>
 
     <!-- Row 2: Two columns side by side -->
-    <div class="flex gap-4 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+    <div class="flex gap-12 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
       <!-- Left column: Simulation Metrics -->
       <div class="flex-1">
-        <h4 class="text-sm font-semibold mb-2 text-gray-900 dark:text-gray-100">Simulation Metrics</h4>
         <div id="metrics-container"></div>
       </div>
 
       <!-- Right column: Pattern Analysis -->
       <div class="flex-1">
-        <h4 class="text-sm font-semibold mb-2 text-gray-900 dark:text-gray-100">Pattern Analysis</h4>
         <div id="stats-container"></div>
       </div>
     </div>
 
-    <!-- Row 3: Export Buttons side by side -->
-    <div class="flex gap-3">
+    <!-- Row 3: Export Buttons -->
+    <div class="flex gap-3 flex-col">
       <button
         id="copy-json-btn"
         class="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"

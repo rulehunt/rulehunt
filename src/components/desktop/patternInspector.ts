@@ -26,7 +26,6 @@ export function createPatternInspector(): {
     'w-80 lg:w-96 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 p-4'
 
   root.innerHTML = `
-    <h2 class="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Pattern Inspector</h2>
     <div id="pattern-content" class="text-sm">
       <div class="text-gray-500 dark:text-gray-400 text-center py-8">
         Click on a pattern in the ruleset canvas to inspect
@@ -84,7 +83,7 @@ export function createPatternInspector(): {
       container.innerHTML = `
         <div class="flex gap-4">
           <!-- Left side: numerical values -->
-          <div class="flex-1 space-y-2 text-sm">
+          <div class="flex-1 space-y-2 text-sm min-w-32">
             <div class="flex justify-between">
               <span class="text-gray-600 dark:text-gray-400">Type:</span>
               <span class="text-gray-900 dark:text-white font-semibold">Orbit</span>
@@ -109,11 +108,7 @@ export function createPatternInspector(): {
 
           <!-- Right side: kernel view with output and rotate button -->
           <div class="flex flex-col items-center gap-1 mx-12">
-            <button id="rotate-btn" class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" title="Rotate 90° (${rotation}°)">
-              <svg class="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
+
             <div class="flex items-center gap-2">
               <div class="grid grid-cols-3 gap-1 w-20 h-20">
                 ${displayBits
@@ -128,6 +123,18 @@ export function createPatternInspector(): {
                 <span class="text-xl font-bold ${output === 1 ? 'text-violet-600 dark:text-violet-400' : 'text-gray-600 dark:text-gray-400'}">${output}</span>
               </div>
             </div>
+
+            <button
+              id="rotate-btn"
+              class="px-2 py-1 rounded-md text-sm font-medium transition-all
+                    bg-blue-600 text-white hover:bg-blue-700 active:scale-95 my-4"
+              title="Rotate 90° (${rotation}°)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
           </div>
         </div>
       `
