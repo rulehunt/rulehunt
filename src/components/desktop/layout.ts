@@ -441,6 +441,7 @@ export async function setupDesktopLayout(
     const leaderboardVisible = tabId === 'leaderboard'
 
     // Explore tab: show simulation + ruleset + stats bar, hide summary + pattern inspector + leaderboard
+    mainContainer.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
     leftColumn.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
     rightColumn.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
     leaderboardColumn.style.display = leaderboardVisible ? 'flex' : 'none'
