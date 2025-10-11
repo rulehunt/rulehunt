@@ -442,8 +442,8 @@ export async function setupDesktopLayout(
 
     // Show/hide main containers based on tab
     mainContainer.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
-    leftColumn.style.display = exploreVisible ? 'flex' : 'none'
-    rightColumn.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
+    leftColumn.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
+    rightColumn.style.display = exploreVisible ? 'flex' : 'none'
     leaderboardColumn.style.display = leaderboardVisible ? 'flex' : 'none'
 
     if (exploreVisible) {
@@ -461,10 +461,11 @@ export async function setupDesktopLayout(
       }
     } else if (analyzeVisible) {
       // Analyze: only summary panel
-      rulesetPanel.root.style.display = 'none'
-      patternInspector.root.style.display = 'none'
+      simulationContainer.style.display = 'none'
       summaryPanel.root.style.display = 'flex'
       statsBar.root.style.display = 'none'
+      rulesetPanel.root.style.display = 'none'
+      patternInspector.root.style.display = 'none'
     }
   }
 

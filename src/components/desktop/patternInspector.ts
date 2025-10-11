@@ -52,48 +52,47 @@ export function createPatternInspector(): {
 
     const { type, index, output, bits } = data
 
-    // Create 3x3 grid visualization
-    const gridHtml = `
-      <div class="grid grid-cols-3 gap-1 w-24 h-24 mx-auto mb-4">
-        ${bits
-          .map(
-            (bit) =>
-              `<div class="border ${bit === 1 ? 'bg-violet-600 dark:bg-violet-400' : 'bg-gray-100 dark:bg-gray-700'} border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs font-mono ${bit === 1 ? 'text-white' : 'text-gray-600 dark:text-gray-400'}">${bit}</div>`,
-          )
-          .join('')}
-      </div>
-    `
-
     if (type === 'orbit') {
       const { stabilizer, size } = data
       container.innerHTML = `
-        <div class="space-y-3">
-          <div class="flex justify-between">
-            <span class="text-gray-600 dark:text-gray-400">Type:</span>
-            <span class="text-gray-900 dark:text-white font-semibold">Orbit</span>
+        <div class="flex gap-4">
+          <!-- Left side: numerical values -->
+          <div class="flex-1 space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-400">Type:</span>
+              <span class="text-gray-900 dark:text-white font-semibold">Orbit</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-400">Orbit ID:</span>
+              <span class="text-gray-900 dark:text-white font-mono">${index}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-400">Output:</span>
+              <span class="text-gray-900 dark:text-white font-mono font-semibold">${output}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-400">Stabilizer:</span>
+              <span class="text-gray-900 dark:text-white font-mono">${stabilizer}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-400">Size:</span>
+              <span class="text-gray-900 dark:text-white font-mono">${size}</span>
+            </div>
           </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600 dark:text-gray-400">Orbit ID:</span>
-            <span class="text-gray-900 dark:text-white font-mono">${index}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600 dark:text-gray-400">Output:</span>
-            <span class="text-gray-900 dark:text-white font-mono font-semibold">${output}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600 dark:text-gray-400">Stabilizer:</span>
-            <span class="text-gray-900 dark:text-white font-mono">${stabilizer}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600 dark:text-gray-400">Size:</span>
-            <span class="text-gray-900 dark:text-white font-mono">${size}</span>
-          </div>
-          <div class="border-t border-gray-300 dark:border-gray-600 pt-3 mt-3">
-            <div class="text-gray-600 dark:text-gray-400 text-center mb-2">Representative Pattern</div>
-            ${gridHtml}
-            <div class="text-center">
-              <span class="text-2xl text-gray-600 dark:text-gray-400">→</span>
-              <span class="text-2xl font-bold ml-2 ${output === 1 ? 'text-violet-600 dark:text-violet-400' : 'text-gray-600 dark:text-gray-400'}">${output}</span>
+
+          <!-- Right side: kernel view with output -->
+          <div class="flex items-center gap-2">
+            <div class="grid grid-cols-3 gap-1 w-20 h-20">
+              ${bits
+                .map(
+                  (bit) =>
+                    `<div class="border ${bit === 1 ? 'bg-violet-600 dark:bg-violet-400' : 'bg-gray-100 dark:bg-gray-700'} border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs font-mono ${bit === 1 ? 'text-white' : 'text-gray-600 dark:text-gray-400'}">${bit}</div>`,
+                )
+                .join('')}
+            </div>
+            <div class="flex flex-col items-center">
+              <span class="text-xl text-gray-600 dark:text-gray-400">→</span>
+              <span class="text-xl font-bold ${output === 1 ? 'text-violet-600 dark:text-violet-400' : 'text-gray-600 dark:text-gray-400'}">${output}</span>
             </div>
           </div>
         </div>
@@ -102,29 +101,40 @@ export function createPatternInspector(): {
       // Pattern mode
       const { orbitId } = data
       container.innerHTML = `
-        <div class="space-y-3">
-          <div class="flex justify-between">
-            <span class="text-gray-600 dark:text-gray-400">Type:</span>
-            <span class="text-gray-900 dark:text-white font-semibold">Pattern</span>
+        <div class="flex gap-4">
+          <!-- Left side: numerical values -->
+          <div class="flex-1 space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-400">Type:</span>
+              <span class="text-gray-900 dark:text-white font-semibold">Pattern</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-400">Pattern ID:</span>
+              <span class="text-gray-900 dark:text-white font-mono">${index}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-400">Orbit ID:</span>
+              <span class="text-gray-900 dark:text-white font-mono">${orbitId}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-400">Output:</span>
+              <span class="text-gray-900 dark:text-white font-mono font-semibold">${output}</span>
+            </div>
           </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600 dark:text-gray-400">Pattern ID:</span>
-            <span class="text-gray-900 dark:text-white font-mono">${index}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600 dark:text-gray-400">Orbit ID:</span>
-            <span class="text-gray-900 dark:text-white font-mono">${orbitId}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600 dark:text-gray-400">Output:</span>
-            <span class="text-gray-900 dark:text-white font-mono font-semibold">${output}</span>
-          </div>
-          <div class="border-t border-gray-300 dark:border-gray-600 pt-3 mt-3">
-            <div class="text-gray-600 dark:text-gray-400 text-center mb-2">3×3 Neighborhood</div>
-            ${gridHtml}
-            <div class="text-center">
-              <span class="text-2xl text-gray-600 dark:text-gray-400">→</span>
-              <span class="text-2xl font-bold ml-2 ${output === 1 ? 'text-violet-600 dark:text-violet-400' : 'text-gray-600 dark:text-gray-400'}">${output}</span>
+
+          <!-- Right side: kernel view with output -->
+          <div class="flex items-center gap-2">
+            <div class="grid grid-cols-3 gap-1 w-20 h-20">
+              ${bits
+                .map(
+                  (bit) =>
+                    `<div class="border ${bit === 1 ? 'bg-violet-600 dark:bg-violet-400' : 'bg-gray-100 dark:bg-gray-700'} border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs font-mono ${bit === 1 ? 'text-white' : 'text-gray-600 dark:text-gray-400'}">${bit}</div>`,
+                )
+                .join('')}
+            </div>
+            <div class="flex flex-col items-center">
+              <span class="text-xl text-gray-600 dark:text-gray-400">→</span>
+              <span class="text-xl font-bold ${output === 1 ? 'text-violet-600 dark:text-violet-400' : 'text-gray-600 dark:text-gray-400'}">${output}</span>
             </div>
           </div>
         </div>
