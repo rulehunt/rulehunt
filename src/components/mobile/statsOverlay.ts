@@ -28,7 +28,7 @@ export function createStatsOverlay(parentElement?: HTMLElement): {
 } {
   const overlay = document.createElement('div')
   overlay.className =
-    'absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 w-full h-full'
+    'absolute inset-0 z-[1100] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 w-full h-full'
   overlay.style.display = 'none'
 
   const panel = document.createElement('div')
