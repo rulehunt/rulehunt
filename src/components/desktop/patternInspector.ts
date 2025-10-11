@@ -43,13 +43,13 @@ export function createPatternInspector(): {
   let currentData: PatternInspectorData | null = null
   let rotation = 0 // 0, 90, 180, 270 degrees
 
-  // Rotate 3x3 grid 90 degrees clockwise
+  // Rotate 3x3 grid 90 degrees counter-clockwise
   function rotateBits90(bits: number[]): number[] {
-    // Original:     After 90° CW:
-    // 0 1 2         6 3 0
-    // 3 4 5   -->   7 4 1
-    // 6 7 8         8 5 2
-    return [bits[6], bits[3], bits[0], bits[7], bits[4], bits[1], bits[8], bits[5], bits[2]]
+    // Original:     After 90° CCW:
+    // 0 1 2         2 5 8
+    // 3 4 5   -->   1 4 7
+    // 6 7 8         0 3 6
+    return [bits[2], bits[5], bits[8], bits[1], bits[4], bits[7], bits[0], bits[3], bits[6]]
   }
 
   function getRotatedBits(bits: number[], rotationDegrees: number): number[] {
@@ -124,7 +124,7 @@ export function createPatternInspector(): {
                   .join('')}
               </div>
               <div class="flex flex-row items-center">
-                <span class="text-xl text-gray-600 dark:text-gray-400">→</span>
+                <span class="text-xl text-gray-600 dark:text-gray-400 px-6">→</span>
                 <span class="text-xl font-bold ${output === 1 ? 'text-violet-600 dark:text-violet-400' : 'text-gray-600 dark:text-gray-400'}">${output}</span>
               </div>
             </div>
