@@ -25,9 +25,7 @@ const TABS: TabConfig[] = [
   { id: 'leaderboard', label: 'Leaderboard', icon: '🏆', shortcut: 'Ctrl+3' },
 ]
 
-export function createTabContainer(
-  config: TabContainerConfig,
-): {
+export function createTabContainer(config: TabContainerConfig): {
   root: HTMLDivElement
   elements: TabContainerElements
   getActiveTab: () => TabId
@@ -57,7 +55,10 @@ export function createTabContainer(
   for (const tab of TABS) {
     const button = document.createElement('button')
     button.setAttribute('role', 'tab')
-    button.setAttribute('aria-selected', tab.id === activeTab ? 'true' : 'false')
+    button.setAttribute(
+      'aria-selected',
+      tab.id === activeTab ? 'true' : 'false',
+    )
     button.setAttribute('aria-controls', `${tab.id}-panel`)
     button.id = `tab-${tab.id}`
     button.title = `${tab.label} (${tab.shortcut})`
