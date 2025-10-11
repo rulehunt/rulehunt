@@ -447,12 +447,12 @@ export async function setupDesktopLayout(
     leaderboardColumn.style.display = leaderboardVisible ? 'flex' : 'none'
 
     if (exploreVisible) {
-      // Explore: full simulation + full ruleset + stats bar
+      // Explore: full simulation + full ruleset + pattern inspector + stats bar
       simulationContainer.style.display = 'flex'
       summaryPanel.root.style.display = 'none'
       statsBar.root.style.display = 'block'
       rulesetPanel.root.style.display = 'flex'
-      patternInspector.root.style.display = 'none'
+      patternInspector.root.style.display = 'block'
       simCanvas.width = 400
       simCanvas.height = 400
       // Re-render if CA is initialized
