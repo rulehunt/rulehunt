@@ -46,7 +46,7 @@ export function createProgressBar(options: ProgressBarOptions = {}): {
       <button
         id="progress-save-button"
         disabled
-        class="flex-1 px-2 py-1 rounded-md text-sm font-medium transition-all
+        class="flex-1 px-2 py-[0.425rem] rounded-md text-sm font-medium transition-all
                disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed
                enabled:bg-blue-600 enabled:text-white enabled:hover:bg-blue-700 enabled:active:scale-95"
       >
