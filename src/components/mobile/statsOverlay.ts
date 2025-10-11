@@ -20,7 +20,7 @@ export interface StatsOverlayElements {
 
 export type CleanupFunction = () => void
 
-export function createStatsOverlay(): {
+export function createStatsOverlay(parentElement?: HTMLElement): {
   elements: StatsOverlayElements
   show: (data: RunSubmission) => void
   hide: () => void
@@ -28,19 +28,19 @@ export function createStatsOverlay(): {
 } {
   const overlay = document.createElement('div')
   overlay.className =
-    'fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4'
+    'absolute inset-0 z-[1100] bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 w-full h-full'
   overlay.style.display = 'none'
 
   const panel = document.createElement('div')
   panel.className =
-    'bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] overflow-hidden transform scale-95 transition-transform duration-300'
+    'bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-full max-h-[85%] flex flex-col overflow-hidden transform scale-95 transition-transform duration-300'
 
   const header = document.createElement('div')
   header.className =
-    'sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-end'
+    'flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-end'
   header.innerHTML = `
 
-    <button 
+    <button
       id="close-stats"
       class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
       aria-label="Close"
@@ -52,14 +52,17 @@ export function createStatsOverlay(): {
   `
 
   const content = document.createElement('div')
-  content.className = 'px-6 py-6 overflow-y-auto max-h-[calc(85vh-5rem)]'
+  content.className = 'flex-1 px-6 py-6 overflow-y-auto min-h-0'
 
   const closeButton = header.querySelector('#close-stats') as HTMLButtonElement
 
   panel.appendChild(header)
   panel.appendChild(content)
   overlay.appendChild(panel)
-  document.body.appendChild(overlay)
+
+  // Append to provided parent or document.body
+  const container = parentElement || document.body
+  container.appendChild(overlay)
 
   const elements: StatsOverlayElements = {
     overlay,
@@ -71,27 +74,8 @@ export function createStatsOverlay(): {
   const show = (data: RunSubmission) => {
     const jsonString = JSON.stringify(data, null, 2)
 
-    // Safe accessors with defaults
-    // const gridSize = data.gridSize ?? 0
-    // const actualSps = data.actualSps ?? 0
-
     content.innerHTML = `
       <div class="space-y-4">
-        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <div class="space-y-2 font-mono text-sm">
-            <div>
-              <span class="text-gray-500 dark:text-gray-400">Name:</span>
-              <span class="ml-2 text-gray-900 dark:text-white font-semibold">${data.rulesetName}</span>
-            </div>
-            <div>
-              <span class="text-gray-500 dark:text-gray-400">Hex:</span>
-              <div class="mt-1 p-2 bg-gray-100 dark:bg-gray-900 rounded text-xs break-all text-gray-900 dark:text-white">
-                ${data.rulesetHex}
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
           <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">Simulation Metrics</h3>
           ${generateSimulationMetricsHTML(data)}

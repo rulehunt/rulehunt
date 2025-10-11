@@ -18,6 +18,8 @@ import {
   parseURLState,
   updateURLWithoutReload,
 } from '../../urlState.ts'
+import { generateSimulationMetricsHTML } from '../shared/simulationInfo.ts'
+import { generateStatsHTML, getInterestColorClass } from '../shared/stats.ts'
 import { setupBenchmarkModal } from './benchmark.ts'
 import { setupDataModeLayout } from './dataMode.ts'
 import { createHeader, setupTheme } from './header.ts'
@@ -28,10 +30,10 @@ import {
 } from './patternInspector.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
-import { generateSimulationMetricsHTML } from '../shared/simulationInfo.ts'
-import { generateStatsHTML, getInterestColorClass } from '../shared/stats.ts'
 import { createSimulationPanel } from './simulation.ts'
+import { createStatsBar } from './statsBar.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
+import { type TabId, createTabContainer } from './tabContainer.ts'
 import { createZoomSlider } from './zoomSlider.ts'
 
 const PROGRESS_BAR_STEPS = 500
@@ -47,7 +49,7 @@ function getCurrentColors(): { fgColor: string; bgColor: string } {
   const isDark = document.documentElement.classList.contains('dark')
   return {
     fgColor: isDark ? '#a78bfa' : '#9333ea', // violet-400 : violet-600
-    bgColor: isDark ? '#1e1e1e' : '#ffffff',
+    bgColor: isDark ? '#111827' : '#ffffff', // gray-900 : white
   }
 }
 
@@ -63,6 +65,7 @@ function renderRule(
   displayMode: DisplayMode,
   fgColor: string,
   bgColor: string,
+  selectedCell?: { type: 'orbit' | 'pattern'; index: number } | null,
 ) {
   if (displayMode === 'orbits') {
     const cols = 10
@@ -79,6 +82,14 @@ function renderRule(
         const { x, y } = coords10x14(orbit)
         ctx.fillRect(x * cellW, y * cellH, cellW, cellH)
       }
+    }
+
+    // Draw blue border around selected cell
+    if (selectedCell && selectedCell.type === 'orbit') {
+      const { x, y } = coords10x14(selectedCell.index)
+      ctx.strokeStyle = '#3b82f6' // blue-500
+      ctx.lineWidth = 3
+      ctx.strokeRect(x * cellW, y * cellH, cellW, cellH)
     }
   } else {
     const cols = 32
@@ -98,6 +109,14 @@ function renderRule(
         ctx.fillRect(x * cellW, y * cellH, cellW, cellH)
       }
     }
+
+    // Draw blue border around selected cell
+    if (selectedCell && selectedCell.type === 'pattern') {
+      const { x, y } = coords32x16(selectedCell.index)
+      ctx.strokeStyle = '#3b82f6' // blue-500
+      ctx.lineWidth = 3
+      ctx.strokeRect(x * cellW, y * cellH, cellW, cellH)
+    }
   }
 
   const hex35 = c4RulesetToHex(ruleset)
@@ -109,6 +128,7 @@ function updateStatisticsDisplay(
   cellularAutomata: CellularAutomata,
   elements: SummaryPanelElements,
   progressBar: ReturnType<typeof createProgressBar>,
+  statsBarComponent?: ReturnType<typeof createStatsBar>,
 ) {
   const stats = cellularAutomata.getStatistics()
   const recentStats = stats.getRecentStats(1)
@@ -156,6 +176,16 @@ function updateStatisticsDisplay(
   if (interestField) {
     interestField.className = `text-gray-900 dark:text-white font-semibold text-lg ${getInterestColorClass(interestScore)}`
   }
+
+  // Update stats bar (for Explore tab)
+  if (statsBarComponent) {
+    statsBarComponent.update({
+      population: current.population,
+      activity: current.activity,
+      interestScore,
+      stepCount: metadata?.stepCount ?? 0,
+    })
+  }
 }
 
 function handleCanvasClick(
@@ -166,6 +196,7 @@ function handleCanvasClick(
   orbitLookup: Uint8Array,
   displayMode: DisplayMode,
   onPatternClick: (data: PatternInspectorData) => void,
+  onSelectionChange: (selection: { type: 'orbit' | 'pattern'; index: number }) => void,
 ) {
   const rect = canvas.getBoundingClientRect()
   const x = event.clientX - rect.left
@@ -200,6 +231,8 @@ function handleCanvasClick(
       stabilizer: orbit.stabilizer,
       size: orbit.size,
     })
+
+    onSelectionChange({ type: 'orbit', index: orbitIndex })
   } else {
     const cols = 32
     const rows = 16
@@ -236,6 +269,8 @@ function handleCanvasClick(
       bits,
       orbitId,
     })
+
+    onSelectionChange({ type: 'pattern', index: patternIndex })
   }
 }
 
@@ -330,22 +365,29 @@ export async function setupDesktopLayout(
   simulationContainer.appendChild(simulationPanel.root)
 
   const summaryPanel = createSummaryPanel()
+  const statsBar = createStatsBar()
   leftColumn.appendChild(simulationContainer)
   leftColumn.appendChild(summaryPanel.root)
+  leftColumn.appendChild(statsBar.root)
 
   const rightColumn = document.createElement('div')
   rightColumn.className = 'flex flex-col items-center gap-3'
 
   const rulesetPanel = createRulesetPanel()
   const patternInspector = createPatternInspector()
-  const leaderboardPanel = createLeaderboardPanel()
   rightColumn.appendChild(rulesetPanel.root)
   rightColumn.appendChild(patternInspector.root)
-  rightColumn.appendChild(leaderboardPanel.root)
+
+  // Leaderboard column (full-width for leaderboard tab)
+  const leaderboardColumn = document.createElement('div')
+  leaderboardColumn.className = 'flex flex-col items-center gap-3 w-full'
+  const leaderboardPanel = createLeaderboardPanel()
+  leaderboardColumn.appendChild(leaderboardPanel.root)
 
   mainContainer.appendChild(leftColumn)
   mainContainer.appendChild(rightColumn)
   mainContent.appendChild(mainContainer)
+  mainContent.appendChild(leaderboardColumn)
   appRoot.appendChild(mainContent)
 
   // Create footer with build info
@@ -414,6 +456,41 @@ export async function setupDesktopLayout(
 
   const ctx = ruleCanvas.getContext('2d') as CanvasRenderingContext2D
 
+  // Helper to show/hide elements based on active tab
+  function updateTabVisibility(tabId: TabId, caInstance?: CellularAutomata) {
+    const exploreVisible = tabId === 'explore'
+    const analyzeVisible = tabId === 'analyze'
+    const leaderboardVisible = tabId === 'leaderboard'
+
+    // Show/hide main containers based on tab
+    mainContainer.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
+    leftColumn.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
+    rightColumn.style.display = exploreVisible ? 'flex' : 'none'
+    leaderboardColumn.style.display = leaderboardVisible ? 'flex' : 'none'
+
+    if (exploreVisible) {
+      // Explore: full simulation + full ruleset + pattern inspector + stats bar
+      simulationContainer.style.display = 'flex'
+      summaryPanel.root.style.display = 'none'
+      statsBar.root.style.display = 'block'
+      rulesetPanel.root.style.display = 'flex'
+      patternInspector.root.style.display = 'block'
+      simCanvas.width = 400
+      simCanvas.height = 400
+      // Re-render if CA is initialized
+      if (caInstance) {
+        caInstance.render()
+      }
+    } else if (analyzeVisible) {
+      // Analyze: only summary panel
+      simulationContainer.style.display = 'none'
+      summaryPanel.root.style.display = 'flex'
+      statsBar.root.style.display = 'none'
+      rulesetPanel.root.style.display = 'none'
+      patternInspector.root.style.display = 'none'
+    }
+  }
+
   // Load orbit data
   const response = await fetch('./resources/c4-orbits.json')
   const orbitsData: C4OrbitsData = await response.json()
@@ -430,6 +507,19 @@ export async function setupDesktopLayout(
     bgColor: colors.bgColor,
   })
 
+  // Create tab container (must be after cellularAutomata is initialized)
+  const tabContainer = createTabContainer({
+    onTabChange: (tabId) => {
+      updateTabVisibility(tabId, cellularAutomata)
+      // Auto-refresh leaderboard when entering that tab
+      if (tabId === 'leaderboard') {
+        leaderboardPanel.elements.refreshButton.click()
+      }
+    },
+  })
+  // Insert tab container after header
+  appRoot.insertBefore(tabContainer.root, appRoot.children[1])
+
   // Parse URL state for shareable links
   const urlState = parseURLState()
   const urlRuleset = parseURLRuleset()
@@ -439,6 +529,7 @@ export async function setupDesktopLayout(
   let initialConditionType: 'center' | 'random' | 'patch' = 'patch'
   let displayMode: DisplayMode = 'orbits'
   let statsUpdateInterval: number | null = null
+  let selectedCell: { type: 'orbit' | 'pattern'; index: number } | null = null
 
   // Apply URL seed if provided
   if (urlState.seed !== undefined) {
@@ -492,6 +583,7 @@ export async function setupDesktopLayout(
       cellularAutomata,
       summaryPanel.elements,
       progressBar,
+      statsBar,
     )
     initializeSimulationMetadata()
     updateURL()
@@ -600,6 +692,57 @@ export async function setupDesktopLayout(
   // Now apply initial condition which will also initialize simulation metadata
   applyInitialCondition()
 
+  // Auto-select first cell (index 0) on page load
+  if (displayMode === 'orbits') {
+    const orbit = orbitsData.orbits[0]
+    const output = currentRuleset[0]
+    const representative = orbit.representative
+    const bits = []
+    for (let i = 0; i < 9; i++) {
+      bits.push((representative >> i) & 1)
+    }
+    patternInspector.update({
+      type: 'orbit',
+      index: 0,
+      output,
+      bits,
+      stabilizer: orbit.stabilizer,
+      size: orbit.size,
+    })
+    selectedCell = { type: 'orbit', index: 0 }
+  } else {
+    const expandedRuleset = expandC4Ruleset(currentRuleset, orbitLookup)
+    const output = expandedRuleset[0]
+    const orbitId = orbitLookup[0]
+    const bits = []
+    for (let i = 0; i < 9; i++) {
+      bits.push((0 >> i) & 1)
+    }
+    patternInspector.update({
+      type: 'pattern',
+      index: 0,
+      output,
+      bits,
+      orbitId,
+    })
+    selectedCell = { type: 'pattern', index: 0 }
+  }
+
+  // Re-render with selection
+  renderRule(
+    currentRuleset,
+    orbitLookup,
+    ctx,
+    ruleCanvas,
+    ruleLabelDisplay,
+    ruleIdDisplay,
+    ruleLabelDisplay.textContent || 'Loading...',
+    displayMode,
+    colors.fgColor,
+    colors.bgColor,
+    selectedCell,
+  )
+
   // Setup theme with re-render callback
   const cleanupTheme = setupTheme(header.elements.themeToggle, () => {
     const newColors = getCurrentColors()
@@ -610,6 +753,7 @@ export async function setupDesktopLayout(
       cellularAutomata,
       summaryPanel.elements,
       progressBar,
+      statsBar,
     )
     renderRule(
       currentRuleset,
@@ -646,6 +790,23 @@ export async function setupDesktopLayout(
       orbitLookup,
       displayMode,
       (data) => patternInspector.update(data),
+      (selection) => {
+        selectedCell = selection
+        const colors = getCurrentColors()
+        renderRule(
+          currentRuleset,
+          orbitLookup,
+          ctx,
+          ruleCanvas,
+          ruleLabelDisplay,
+          ruleIdDisplay,
+          ruleLabelDisplay.textContent || 'Loading...',
+          displayMode,
+          colors.fgColor,
+          colors.bgColor,
+          selectedCell,
+        )
+      },
     )
   }
   addEventListener(ruleCanvas, 'click', canvasClickHandler)
@@ -786,6 +947,7 @@ export async function setupDesktopLayout(
       cellularAutomata,
       summaryPanel.elements,
       progressBar,
+      statsBar,
     )
   })
 
@@ -802,6 +964,7 @@ export async function setupDesktopLayout(
         cellularAutomata,
         summaryPanel.elements,
         progressBar,
+        statsBar,
       )
       initializeSimulationMetadata()
       updateURL()
@@ -842,6 +1005,7 @@ export async function setupDesktopLayout(
           cellularAutomata,
           summaryPanel.elements,
           progressBar,
+          statsBar,
         )
       }, 100)
     }
@@ -868,6 +1032,7 @@ export async function setupDesktopLayout(
           cellularAutomata,
           summaryPanel.elements,
           progressBar,
+          statsBar,
         )
       }, 100)
     }
@@ -897,6 +1062,118 @@ export async function setupDesktopLayout(
     const zoomLevel = zoomSlider.value()
     cellularAutomata.setZoom(zoomLevel)
     cellularAutomata.render()
+  })
+
+  // Export button handlers
+  addEventListener(summaryPanel.elements.copyJsonButton, 'click', async () => {
+    const stats = cellularAutomata.getStatistics()
+    const metadata = stats.getMetadata()
+    const recent = stats.getRecentStats(1)[0]
+    const interestScore = stats.calculateInterestScore()
+
+    const exportData = {
+      rulesetName: metadata?.rulesetName ?? 'Unknown',
+      rulesetHex: c4RulesetToHex(currentRuleset),
+      seed: cellularAutomata.getSeed(),
+      seedType: metadata?.seedType,
+      seedPercentage: metadata?.seedPercentage,
+      stepCount: metadata?.stepCount ?? 0,
+      elapsedTime: stats.getElapsedTime(),
+      actualSps: stats.getActualStepsPerSecond(),
+      requestedSps: metadata?.requestedStepsPerSecond,
+      gridSize: cellularAutomata.getGridSize(),
+      population: recent?.population ?? 0,
+      activity: recent?.activity ?? 0,
+      populationChange: recent?.populationChange ?? 0,
+      entropy2x2: recent?.entropy2x2 ?? 0,
+      entropy4x4: recent?.entropy4x4 ?? 0,
+      entropy8x8: recent?.entropy8x8 ?? 0,
+      entityCount: recent?.entityCount ?? 0,
+      entityChange: recent?.entityChange ?? 0,
+      totalEntitiesEverSeen: recent?.totalEntitiesEverSeen ?? 0,
+      uniquePatterns: recent?.uniquePatterns ?? 0,
+      entitiesAlive: recent?.entitiesAlive ?? 0,
+      entitiesDied: recent?.entitiesDied ?? 0,
+      interestScore,
+    }
+
+    const jsonString = JSON.stringify(exportData, null, 2)
+
+    try {
+      await navigator.clipboard.writeText(jsonString)
+      const btn = summaryPanel.elements.copyJsonButton
+      const originalHTML = btn.innerHTML
+      btn.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        <span>Copied!</span>
+      `
+      btn.className = btn.className.replace('bg-blue-600 hover:bg-blue-700', 'bg-green-600 hover:bg-green-700')
+      setTimeout(() => {
+        btn.innerHTML = originalHTML
+        btn.className = btn.className.replace('bg-green-600 hover:bg-green-700', 'bg-blue-600 hover:bg-blue-700')
+      }, 2000)
+    } catch (err) {
+      console.error('Failed to copy JSON:', err)
+    }
+  })
+
+  addEventListener(summaryPanel.elements.exportCsvButton, 'click', () => {
+    const stats = cellularAutomata.getStatistics()
+    const metadata = stats.getMetadata()
+    const recent = stats.getRecentStats(1)[0]
+    const interestScore = stats.calculateInterestScore()
+
+    const csvData = [
+      ['Field', 'Value'],
+      ['Ruleset Name', metadata?.rulesetName ?? 'Unknown'],
+      ['Ruleset Hex', c4RulesetToHex(currentRuleset)],
+      ['Seed', cellularAutomata.getSeed().toString()],
+      ['Seed Type', metadata?.seedType ?? ''],
+      ['Seed Percentage', metadata?.seedPercentage?.toString() ?? ''],
+      ['Step Count', (metadata?.stepCount ?? 0).toString()],
+      ['Elapsed Time (ms)', stats.getElapsedTime().toString()],
+      ['Actual SPS', stats.getActualStepsPerSecond().toFixed(2)],
+      ['Requested SPS', metadata?.requestedStepsPerSecond?.toString() ?? ''],
+      ['Grid Size', cellularAutomata.getGridSize().toString()],
+      ['Population', (recent?.population ?? 0).toString()],
+      ['Activity', (recent?.activity ?? 0).toString()],
+      ['Population Change', (recent?.populationChange ?? 0).toString()],
+      ['Entropy 2x2', (recent?.entropy2x2 ?? 0).toFixed(4)],
+      ['Entropy 4x4', (recent?.entropy4x4 ?? 0).toFixed(4)],
+      ['Entropy 8x8', (recent?.entropy8x8 ?? 0).toFixed(4)],
+      ['Entity Count', (recent?.entityCount ?? 0).toString()],
+      ['Entity Change', (recent?.entityChange ?? 0).toString()],
+      ['Total Entities Ever Seen', (recent?.totalEntitiesEverSeen ?? 0).toString()],
+      ['Unique Patterns', (recent?.uniquePatterns ?? 0).toString()],
+      ['Entities Alive', (recent?.entitiesAlive ?? 0).toString()],
+      ['Entities Died', (recent?.entitiesDied ?? 0).toString()],
+      ['Interest Score', interestScore.toFixed(2)],
+    ]
+
+    const csvContent = csvData.map(row => row.map(field => `"${field}"`).join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `rulehunt-${metadata?.rulesetName ?? 'simulation'}-${Date.now()}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+
+    const btn = summaryPanel.elements.exportCsvButton
+    const originalHTML = btn.innerHTML
+    btn.innerHTML = `
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+      </svg>
+      <span>Exported!</span>
+    `
+    btn.className = btn.className.replace('bg-green-600 hover:bg-green-700', 'bg-blue-600 hover:bg-blue-700')
+    setTimeout(() => {
+      btn.innerHTML = originalHTML
+      btn.className = btn.className.replace('bg-blue-600 hover:bg-blue-700', 'bg-green-600 hover:bg-green-700')
+    }, 2000)
   })
 
   // Save button click handler
@@ -1057,6 +1334,9 @@ export async function setupDesktopLayout(
     })
   }
 
+  // Initialize tab visibility
+  updateTabVisibility(tabContainer.getActiveTab(), cellularAutomata)
+
   // Auto-start simulation
   btnPlay.click()
 
@@ -1076,6 +1356,7 @@ export async function setupDesktopLayout(
     }
     cleanupTheme()
     benchmarkModal.cleanup()
+    tabContainer.cleanup()
     console.log('Desktop layout cleaned up')
   }
 }

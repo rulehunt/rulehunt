@@ -14,7 +14,7 @@ export function createLeaderboardPanel(): {
 } {
   const root = document.createElement('div')
   root.className =
-    'w-full border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 mt-4'
+    'w-full max-w-7xl border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 mt-4'
 
   // --- Construct HTML skeleton ---
   root.innerHTML = `
