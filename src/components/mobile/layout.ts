@@ -401,7 +401,7 @@ function setupDualCanvasSwipe(
 
     if (shouldCommit) {
       const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      const bgColor = isDark ? '#1e1e1e' : '#ffffff'
+      const bgColor = isDark ? '#111827' : '#ffffff' // gray-900 : white
 
       requestAnimationFrame(() => {
         // Explicitly fill background before rendering to prevent black flash
@@ -877,7 +877,7 @@ export async function setupMobileLayout(
 
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   const palette = isDark ? DARK_FG_COLORS : LIGHT_FG_COLORS
-  const bgColor = isDark ? '#1e1e1e' : '#ffffff'
+  const bgColor = isDark ? '#111827' : '#ffffff' // gray-900 : white
   let colorIndex = Math.floor(Math.random() * palette.length)
 
   const wrapper = document.createElement('div')

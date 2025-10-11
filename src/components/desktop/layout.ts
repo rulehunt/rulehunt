@@ -49,7 +49,7 @@ function getCurrentColors(): { fgColor: string; bgColor: string } {
   const isDark = document.documentElement.classList.contains('dark')
   return {
     fgColor: isDark ? '#a78bfa' : '#9333ea', // violet-400 : violet-600
-    bgColor: isDark ? '#1e1e1e' : '#ffffff',
+    bgColor: isDark ? '#111827' : '#ffffff', // gray-900 : white
   }
 }
 
