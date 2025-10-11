@@ -692,6 +692,57 @@ export async function setupDesktopLayout(
   // Now apply initial condition which will also initialize simulation metadata
   applyInitialCondition()
 
+  // Auto-select first cell (index 0) on page load
+  if (displayMode === 'orbits') {
+    const orbit = orbitsData.orbits[0]
+    const output = currentRuleset[0]
+    const representative = orbit.representative
+    const bits = []
+    for (let i = 0; i < 9; i++) {
+      bits.push((representative >> i) & 1)
+    }
+    patternInspector.update({
+      type: 'orbit',
+      index: 0,
+      output,
+      bits,
+      stabilizer: orbit.stabilizer,
+      size: orbit.size,
+    })
+    selectedCell = { type: 'orbit', index: 0 }
+  } else {
+    const expandedRuleset = expandC4Ruleset(currentRuleset, orbitLookup)
+    const output = expandedRuleset[0]
+    const orbitId = orbitLookup[0]
+    const bits = []
+    for (let i = 0; i < 9; i++) {
+      bits.push((0 >> i) & 1)
+    }
+    patternInspector.update({
+      type: 'pattern',
+      index: 0,
+      output,
+      bits,
+      orbitId,
+    })
+    selectedCell = { type: 'pattern', index: 0 }
+  }
+
+  // Re-render with selection
+  renderRule(
+    currentRuleset,
+    orbitLookup,
+    ctx,
+    ruleCanvas,
+    ruleLabelDisplay,
+    ruleIdDisplay,
+    ruleLabelDisplay.textContent || 'Loading...',
+    displayMode,
+    colors.fgColor,
+    colors.bgColor,
+    selectedCell,
+  )
+
   // Setup theme with re-render callback
   const cleanupTheme = setupTheme(header.elements.themeToggle, () => {
     const newColors = getCurrentColors()
