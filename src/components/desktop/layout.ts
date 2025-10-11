@@ -978,6 +978,118 @@ export async function setupDesktopLayout(
     cellularAutomata.render()
   })
 
+  // Export button handlers
+  addEventListener(summaryPanel.elements.copyJsonButton, 'click', async () => {
+    const stats = cellularAutomata.getStatistics()
+    const metadata = stats.getMetadata()
+    const recent = stats.getRecentStats(1)[0]
+    const interestScore = stats.calculateInterestScore()
+
+    const exportData = {
+      rulesetName: metadata?.rulesetName ?? 'Unknown',
+      rulesetHex: c4RulesetToHex(currentRuleset),
+      seed: cellularAutomata.getSeed(),
+      seedType: metadata?.seedType,
+      seedPercentage: metadata?.seedPercentage,
+      stepCount: metadata?.stepCount ?? 0,
+      elapsedTime: stats.getElapsedTime(),
+      actualSps: stats.getActualStepsPerSecond(),
+      requestedSps: metadata?.requestedStepsPerSecond,
+      gridSize: cellularAutomata.getGridSize(),
+      population: recent?.population ?? 0,
+      activity: recent?.activity ?? 0,
+      populationChange: recent?.populationChange ?? 0,
+      entropy2x2: recent?.entropy2x2 ?? 0,
+      entropy4x4: recent?.entropy4x4 ?? 0,
+      entropy8x8: recent?.entropy8x8 ?? 0,
+      entityCount: recent?.entityCount ?? 0,
+      entityChange: recent?.entityChange ?? 0,
+      totalEntitiesEverSeen: recent?.totalEntitiesEverSeen ?? 0,
+      uniquePatterns: recent?.uniquePatterns ?? 0,
+      entitiesAlive: recent?.entitiesAlive ?? 0,
+      entitiesDied: recent?.entitiesDied ?? 0,
+      interestScore,
+    }
+
+    const jsonString = JSON.stringify(exportData, null, 2)
+
+    try {
+      await navigator.clipboard.writeText(jsonString)
+      const btn = summaryPanel.elements.copyJsonButton
+      const originalHTML = btn.innerHTML
+      btn.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        <span>Copied!</span>
+      `
+      btn.className = btn.className.replace('bg-blue-600 hover:bg-blue-700', 'bg-green-600 hover:bg-green-700')
+      setTimeout(() => {
+        btn.innerHTML = originalHTML
+        btn.className = btn.className.replace('bg-green-600 hover:bg-green-700', 'bg-blue-600 hover:bg-blue-700')
+      }, 2000)
+    } catch (err) {
+      console.error('Failed to copy JSON:', err)
+    }
+  })
+
+  addEventListener(summaryPanel.elements.exportCsvButton, 'click', () => {
+    const stats = cellularAutomata.getStatistics()
+    const metadata = stats.getMetadata()
+    const recent = stats.getRecentStats(1)[0]
+    const interestScore = stats.calculateInterestScore()
+
+    const csvData = [
+      ['Field', 'Value'],
+      ['Ruleset Name', metadata?.rulesetName ?? 'Unknown'],
+      ['Ruleset Hex', c4RulesetToHex(currentRuleset)],
+      ['Seed', cellularAutomata.getSeed().toString()],
+      ['Seed Type', metadata?.seedType ?? ''],
+      ['Seed Percentage', metadata?.seedPercentage?.toString() ?? ''],
+      ['Step Count', (metadata?.stepCount ?? 0).toString()],
+      ['Elapsed Time (ms)', stats.getElapsedTime().toString()],
+      ['Actual SPS', stats.getActualStepsPerSecond().toFixed(2)],
+      ['Requested SPS', metadata?.requestedStepsPerSecond?.toString() ?? ''],
+      ['Grid Size', cellularAutomata.getGridSize().toString()],
+      ['Population', (recent?.population ?? 0).toString()],
+      ['Activity', (recent?.activity ?? 0).toString()],
+      ['Population Change', (recent?.populationChange ?? 0).toString()],
+      ['Entropy 2x2', (recent?.entropy2x2 ?? 0).toFixed(4)],
+      ['Entropy 4x4', (recent?.entropy4x4 ?? 0).toFixed(4)],
+      ['Entropy 8x8', (recent?.entropy8x8 ?? 0).toFixed(4)],
+      ['Entity Count', (recent?.entityCount ?? 0).toString()],
+      ['Entity Change', (recent?.entityChange ?? 0).toString()],
+      ['Total Entities Ever Seen', (recent?.totalEntitiesEverSeen ?? 0).toString()],
+      ['Unique Patterns', (recent?.uniquePatterns ?? 0).toString()],
+      ['Entities Alive', (recent?.entitiesAlive ?? 0).toString()],
+      ['Entities Died', (recent?.entitiesDied ?? 0).toString()],
+      ['Interest Score', interestScore.toFixed(2)],
+    ]
+
+    const csvContent = csvData.map(row => row.map(field => `"${field}"`).join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `rulehunt-${metadata?.rulesetName ?? 'simulation'}-${Date.now()}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+
+    const btn = summaryPanel.elements.exportCsvButton
+    const originalHTML = btn.innerHTML
+    btn.innerHTML = `
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+      </svg>
+      <span>Exported!</span>
+    `
+    btn.className = btn.className.replace('bg-green-600 hover:bg-green-700', 'bg-blue-600 hover:bg-blue-700')
+    setTimeout(() => {
+      btn.innerHTML = originalHTML
+      btn.className = btn.className.replace('bg-blue-600 hover:bg-blue-700', 'bg-green-600 hover:bg-green-700')
+    }, 2000)
+  })
+
   // Save button click handler
   if (progressBar.elements.saveButton) {
     addEventListener(progressBar.elements.saveButton, 'click', () => {
