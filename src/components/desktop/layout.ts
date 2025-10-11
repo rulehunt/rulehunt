@@ -65,6 +65,7 @@ function renderRule(
   displayMode: DisplayMode,
   fgColor: string,
   bgColor: string,
+  selectedCell?: { type: 'orbit' | 'pattern'; index: number } | null,
 ) {
   if (displayMode === 'orbits') {
     const cols = 10
@@ -81,6 +82,14 @@ function renderRule(
         const { x, y } = coords10x14(orbit)
         ctx.fillRect(x * cellW, y * cellH, cellW, cellH)
       }
+    }
+
+    // Draw blue border around selected cell
+    if (selectedCell && selectedCell.type === 'orbit') {
+      const { x, y } = coords10x14(selectedCell.index)
+      ctx.strokeStyle = '#3b82f6' // blue-500
+      ctx.lineWidth = 3
+      ctx.strokeRect(x * cellW, y * cellH, cellW, cellH)
     }
   } else {
     const cols = 32
@@ -99,6 +108,14 @@ function renderRule(
         const { x, y } = coords32x16(pattern)
         ctx.fillRect(x * cellW, y * cellH, cellW, cellH)
       }
+    }
+
+    // Draw blue border around selected cell
+    if (selectedCell && selectedCell.type === 'pattern') {
+      const { x, y } = coords32x16(selectedCell.index)
+      ctx.strokeStyle = '#3b82f6' // blue-500
+      ctx.lineWidth = 3
+      ctx.strokeRect(x * cellW, y * cellH, cellW, cellH)
     }
   }
 
@@ -179,6 +196,7 @@ function handleCanvasClick(
   orbitLookup: Uint8Array,
   displayMode: DisplayMode,
   onPatternClick: (data: PatternInspectorData) => void,
+  onSelectionChange: (selection: { type: 'orbit' | 'pattern'; index: number }) => void,
 ) {
   const rect = canvas.getBoundingClientRect()
   const x = event.clientX - rect.left
@@ -213,6 +231,8 @@ function handleCanvasClick(
       stabilizer: orbit.stabilizer,
       size: orbit.size,
     })
+
+    onSelectionChange({ type: 'orbit', index: orbitIndex })
   } else {
     const cols = 32
     const rows = 16
@@ -249,6 +269,8 @@ function handleCanvasClick(
       bits,
       orbitId,
     })
+
+    onSelectionChange({ type: 'pattern', index: patternIndex })
   }
 }
 
@@ -507,6 +529,7 @@ export async function setupDesktopLayout(
   let initialConditionType: 'center' | 'random' | 'patch' = 'patch'
   let displayMode: DisplayMode = 'orbits'
   let statsUpdateInterval: number | null = null
+  let selectedCell: { type: 'orbit' | 'pattern'; index: number } | null = null
 
   // Apply URL seed if provided
   if (urlState.seed !== undefined) {
@@ -716,6 +739,23 @@ export async function setupDesktopLayout(
       orbitLookup,
       displayMode,
       (data) => patternInspector.update(data),
+      (selection) => {
+        selectedCell = selection
+        const colors = getCurrentColors()
+        renderRule(
+          currentRuleset,
+          orbitLookup,
+          ctx,
+          ruleCanvas,
+          ruleLabelDisplay,
+          ruleIdDisplay,
+          ruleLabelDisplay.textContent || 'Loading...',
+          displayMode,
+          colors.fgColor,
+          colors.bgColor,
+          selectedCell,
+        )
+      },
     )
   }
   addEventListener(ruleCanvas, 'click', canvasClickHandler)
