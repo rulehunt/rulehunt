@@ -440,9 +440,9 @@ export async function setupDesktopLayout(
     const analyzeVisible = tabId === 'analyze'
     const leaderboardVisible = tabId === 'leaderboard'
 
-    // Explore tab: show simulation + ruleset + stats bar, hide summary + pattern inspector + leaderboard
+    // Show/hide main containers based on tab
     mainContainer.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
-    leftColumn.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
+    leftColumn.style.display = exploreVisible ? 'flex' : 'none'
     rightColumn.style.display = exploreVisible || analyzeVisible ? 'flex' : 'none'
     leaderboardColumn.style.display = leaderboardVisible ? 'flex' : 'none'
 
@@ -460,18 +460,11 @@ export async function setupDesktopLayout(
         caInstance.render()
       }
     } else if (analyzeVisible) {
-      // Analyze: smaller preview + pattern inspector on left, full summary on right
-      simulationContainer.style.display = 'flex'
+      // Analyze: only summary panel
+      rulesetPanel.root.style.display = 'none'
+      patternInspector.root.style.display = 'none'
       summaryPanel.root.style.display = 'flex'
       statsBar.root.style.display = 'none'
-      rulesetPanel.root.style.display = 'none'
-      patternInspector.root.style.display = 'block'
-      simCanvas.width = 300
-      simCanvas.height = 300
-      // Re-render after canvas resize if CA is initialized
-      if (caInstance) {
-        caInstance.render()
-      }
     }
   }
 
