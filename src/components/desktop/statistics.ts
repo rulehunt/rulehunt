@@ -142,8 +142,9 @@ export function renderStatistics(
   const textColor = isDark ? '#f3f4f6' : '#1f2937'
   const gridColor = isDark ? '#374151' : '#e5e7eb'
 
-  // Render summary cards
+  // Render summary cards - Automata stats first, then engagement stats
   elements.summaryCards.innerHTML = `
+    <!-- Automata Statistics -->
     <div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-lg border border-violet-200 dark:border-violet-800">
       <div class="text-sm text-violet-600 dark:text-violet-400 font-medium">Total Runs</div>
       <div class="text-2xl font-bold text-violet-900 dark:text-violet-100">${data.total_runs.toLocaleString()}</div>
@@ -160,17 +161,32 @@ export function renderStatistics(
       <div class="text-sm text-green-600 dark:text-green-400 font-medium">Unique Rulesets</div>
       <div class="text-2xl font-bold text-green-900 dark:text-green-100">${data.unique_rulesets.toLocaleString()}</div>
     </div>
+    <!-- User Engagement Statistics -->
+    <div class="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg border border-indigo-200 dark:border-indigo-800">
+      <div class="text-sm text-indigo-600 dark:text-indigo-400 font-medium">Unique Users</div>
+      <div class="text-2xl font-bold text-indigo-900 dark:text-indigo-100">${data.unique_users.toLocaleString()}</div>
+    </div>
+    <div class="bg-cyan-50 dark:bg-cyan-900/20 p-4 rounded-lg border border-cyan-200 dark:border-cyan-800">
+      <div class="text-sm text-cyan-600 dark:text-cyan-400 font-medium">Avg Runs/User</div>
+      <div class="text-2xl font-bold text-cyan-900 dark:text-cyan-100">${data.avg_runs_per_user.toFixed(1)}</div>
+    </div>
+    <div class="bg-pink-50 dark:bg-pink-900/20 p-4 rounded-lg border border-pink-200 dark:border-pink-800">
+      <div class="text-sm text-pink-600 dark:text-pink-400 font-medium">Active (24h)</div>
+      <div class="text-2xl font-bold text-pink-900 dark:text-pink-100">${data.active_users_24h.toLocaleString()}</div>
+    </div>
+    <div class="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
+      <div class="text-sm text-orange-600 dark:text-orange-400 font-medium">Active (7d)</div>
+      <div class="text-2xl font-bold text-orange-900 dark:text-orange-100">${data.active_users_7d.toLocaleString()}</div>
+    </div>
   `
 
-  // Common chart options
+  // Common chart options (for bar charts)
   const commonOptions: Partial<ChartOptions> = {
     responsive: false,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        labels: {
-          color: textColor,
-        },
+        display: false, // Hide legend for histograms
       },
     },
     scales: {
