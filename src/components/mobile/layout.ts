@@ -20,6 +20,7 @@ import {
   conwayRule,
   expandC4Ruleset,
   makeC4Ruleset,
+  mutateC4Ruleset,
   randomC4RulesetByDensity,
 } from '../../utils.ts'
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
@@ -40,7 +41,10 @@ import { createStarButton } from './starButton.ts'
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 60
 const TARGET_GRID_SIZE = 600_000
-const STARRED_PATTERN_PROBABILITY = 0.2 // 20% starred, 80% random
+// Exploration/Exploitation/Mutation Strategy:
+// 20% random - Generate completely new random rule (exploration)
+// 10% exact starred - Load exact starred pattern from database (exploitation)
+// 70% mutated starred - Load starred pattern and mutate it with ramping magnitude (balanced)
 
 const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1
 const SWIPE_COMMIT_MIN_DISTANCE = 50
@@ -592,41 +596,72 @@ function generateRandomRule(): RuleData {
 }
 
 /**
- * Exploration/Exploitation Strategy:
- * 20% of the time, load a starred pattern from the database (exploitation)
- * 80% of the time, generate a new random rule (exploration)
+ * Exploration/Exploitation/Mutation Strategy:
+ * - 0.0–0.2: return a brand new random rule
+ * - 0.2–0.9: fetch a starred rule, then mutate it with increasing magnitude
+ * - 0.9–1.0: fetch and return starred rule unmodified
  */
 async function generateNextRule(): Promise<RuleData> {
-  const shouldUseStarred = Math.random() < STARRED_PATTERN_PROBABILITY
+  const r = Math.random()
 
-  if (shouldUseStarred) {
-    try {
-      const starred = await fetchStarredPattern()
-      if (starred) {
-        console.log(
-          '[generateNextRule] Using starred pattern:',
-          starred.ruleset_name,
-          'seed:',
-          starred.seed,
-        )
-        const ruleset = hexToC4Ruleset(starred.ruleset_hex)
-        return {
-          name: starred.ruleset_name,
-          hex: starred.ruleset_hex,
-          ruleset,
-          seed: starred.seed, // Include saved seed for exact reproduction
-        }
-      }
-    } catch (err) {
-      console.warn(
-        '[generateNextRule] Failed to fetch starred pattern, falling back to random:',
-        err,
-      )
-    }
+  // 20% random (0.0 - 0.2)
+  if (r < 0.2) {
+    console.log('[generateNextRule] Strategy: Random')
+    return generateRandomRule()
   }
 
-  // Fallback to random rule (either by design or if starred fetch failed)
-  return generateRandomRule()
+  // Try to fetch a starred pattern for both exact and mutation cases
+  try {
+    const starred = await fetchStarredPattern()
+    if (!starred) {
+      console.warn(
+        '[generateNextRule] No starred pattern returned, using random',
+      )
+      return generateRandomRule()
+    }
+
+    const ruleset = hexToC4Ruleset(starred.ruleset_hex)
+
+    // 10% exact starred (0.9 - 1.0)
+    if (r > 0.9) {
+      console.log(
+        '[generateNextRule] Strategy: Exact starred -',
+        starred.ruleset_name,
+        'seed:',
+        starred.seed,
+      )
+      return {
+        name: starred.ruleset_name,
+        hex: starred.ruleset_hex,
+        ruleset,
+        seed: starred.seed, // Include saved seed for exact reproduction
+      }
+    }
+
+    // 70% mutated starred (0.2 - 0.9)
+    // Map r in [0.2, 0.9] to normalized value in [0.0, 1.0]
+    const normalized = (r - 0.2) / 0.7
+    // Then invert to get mutation magnitude: 1.0 at r=0.2, decreasing to 0.0 at r=0.9
+    const magnitude = 1.0 - normalized
+    const mutated = mutateC4Ruleset(ruleset, magnitude, FORCE_RULE_ZERO_OFF)
+    const mutatedHex = c4RulesetToHex(mutated)
+    console.log(
+      `[generateNextRule] Strategy: Mutated starred (magnitude=${magnitude.toFixed(2)}) - based on`,
+      starred.ruleset_name,
+    )
+    return {
+      name: `${starred.ruleset_name} (mutated)`,
+      hex: mutatedHex,
+      ruleset: mutated,
+      // Don't include seed - let it be random for mutations
+    }
+  } catch (err) {
+    console.warn(
+      '[generateNextRule] Failed to fetch starred pattern, falling back to random:',
+      err,
+    )
+    return generateRandomRule()
+  }
 }
 
 // --- Explicit rule setup and play functions ---------------------------------

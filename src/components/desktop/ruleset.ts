@@ -7,8 +7,11 @@ export interface RulesetPanelElements {
   btnConway: HTMLButtonElement
   btnOutlier: HTMLButtonElement
   btnRandomC4Ruleset: HTMLButtonElement
+  btnMutate: HTMLButtonElement
   orbitSlider: HTMLInputElement
   orbitValue: HTMLSpanElement
+  mutationSlider: HTMLInputElement
+  mutationValue: HTMLSpanElement
   radioDisplayOrbits: HTMLInputElement
   radioDisplayFull: HTMLInputElement
 }
@@ -41,12 +44,21 @@ export function createRulesetPanel(): {
       <button id="btn-random-c4-ruleset" class="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2">
         Random
       </button>
+      <button id="btn-mutate" class="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2">
+        Mutate
+      </button>
     </div>
     
     <div class="mt-3 flex items-center gap-3 text-sm">
       <label for="orbit-slider" class="min-w-16 text-right">Orbit %:</label>
       <input type="range" id="orbit-slider" min="0" max="100" value="50" class="w-48 cursor-pointer" />
       <span id="orbit-value" class="min-w-12">50%</span>
+    </div>
+
+    <div class="mt-3 flex items-center gap-3 text-sm">
+      <label for="mutation-slider" class="min-w-16 text-right">Mutation:</label>
+      <input type="range" id="mutation-slider" min="0" max="100" value="5" class="w-48 cursor-pointer" />
+      <span id="mutation-value" class="min-w-12">5%</span>
     </div>
     
     <div class="mt-3 flex flex-col gap-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800">
@@ -70,8 +82,11 @@ export function createRulesetPanel(): {
     btnRandomC4Ruleset: root.querySelector(
       '#btn-random-c4-ruleset',
     ) as HTMLButtonElement,
+    btnMutate: root.querySelector('#btn-mutate') as HTMLButtonElement,
     orbitSlider: root.querySelector('#orbit-slider') as HTMLInputElement,
     orbitValue: root.querySelector('#orbit-value') as HTMLSpanElement,
+    mutationSlider: root.querySelector('#mutation-slider') as HTMLInputElement,
+    mutationValue: root.querySelector('#mutation-value') as HTMLSpanElement,
     radioDisplayOrbits: root.querySelector(
       '#radio-display-orbits',
     ) as HTMLInputElement,
