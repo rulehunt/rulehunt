@@ -165,8 +165,7 @@ export function renderStatistics(
   // Common chart options
   const commonOptions: Partial<ChartOptions> = {
     responsive: true,
-    maintainAspectRatio: true,
-    aspectRatio: 2,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
         labels: {
@@ -204,8 +203,7 @@ export function renderStatistics(
     },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 1,
+      maintainAspectRatio: false,
       plugins: {
         legend: {
           labels: { color: textColor },
@@ -239,8 +237,7 @@ export function renderStatistics(
     },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 1,
+      maintainAspectRatio: false,
       plugins: {
         legend: {
           labels: { color: textColor },
