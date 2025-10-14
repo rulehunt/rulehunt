@@ -10,6 +10,11 @@ const StatisticsResponse = z.object({
     total_steps: z.number().nonnegative(),
     total_starred: z.number().int().nonnegative(),
     unique_rulesets: z.number().int().nonnegative(),
+    unique_users: z.number().int().nonnegative(),
+    avg_runs_per_user: z.number(),
+    avg_starred_per_user: z.number(),
+    active_users_24h: z.number().int().nonnegative(),
+    active_users_7d: z.number().int().nonnegative(),
     avg_interest_score: z.number(),
     avg_population: z.number(),
     avg_activity: z.number(),
@@ -51,7 +56,9 @@ export const onRequestGet = async (
         interest_score,
         step_count,
         ruleset_hex,
-        is_starred
+        is_starred,
+        user_id,
+        submitted_at
       FROM runs
     `
 
@@ -66,6 +73,8 @@ export const onRequestGet = async (
       step_count: number
       ruleset_hex: string
       is_starred: number
+      user_id: string
+      submitted_at: string
     }
     const runs = results as unknown as RunRow[]
 
@@ -80,6 +89,11 @@ export const onRequestGet = async (
           total_steps: 0,
           total_starred: 0,
           unique_rulesets: 0,
+          unique_users: 0,
+          avg_runs_per_user: 0,
+          avg_starred_per_user: 0,
+          active_users_24h: 0,
+          active_users_7d: 0,
           avg_interest_score: 0,
           avg_population: 0,
           avg_activity: 0,
@@ -103,6 +117,39 @@ export const onRequestGet = async (
     const totalSteps = runs.reduce((sum, r) => sum + (r.step_count || 0), 0)
     const totalStarred = runs.filter((r) => r.is_starred === 1).length
     const uniqueRulesets = new Set(runs.map((r) => r.ruleset_hex)).size
+
+    // User engagement metrics
+    const uniqueUsers = new Set(runs.map((r) => r.user_id)).size
+    const avgRunsPerUser = uniqueUsers > 0 ? totalRuns / uniqueUsers : 0
+
+    // Calculate starred patterns per user
+    const starredByUser = new Map<string, number>()
+    for (const run of runs) {
+      if (run.is_starred === 1) {
+        starredByUser.set(
+          run.user_id,
+          (starredByUser.get(run.user_id) || 0) + 1,
+        )
+      }
+    }
+    const avgStarredPerUser = uniqueUsers > 0 ? totalStarred / uniqueUsers : 0
+
+    // Active users in time windows
+    const now = new Date()
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+    const activeUsers24h = new Set(
+      runs
+        .filter((r) => new Date(r.submitted_at) > oneDayAgo)
+        .map((r) => r.user_id),
+    ).size
+
+    const activeUsers7d = new Set(
+      runs
+        .filter((r) => new Date(r.submitted_at) > sevenDaysAgo)
+        .map((r) => r.user_id),
+    ).size
 
     // Averages
     const avgInterestScore =
@@ -195,6 +242,11 @@ export const onRequestGet = async (
         total_steps: totalSteps,
         total_starred: totalStarred,
         unique_rulesets: uniqueRulesets,
+        unique_users: uniqueUsers,
+        avg_runs_per_user: avgRunsPerUser,
+        avg_starred_per_user: avgStarredPerUser,
+        active_users_24h: activeUsers24h,
+        active_users_7d: activeUsers7d,
         avg_interest_score: avgInterestScore,
         avg_population: avgPopulation,
         avg_activity: avgActivity,
