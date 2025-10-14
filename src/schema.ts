@@ -260,6 +260,48 @@ export const StarredResponse = z.object({
 })
 
 // ============================================================================
+// Statistics types
+// ============================================================================
+
+export const OutcomeDistribution = z.object({
+  dies_out: z.number().int().nonnegative(),
+  exploding: z.number().int().nonnegative(),
+  complex: z.number().int().nonnegative(),
+})
+
+export const WolframClassification = z.object({
+  class_i: z.number().int().nonnegative(),
+  class_ii: z.number().int().nonnegative(),
+  class_iii: z.number().int().nonnegative(),
+  class_iv: z.number().int().nonnegative(),
+})
+
+export const StatisticsData = z.object({
+  total_runs: z.number().int().nonnegative(),
+  total_steps: z.number().int().nonnegative(),
+  total_starred: z.number().int().nonnegative(),
+  unique_rulesets: z.number().int().nonnegative(),
+  avg_interest_score: z.number(),
+  avg_population: z.number(),
+  avg_activity: z.number(),
+  avg_entropy4x4: z.number(),
+  outcome_distribution: OutcomeDistribution,
+  wolfram_classification: WolframClassification,
+  interest_score_distribution: z
+    .array(z.number().int().nonnegative())
+    .length(10),
+  population_distribution: z.array(z.number().int().nonnegative()).length(10),
+  activity_distribution: z.array(z.number().int().nonnegative()).length(10),
+  entropy_distribution: z.array(z.number().int().nonnegative()).length(10),
+})
+
+export const StatisticsResponse = z.object({
+  ok: z.boolean(),
+  stats: StatisticsData.optional(),
+  error: z.string().optional(),
+})
+
+// ============================================================================
 // Type exports
 // ============================================================================
 export type RunSubmission = z.infer<typeof RunSubmission>
@@ -285,3 +327,7 @@ export type LeaderboardEntry = z.infer<typeof LeaderboardEntry>
 export type LeaderboardResponse = z.infer<typeof LeaderboardResponse>
 export type StarredPattern = z.infer<typeof StarredPattern>
 export type StarredResponse = z.infer<typeof StarredResponse>
+export type OutcomeDistribution = z.infer<typeof OutcomeDistribution>
+export type WolframClassification = z.infer<typeof WolframClassification>
+export type StatisticsData = z.infer<typeof StatisticsData>
+export type StatisticsResponse = z.infer<typeof StatisticsResponse>

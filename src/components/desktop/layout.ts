@@ -13,6 +13,7 @@ import {
   randomC4RulesetByDensity,
 } from '../../utils.ts'
 
+import { fetchStatistics } from '../../api/statistics.ts'
 import {
   parseURLRuleset,
   parseURLState,
@@ -31,11 +32,7 @@ import {
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
 import { createSimulationPanel } from './simulation.ts'
-import {
-  type StatisticsData,
-  createStatisticsPanel,
-  renderStatistics,
-} from './statistics.ts'
+import { createStatisticsPanel, renderStatistics } from './statistics.ts'
 import { createStatsBar } from './statsBar.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
 import { type TabId, createTabContainer } from './tabContainer.ts'
@@ -1413,26 +1410,16 @@ export async function setupDesktopLayout(
         statisticsPanel.elements.refreshButton.disabled = true
         statisticsPanel.elements.refreshButton.textContent = '⏳ Loading...'
 
-        const response = await fetch('/api/statistics')
-        const data = (await response.json()) as {
-          ok: boolean
-          stats?: StatisticsData
-          error?: string
-        }
+        const stats = await fetchStatistics()
 
-        if (data.ok && data.stats) {
+        if (stats) {
           // Clean up old charts before rendering new ones
           if (currentStatsChartCleanup) {
             currentStatsChartCleanup()
           }
           // Render new charts
-          const { destroy } = renderStatistics(
-            statisticsPanel.elements,
-            data.stats,
-          )
+          const { destroy } = renderStatistics(statisticsPanel.elements, stats)
           currentStatsChartCleanup = destroy
-        } else {
-          console.error('[statistics] Failed to load statistics:', data.error)
         }
       } catch (error) {
         console.error('[statistics] Error fetching statistics:', error)

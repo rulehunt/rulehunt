@@ -11,6 +11,7 @@ import {
   Title,
   Tooltip,
 } from 'chart.js'
+import type { StatisticsData } from '../../schema'
 
 // Register Chart.js components
 Chart.register(
@@ -21,32 +22,6 @@ Chart.register(
   Title,
   Tooltip,
 )
-
-export interface StatisticsData {
-  total_runs: number
-  total_steps: number
-  total_starred: number
-  unique_rulesets: number
-  avg_interest_score: number
-  avg_population: number
-  avg_activity: number
-  avg_entropy4x4: number
-  outcome_distribution: {
-    dies_out: number
-    exploding: number
-    complex: number
-  }
-  wolfram_classification: {
-    class_i: number
-    class_ii: number
-    class_iii: number
-    class_iv: number
-  }
-  interest_score_distribution: number[]
-  population_distribution: number[]
-  activity_distribution: number[]
-  entropy_distribution: number[]
-}
 
 export interface StatisticsPanelElements {
   container: HTMLDivElement
