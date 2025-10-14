@@ -436,6 +436,7 @@ export async function setupDesktopLayout(
     btnPlay,
     btnBenchmark,
     btnHeadless,
+    btnStar,
     stepsPerSecondInput,
     aliveSlider,
     aliveValue,
@@ -535,6 +536,7 @@ export async function setupDesktopLayout(
   let displayMode: DisplayMode = 'orbits'
   let statsUpdateInterval: number | null = null
   let selectedCell: { type: 'orbit' | 'pattern'; index: number } | null = null
+  let isStarred = false
 
   // Apply URL seed if provided
   if (urlState.seed !== undefined) {
@@ -651,6 +653,8 @@ export async function setupDesktopLayout(
       colors.fgColor,
       colors.bgColor,
     )
+    isStarred = false
+    updateStarButtonAppearance()
     applyInitialCondition()
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
@@ -817,7 +821,27 @@ export async function setupDesktopLayout(
   addEventListener(ruleCanvas, 'click', canvasClickHandler)
   ruleCanvas.style.cursor = 'pointer'
 
+  // Helper function to update star button appearance
+  function updateStarButtonAppearance() {
+    const isDark = document.documentElement.classList.contains('dark')
+
+    if (isStarred) {
+      btnStar.textContent = '★ Starred'
+      btnStar.style.backgroundColor = isDark ? '#422006' : '#fef3c7' // yellow-900 : yellow-100
+      btnStar.style.borderColor = isDark ? '#ca8a04' : '#fbbf24' // yellow-600 : yellow-400
+    } else {
+      btnStar.textContent = '☆ Star'
+      btnStar.style.backgroundColor = isDark ? '#1f2937' : '#f9fafb' // gray-800 : gray-50
+      btnStar.style.borderColor = isDark ? '#4b5563' : '#d1d5db' // gray-600 : gray-300
+    }
+  }
+
   // Event Listeners
+  addEventListener(btnStar, 'click', () => {
+    isStarred = !isStarred
+    updateStarButtonAppearance()
+  })
+
   addEventListener(btnConway, 'click', () => {
     const ruleset = makeC4Ruleset(conwayRule, orbitLookup)
     currentRuleset = ruleset
@@ -834,6 +858,8 @@ export async function setupDesktopLayout(
       colors.fgColor,
       colors.bgColor,
     )
+    isStarred = false
+    updateStarButtonAppearance()
     applyInitialCondition()
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
@@ -859,6 +885,8 @@ export async function setupDesktopLayout(
       colors.fgColor,
       colors.bgColor,
     )
+    isStarred = false
+    updateStarButtonAppearance()
     applyInitialCondition()
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
@@ -1257,6 +1285,7 @@ export async function setupDesktopLayout(
         entitiesAlive: recent.entitiesAlive,
         entitiesDied: recent.entitiesDied,
         interestScore,
+        isStarred,
         simVersion: 'v0.1.0',
         engineCommit: undefined,
         extraScores: undefined,
