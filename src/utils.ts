@@ -169,6 +169,43 @@ export function randomC4RulesetByDensity(
   return ruleset as C4Ruleset
 }
 
+/**
+ * Mutate a C4Ruleset by flipping random orbits with given mutation rate.
+ * @param ruleset - The C4Ruleset to mutate
+ * @param mutationRate - Probability (0-1) of flipping each orbit
+ * @param forceRuleZeroOff - If true, ensure rule 0 outputs 0
+ * @returns A new mutated C4Ruleset
+ */
+export function mutateC4Ruleset(
+  ruleset: C4Ruleset,
+  mutationRate = 0.05,
+  forceRuleZeroOff = false,
+): C4Ruleset {
+  const mutated = [...ruleset] as (0 | 1)[]
+
+  while (true) {
+    // Flip each orbit with probability = mutationRate
+    for (let i = 0; i < 140; i++) {
+      if (Math.random() < mutationRate) {
+        mutated[i] = mutated[i] === 0 ? 1 : 0
+      }
+    }
+
+    if (forceRuleZeroOff) {
+      const allDead = 0
+      // Rule 0 must produce 0 to prevent screen-wide toggling
+      if (mutated[allDead] !== 0) {
+        // Fix it instead of regenerating
+        mutated[allDead] = 0
+      }
+    }
+
+    break
+  }
+
+  return mutated as C4Ruleset
+}
+
 // --- Canonical Rule Definitions ---------------------------------------------
 /** Conway's Game of Life (B3/S23) */
 export function conwayRule(pattern: Pattern): 0 | 1 {

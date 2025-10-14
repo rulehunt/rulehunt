@@ -20,6 +20,7 @@ import {
   conwayRule,
   expandC4Ruleset,
   makeC4Ruleset,
+  mutateC4Ruleset,
   randomC4RulesetByDensity,
 } from '../../utils.ts'
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
@@ -40,7 +41,10 @@ import { createStarButton } from './starButton.ts'
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 60
 const TARGET_GRID_SIZE = 600_000
-const STARRED_PATTERN_PROBABILITY = 0.2 // 20% starred, 80% random
+// Exploration/Exploitation Strategy: 30% random, 30% exact starred, 40% mutated starred
+const RANDOM_PROBABILITY = 0.3
+const STARRED_EXACT_PROBABILITY = 0.3
+// STARRED_MUTATED_PROBABILITY = 0.4 (implicit - remaining probability)
 
 const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1
 const SWIPE_COMMIT_MIN_DISTANCE = 50
@@ -593,18 +597,26 @@ function generateRandomRule(): RuleData {
 
 /**
  * Exploration/Exploitation Strategy:
- * 20% of the time, load a starred pattern from the database (exploitation)
- * 80% of the time, generate a new random rule (exploration)
+ * 30% random - Generate completely new random rule (exploration)
+ * 30% exact starred - Load exact starred pattern from database (exploitation)
+ * 40% mutated starred - Load starred pattern and mutate it (balanced)
  */
 async function generateNextRule(): Promise<RuleData> {
-  const shouldUseStarred = Math.random() < STARRED_PATTERN_PROBABILITY
+  const rand = Math.random()
 
-  if (shouldUseStarred) {
+  // 30% random
+  if (rand < RANDOM_PROBABILITY) {
+    console.log('[generateNextRule] Strategy: Random')
+    return generateRandomRule()
+  }
+
+  // 30% exact starred (cumulative: 0.3 - 0.6)
+  if (rand < RANDOM_PROBABILITY + STARRED_EXACT_PROBABILITY) {
     try {
       const starred = await fetchStarredPattern()
       if (starred) {
         console.log(
-          '[generateNextRule] Using starred pattern:',
+          '[generateNextRule] Strategy: Exact starred -',
           starred.ruleset_name,
           'seed:',
           starred.seed,
@@ -619,13 +631,40 @@ async function generateNextRule(): Promise<RuleData> {
       }
     } catch (err) {
       console.warn(
-        '[generateNextRule] Failed to fetch starred pattern, falling back to random:',
+        '[generateNextRule] Failed to fetch starred pattern for exact, falling back to random:',
         err,
       )
     }
+    return generateRandomRule()
   }
 
-  // Fallback to random rule (either by design or if starred fetch failed)
+  // 40% mutated starred (cumulative: 0.6 - 1.0)
+  try {
+    const starred = await fetchStarredPattern()
+    if (starred) {
+      const baseRuleset = hexToC4Ruleset(starred.ruleset_hex)
+      // Use 5% mutation rate (about 7 flipped orbits on average)
+      const mutated = mutateC4Ruleset(baseRuleset, 0.05, FORCE_RULE_ZERO_OFF)
+      const mutatedHex = c4RulesetToHex(mutated)
+      console.log(
+        '[generateNextRule] Strategy: Mutated starred - based on',
+        starred.ruleset_name,
+      )
+      return {
+        name: `${starred.ruleset_name} (mutated)`,
+        hex: mutatedHex,
+        ruleset: mutated,
+        // Don't include seed - let it be random for mutations
+      }
+    }
+  } catch (err) {
+    console.warn(
+      '[generateNextRule] Failed to fetch starred pattern for mutation, falling back to random:',
+      err,
+    )
+  }
+
+  // Fallback to random if starred fetching fails
   return generateRandomRule()
 }
 
