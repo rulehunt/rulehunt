@@ -436,6 +436,7 @@ export async function setupDesktopLayout(
     btnPlay,
     btnBenchmark,
     btnHeadless,
+    btnStar,
     stepsPerSecondInput,
     aliveSlider,
     aliveValue,
@@ -535,6 +536,7 @@ export async function setupDesktopLayout(
   let displayMode: DisplayMode = 'orbits'
   let statsUpdateInterval: number | null = null
   let selectedCell: { type: 'orbit' | 'pattern'; index: number } | null = null
+  let isStarred = false
 
   // Apply URL seed if provided
   if (urlState.seed !== undefined) {
@@ -651,6 +653,8 @@ export async function setupDesktopLayout(
       colors.fgColor,
       colors.bgColor,
     )
+    isStarred = false
+    updateStarButtonAppearance()
     applyInitialCondition()
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
@@ -817,7 +821,45 @@ export async function setupDesktopLayout(
   addEventListener(ruleCanvas, 'click', canvasClickHandler)
   ruleCanvas.style.cursor = 'pointer'
 
+  // Helper function to update star button appearance
+  function updateStarButtonAppearance() {
+    if (isStarred) {
+      btnStar.textContent = '★ Starred'
+      btnStar.className = btnStar.className.replace(
+        /bg-gray-50 dark:bg-gray-800/,
+        'bg-yellow-100 dark:bg-yellow-900',
+      )
+      btnStar.className = btnStar.className.replace(
+        /hover:bg-gray-100 dark:hover:bg-gray-700/,
+        'hover:bg-yellow-200 dark:hover:bg-yellow-800',
+      )
+      btnStar.className = btnStar.className.replace(
+        /border-gray-300 dark:border-gray-600/,
+        'border-yellow-400 dark:border-yellow-600',
+      )
+    } else {
+      btnStar.textContent = '☆ Star'
+      btnStar.className = btnStar.className.replace(
+        /bg-yellow-100 dark:bg-yellow-900/,
+        'bg-gray-50 dark:bg-gray-800',
+      )
+      btnStar.className = btnStar.className.replace(
+        /hover:bg-yellow-200 dark:hover:bg-yellow-800/,
+        'hover:bg-gray-100 dark:hover:bg-gray-700',
+      )
+      btnStar.className = btnStar.className.replace(
+        /border-yellow-400 dark:border-yellow-600/,
+        'border-gray-300 dark:border-gray-600',
+      )
+    }
+  }
+
   // Event Listeners
+  addEventListener(btnStar, 'click', () => {
+    isStarred = !isStarred
+    updateStarButtonAppearance()
+  })
+
   addEventListener(btnConway, 'click', () => {
     const ruleset = makeC4Ruleset(conwayRule, orbitLookup)
     currentRuleset = ruleset
@@ -834,6 +876,8 @@ export async function setupDesktopLayout(
       colors.fgColor,
       colors.bgColor,
     )
+    isStarred = false
+    updateStarButtonAppearance()
     applyInitialCondition()
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
@@ -859,6 +903,8 @@ export async function setupDesktopLayout(
       colors.fgColor,
       colors.bgColor,
     )
+    isStarred = false
+    updateStarButtonAppearance()
     applyInitialCondition()
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
@@ -1257,6 +1303,7 @@ export async function setupDesktopLayout(
         entitiesAlive: recent.entitiesAlive,
         entitiesDied: recent.entitiesDied,
         interestScore,
+        isStarred,
         simVersion: 'v0.1.0',
         engineCommit: undefined,
         extraScores: undefined,
