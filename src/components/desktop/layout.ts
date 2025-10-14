@@ -910,6 +910,9 @@ export async function setupDesktopLayout(
     const mutated = mutateC4Ruleset(currentRuleset, magnitude, true)
     currentRuleset = mutated
     const colors = getCurrentColors()
+    // Remove existing "(mutated)" suffix before adding a new one
+    const baseName =
+      ruleLabelDisplay.textContent?.replace(/\s*\(mutated\)$/, '') || 'Unknown'
     renderRule(
       mutated,
       orbitLookup,
@@ -917,7 +920,7 @@ export async function setupDesktopLayout(
       ruleCanvas,
       ruleLabelDisplay,
       ruleIdDisplay,
-      `${ruleLabelDisplay.textContent} (mutated)`,
+      `${baseName} (mutated)`,
       displayMode,
       colors.fgColor,
       colors.bgColor,
