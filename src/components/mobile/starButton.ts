@@ -45,25 +45,12 @@ export function createStarButton(config: StarButtonConfig): StarButton {
     const starred = getIsStarred()
     button.innerHTML = starred ? starFilledIcon : starOutlineIcon
 
-    // Update background color
+    // Update background color using inline styles
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     if (starred) {
-      button.className = button.className.replace(
-        /bg-gray-800 dark:bg-gray-700/,
-        'bg-yellow-500',
-      )
-      button.className = button.className.replace(
-        /hover:bg-gray-700 dark:hover:bg-gray-600/,
-        'hover:bg-yellow-400',
-      )
+      button.style.backgroundColor = '#eab308' // yellow-500
     } else {
-      button.className = button.className.replace(
-        /bg-yellow-500/,
-        'bg-gray-800 dark:bg-gray-700',
-      )
-      button.className = button.className.replace(
-        /hover:bg-yellow-400/,
-        'hover:bg-gray-700 dark:hover:bg-gray-600',
-      )
+      button.style.backgroundColor = isDark ? '#374151' : '#1f2937' // gray-700 : gray-800
     }
   }
 
