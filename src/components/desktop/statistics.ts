@@ -2,12 +2,14 @@
 
 import {
   ArcElement,
+  BarController,
   BarElement,
   CategoryScale,
   Chart,
   type ChartConfiguration,
   type ChartOptions,
   LinearScale,
+  PieController,
   Title,
   Tooltip,
 } from 'chart.js'
@@ -18,7 +20,9 @@ Chart.register(
   CategoryScale,
   LinearScale,
   BarElement,
+  BarController,
   ArcElement,
+  PieController,
   Title,
   Tooltip,
 )
