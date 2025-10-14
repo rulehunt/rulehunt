@@ -67,37 +67,49 @@ export function createStatisticsPanel(): {
       <!-- Outcome Distribution (Pie) -->
       <div class="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-300 dark:border-gray-600">
         <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Outcome Distribution</h3>
-        <canvas id="outcome-chart" width="300" height="300"></canvas>
+        <div style="height: 300px; position: relative;">
+          <canvas id="outcome-chart"></canvas>
+        </div>
       </div>
 
       <!-- Wolfram Classification (Pie) -->
       <div class="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-300 dark:border-gray-600">
         <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Wolfram Classification</h3>
-        <canvas id="wolfram-chart" width="300" height="300"></canvas>
+        <div style="height: 300px; position: relative;">
+          <canvas id="wolfram-chart"></canvas>
+        </div>
       </div>
 
       <!-- Interest Score Distribution (Bar) -->
       <div class="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-300 dark:border-gray-600">
         <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Interest Score Distribution</h3>
-        <canvas id="interest-chart" width="400" height="300"></canvas>
+        <div style="height: 300px; position: relative;">
+          <canvas id="interest-chart"></canvas>
+        </div>
       </div>
 
       <!-- Population Distribution (Bar) -->
       <div class="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-300 dark:border-gray-600">
         <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Population Distribution</h3>
-        <canvas id="population-chart" width="400" height="300"></canvas>
+        <div style="height: 300px; position: relative;">
+          <canvas id="population-chart"></canvas>
+        </div>
       </div>
 
       <!-- Activity Distribution (Bar) -->
       <div class="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-300 dark:border-gray-600">
         <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Activity Distribution</h3>
-        <canvas id="activity-chart" width="400" height="300"></canvas>
+        <div style="height: 300px; position: relative;">
+          <canvas id="activity-chart"></canvas>
+        </div>
       </div>
 
       <!-- Entropy Distribution (Bar) -->
       <div class="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-300 dark:border-gray-600">
         <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Entropy Distribution</h3>
-        <canvas id="entropy-chart" width="400" height="300"></canvas>
+        <div style="height: 300px; position: relative;">
+          <canvas id="entropy-chart"></canvas>
+        </div>
       </div>
     </div>
   `
@@ -153,7 +165,8 @@ export function renderStatistics(
   // Common chart options
   const commonOptions: Partial<ChartOptions> = {
     responsive: true,
-    maintainAspectRatio: false,
+    maintainAspectRatio: true,
+    aspectRatio: 2,
     plugins: {
       legend: {
         labels: {
@@ -191,7 +204,8 @@ export function renderStatistics(
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false,
+      maintainAspectRatio: true,
+      aspectRatio: 1,
       plugins: {
         legend: {
           labels: { color: textColor },
@@ -225,7 +239,8 @@ export function renderStatistics(
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false,
+      maintainAspectRatio: true,
+      aspectRatio: 1,
       plugins: {
         legend: {
           labels: { color: textColor },
