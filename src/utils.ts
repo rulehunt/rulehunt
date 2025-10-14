@@ -170,37 +170,35 @@ export function randomC4RulesetByDensity(
 }
 
 /**
- * Mutate a C4Ruleset by flipping random orbits with given mutation rate.
+ * Mutate a C4Ruleset by flipping a specific number of random orbits.
  * @param ruleset - The C4Ruleset to mutate
- * @param mutationRate - Probability (0-1) of flipping each orbit
+ * @param mutationMagnitude - Number from 0.0 to 1.0 representing proportion of orbits to flip
  * @param forceRuleZeroOff - If true, ensure rule 0 outputs 0
  * @returns A new mutated C4Ruleset
  */
 export function mutateC4Ruleset(
   ruleset: C4Ruleset,
-  mutationRate = 0.05,
+  mutationMagnitude = 0.05,
   forceRuleZeroOff = false,
 ): C4Ruleset {
   const mutated = [...ruleset] as (0 | 1)[]
+  const flipCount = Math.floor(mutationMagnitude * 140)
 
-  while (true) {
-    // Flip each orbit with probability = mutationRate
-    for (let i = 0; i < 140; i++) {
-      if (Math.random() < mutationRate) {
-        mutated[i] = mutated[i] === 0 ? 1 : 0
-      }
-    }
+  // Select random unique indices to flip
+  const indicesToFlip = new Set<number>()
+  while (indicesToFlip.size < flipCount) {
+    indicesToFlip.add(Math.floor(Math.random() * 140))
+  }
 
-    if (forceRuleZeroOff) {
-      const allDead = 0
-      // Rule 0 must produce 0 to prevent screen-wide toggling
-      if (mutated[allDead] !== 0) {
-        // Fix it instead of regenerating
-        mutated[allDead] = 0
-      }
-    }
+  // Flip the selected orbits
+  for (const i of indicesToFlip) {
+    mutated[i] = mutated[i] === 0 ? 1 : 0
+  }
 
-    break
+  if (forceRuleZeroOff) {
+    const allDead = 0
+    // Rule 0 must produce 0 to prevent screen-wide toggling
+    mutated[allDead] = 0
   }
 
   return mutated as C4Ruleset

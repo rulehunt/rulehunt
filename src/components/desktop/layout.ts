@@ -10,6 +10,7 @@ import {
   coords32x16,
   expandC4Ruleset,
   makeC4Ruleset,
+  mutateC4Ruleset,
   randomC4RulesetByDensity,
 } from '../../utils.ts'
 
@@ -452,8 +453,11 @@ export async function setupDesktopLayout(
     btnConway,
     btnOutlier,
     btnRandomC4Ruleset,
+    btnMutate,
     orbitSlider,
     orbitValue,
+    mutationSlider,
+    mutationValue,
     radioDisplayOrbits,
     radioDisplayFull,
   } = rulesetPanel.elements
@@ -900,9 +904,42 @@ export async function setupDesktopLayout(
     generateRandomPatternRule()
   })
 
+  addEventListener(btnMutate, 'click', () => {
+    const mutationPercentage = Number.parseInt(mutationSlider.value)
+    const magnitude = mutationPercentage / 100
+    const mutated = mutateC4Ruleset(currentRuleset, magnitude, true)
+    currentRuleset = mutated
+    const colors = getCurrentColors()
+    renderRule(
+      mutated,
+      orbitLookup,
+      ctx,
+      ruleCanvas,
+      ruleLabelDisplay,
+      ruleIdDisplay,
+      `${ruleLabelDisplay.textContent} (mutated)`,
+      displayMode,
+      colors.fgColor,
+      colors.bgColor,
+    )
+    isStarred = false
+    updateStarButtonAppearance()
+    applyInitialCondition()
+    if (cellularAutomata.isCurrentlyPlaying()) {
+      cellularAutomata.pause()
+      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
+      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
+      cellularAutomata.play(stepsPerSecond, expanded)
+    }
+  })
+
   addEventListener(orbitSlider, 'input', () => {
     orbitValue.textContent = `${orbitSlider.value}%`
     generateRandomPatternRule()
+  })
+
+  addEventListener(mutationSlider, 'input', () => {
+    mutationValue.textContent = `${mutationSlider.value}%`
   })
 
   radioDisplayOrbits.checked = true
