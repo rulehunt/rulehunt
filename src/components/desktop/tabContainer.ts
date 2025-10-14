@@ -1,6 +1,6 @@
 // src/components/desktop/tabContainer.ts
 
-export type TabId = 'explore' | 'analyze' | 'leaderboard'
+export type TabId = 'explore' | 'analyze' | 'leaderboard' | 'statistics'
 
 export interface TabConfig {
   id: TabId
@@ -23,6 +23,7 @@ const TABS: TabConfig[] = [
   { id: 'explore', label: 'Explore', icon: '🎮', shortcut: 'Ctrl+1' },
   { id: 'analyze', label: 'Analyze', icon: '📊', shortcut: 'Ctrl+2' },
   { id: 'leaderboard', label: 'Leaderboard', icon: '🏆', shortcut: 'Ctrl+3' },
+  { id: 'statistics', label: 'Statistics', icon: '📈', shortcut: 'Ctrl+4' },
 ]
 
 export function createTabContainer(config: TabContainerConfig): {
@@ -129,7 +130,12 @@ export function createTabContainer(config: TabContainerConfig): {
   // Read URL hash and set initial tab
   function readURLHash(): TabId | null {
     const hash = window.location.hash.slice(1) // Remove '#'
-    if (hash === 'explore' || hash === 'analyze' || hash === 'leaderboard') {
+    if (
+      hash === 'explore' ||
+      hash === 'analyze' ||
+      hash === 'leaderboard' ||
+      hash === 'statistics'
+    ) {
       return hash
     }
     return null
@@ -143,7 +149,7 @@ export function createTabContainer(config: TabContainerConfig): {
     tabButtons.get(tab.id)?.addEventListener('click', handler)
   }
 
-  // Keyboard shortcuts (Ctrl+1, Ctrl+2, Ctrl+3)
+  // Keyboard shortcuts (Ctrl+1, Ctrl+2, Ctrl+3, Ctrl+4)
   const keyboardHandler = (e: KeyboardEvent) => {
     if (e.ctrlKey || e.metaKey) {
       if (e.key === '1') {
@@ -155,6 +161,9 @@ export function createTabContainer(config: TabContainerConfig): {
       } else if (e.key === '3') {
         e.preventDefault()
         setActiveTab('leaderboard')
+      } else if (e.key === '4') {
+        e.preventDefault()
+        setActiveTab('statistics')
       }
     }
   }

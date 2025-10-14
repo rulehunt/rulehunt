@@ -14,6 +14,7 @@ import {
   randomC4RulesetByDensity,
 } from '../../utils.ts'
 
+import { fetchStatistics } from '../../api/statistics.ts'
 import {
   parseURLRuleset,
   parseURLState,
@@ -32,6 +33,7 @@ import {
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
 import { createSimulationPanel } from './simulation.ts'
+import { createStatisticsPanel, renderStatistics } from './statistics.ts'
 import { createStatsBar } from './statsBar.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
 import { type TabId, createTabContainer } from './tabContainer.ts'
@@ -388,10 +390,17 @@ export async function setupDesktopLayout(
   const leaderboardPanel = createLeaderboardPanel()
   leaderboardColumn.appendChild(leaderboardPanel.root)
 
+  // Statistics column (full-width for statistics tab)
+  const statisticsColumn = document.createElement('div')
+  statisticsColumn.className = 'flex flex-col items-center gap-3 w-full'
+  const statisticsPanel = createStatisticsPanel()
+  statisticsColumn.appendChild(statisticsPanel.root)
+
   mainContainer.appendChild(leftColumn)
   mainContainer.appendChild(rightColumn)
   mainContent.appendChild(mainContainer)
   mainContent.appendChild(leaderboardColumn)
+  mainContent.appendChild(statisticsColumn)
   appRoot.appendChild(mainContent)
 
   // Create footer with build info
@@ -469,6 +478,7 @@ export async function setupDesktopLayout(
     const exploreVisible = tabId === 'explore'
     const analyzeVisible = tabId === 'analyze'
     const leaderboardVisible = tabId === 'leaderboard'
+    const statisticsVisible = tabId === 'statistics'
 
     // Show/hide main containers based on tab
     mainContainer.style.display =
@@ -477,6 +487,7 @@ export async function setupDesktopLayout(
       exploreVisible || analyzeVisible ? 'flex' : 'none'
     rightColumn.style.display = exploreVisible ? 'flex' : 'none'
     leaderboardColumn.style.display = leaderboardVisible ? 'flex' : 'none'
+    statisticsColumn.style.display = statisticsVisible ? 'flex' : 'none'
 
     if (exploreVisible) {
       // Explore: full simulation + full ruleset + pattern inspector + stats bar
@@ -524,6 +535,10 @@ export async function setupDesktopLayout(
       // Auto-refresh leaderboard when entering that tab
       if (tabId === 'leaderboard') {
         leaderboardPanel.elements.refreshButton.click()
+      }
+      // Auto-refresh statistics when entering that tab
+      if (tabId === 'statistics') {
+        statisticsPanel.elements.refreshButton.click()
       }
     },
   })
@@ -1425,6 +1440,36 @@ export async function setupDesktopLayout(
     })
   }
 
+  // Statistics refresh logic
+  let currentStatsChartCleanup: (() => void) | null = null
+  addEventListener(
+    statisticsPanel.elements.refreshButton,
+    'click',
+    async () => {
+      try {
+        statisticsPanel.elements.refreshButton.disabled = true
+        statisticsPanel.elements.refreshButton.textContent = '⏳ Loading...'
+
+        const stats = await fetchStatistics()
+
+        if (stats) {
+          // Clean up old charts before rendering new ones
+          if (currentStatsChartCleanup) {
+            currentStatsChartCleanup()
+          }
+          // Render new charts
+          const { destroy } = renderStatistics(statisticsPanel.elements, stats)
+          currentStatsChartCleanup = destroy
+        }
+      } catch (error) {
+        console.error('[statistics] Error fetching statistics:', error)
+      } finally {
+        statisticsPanel.elements.refreshButton.disabled = false
+        statisticsPanel.elements.refreshButton.textContent = '🔄 Refresh'
+      }
+    },
+  )
+
   // Initialize tab visibility
   updateTabVisibility(tabContainer.getActiveTab(), cellularAutomata)
 
@@ -1438,6 +1483,9 @@ export async function setupDesktopLayout(
     }
     if (statsUpdateInterval !== null) {
       clearInterval(statsUpdateInterval)
+    }
+    if (currentStatsChartCleanup) {
+      currentStatsChartCleanup()
     }
     for (const id of intervals) {
       window.clearInterval(id)
