@@ -1,0 +1,46 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm run check)",
+      "Bash(pnpm run lint)",
+      "Bash(pnpm run lint:fix)",
+      "Bash(pnpm run build:*)",
+      "Bash(pnpm run dev)",
+      "Bash(git *)",
+      "Bash(gh *)",
+      "Bash(npm install:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm add:*)",
+      "Read(./src/**)",
+      "Read(./functions/**)",
+      "Read(./scripts/**)",
+      "Read(./resources/**)",
+      "Read(./CLAUDE.md)",
+      "Read(./README.md)",
+      "Read(./package.json)",
+      "Read(./tsconfig.json)",
+      "Read(./vite.config.ts)",
+      "Read(./biome.json)",
+      "Edit(./src/**)",
+      "Edit(./functions/**)",
+      "Edit(./scripts/**)",
+      "Write(./src/**)",
+      "Write(./functions/**)",
+      "Write(./scripts/**)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Edit(./.env)",
+      "Edit(./.env.*)",
+      "Write(./.env)",
+      "Write(./.env.*)",
+      "Bash(rm *)",
+      "Bash(rm:*)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(npm publish:*)",
+      "Bash(pnpm publish:*)"
+    ]
+  }
+}

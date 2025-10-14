@@ -28,6 +28,7 @@ tsconfig.tsbuildinfo
 
 .claude/*
 !.claude/commands/
+!.claude/settings.json
 
 # Cloudflare Wrangler local state (D1, KV, R2, etc.)
 .wrangler/
