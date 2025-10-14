@@ -142,6 +142,20 @@ export function renderStatistics(
   const textColor = isDark ? '#f3f4f6' : '#1f2937'
   const gridColor = isDark ? '#374151' : '#e5e7eb'
 
+  // Set explicit canvas dimensions to fill 300px containers
+  const canvases = [
+    elements.outcomeCanvas,
+    elements.wolframCanvas,
+    elements.interestCanvas,
+    elements.populationCanvas,
+    elements.activityCanvas,
+    elements.entropyCanvas,
+  ]
+  for (const canvas of canvases) {
+    canvas.width = 600
+    canvas.height = 300
+  }
+
   // Render summary cards - Automata stats first, then engagement stats
   elements.summaryCards.innerHTML = `
     <!-- Automata Statistics -->
