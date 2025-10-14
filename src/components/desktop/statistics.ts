@@ -164,7 +164,7 @@ export function renderStatistics(
 
   // Common chart options
   const commonOptions: Partial<ChartOptions> = {
-    responsive: true,
+    responsive: false,
     maintainAspectRatio: false,
     plugins: {
       legend: {
@@ -202,7 +202,7 @@ export function renderStatistics(
       ],
     },
     options: {
-      responsive: true,
+      responsive: false,
       maintainAspectRatio: false,
       plugins: {
         legend: {
@@ -236,7 +236,7 @@ export function renderStatistics(
       ],
     },
     options: {
-      responsive: true,
+      responsive: false,
       maintainAspectRatio: false,
       plugins: {
         legend: {
