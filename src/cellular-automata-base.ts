@@ -55,6 +55,7 @@ export abstract class CellularAutomataBase {
 
   protected zoomLevel = 1
   protected displayZoom = 1
+  protected stepCounter = 0
 
   constructor(
     canvas: HTMLCanvasElement | null,
@@ -300,9 +301,19 @@ export abstract class CellularAutomataBase {
 
   // --- Simulation step (calls subclass implementation) ----------------------
   step(ruleset: Ruleset) {
+    this.stepCounter++
+    const stepStart = performance.now()
     this.computeStep(ruleset)
+    const computeEnd = performance.now()
     this.statistics.recordStep(this.grid)
+    const statsEnd = performance.now()
     this.render()
+    const renderEnd = performance.now()
+
+    // Log timing breakdown (only every 100 steps to avoid spam)
+    if (this.stepCounter % 100 === 0) {
+      console.log(`[CA.step] compute: ${(computeEnd - stepStart).toFixed(2)}ms, stats: ${(statsEnd - computeEnd).toFixed(2)}ms, render: ${(renderEnd - statsEnd).toFixed(2)}ms, total: ${(renderEnd - stepStart).toFixed(2)}ms`)
+    }
   }
 
   setZoom(level: number) {
