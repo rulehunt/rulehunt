@@ -1,12 +1,7 @@
 // src/components/mobile.ts
-import { GPU } from 'gpu.js'
 import { formatRulesetName, saveRun } from '../../api/save'
-import { CellularAutomata } from '../../cellular-automata-cpu.ts'
-import { GPUCellularAutomata } from '../../cellular-automata-gpu.ts'
-import type {
-  CellularAutomataOptions,
-  ICellularAutomata,
-} from '../../cellular-automata-interface.ts'
+import { createCellularAutomata } from '../../cellular-automata-factory.ts'
+import type { ICellularAutomata } from '../../cellular-automata-interface.ts'
 import { getUserIdentity } from '../../identity.ts'
 import type {
   C4OrbitsData,
@@ -94,24 +89,19 @@ export type RuleData = {
 // --- Cellular Automata Engine  ----------------------------------------------
 function createCA(
   canvas: HTMLCanvasElement,
-  options: CellularAutomataOptions,
+  gridRows: number,
+  gridCols: number,
+  fgColor: string,
+  bgColor: string,
 ): ICellularAutomata {
-  try {
-    // Test GPU support
-    const testGPU = new GPU({ mode: 'gpu' })
-    const hasGPU = testGPU.mode === 'gpu'
-    testGPU.destroy()
-
-    if (hasGPU) {
-      console.log('[CA] Using GPU acceleration')
-      return new GPUCellularAutomata(canvas, options)
-    }
-  } catch (e) {
-    console.warn('[CA] GPU not available, using CPU:', e)
-  }
-
-  console.log('[CA] Using optimized CPU')
-  return new CellularAutomata(canvas, options)
+  return createCellularAutomata(canvas, {
+    gridRows,
+    gridCols,
+    fgColor,
+    bgColor,
+    // Use default threshold (250K cells = 500x500)
+    // Mobile targets ~600K cells, so will use GPU on most devices
+  })
 }
 
 // --- Helpers ----------------------------------------------------------------
@@ -1025,19 +1015,21 @@ export async function setupMobileLayout(
   offScreenCanvas.style.transform = `translateY(${screenHeight}px)`
 
   // Create cellular automata instances
-  let onScreenCA = createCA(onScreenCanvas, {
+  let onScreenCA = createCA(
+    onScreenCanvas,
     gridRows,
     gridCols,
-    fgColor: palette[colorIndex],
+    palette[colorIndex],
     bgColor,
-  })
+  )
 
-  let offScreenCA = createCA(offScreenCanvas, {
+  let offScreenCA = createCA(
+    offScreenCanvas,
     gridRows,
     gridCols,
-    fgColor: palette[(colorIndex + 1) % palette.length],
+    palette[(colorIndex + 1) % palette.length],
     bgColor,
-  })
+  )
 
   // Parse URL state for shareable links
   const urlState = parseURLState()

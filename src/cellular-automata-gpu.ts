@@ -160,11 +160,12 @@ export class GPUCellularAutomata
   override step(ruleset: Ruleset) {
     this.computeStep(ruleset)
 
-    // Only sync if we have a canvas (for rendering/stats)
-    // Headless benchmarks skip this entirely for max performance
+    // Always sync and record statistics (needed for data mode)
+    this.syncToHost()
+    this.statistics.recordStep(this.grid)
+
+    // Only render if we have a canvas
     if (this.canvas) {
-      this.syncToHost()
-      this.statistics.recordStep(this.grid)
       this.render()
     }
   }
