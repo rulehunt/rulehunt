@@ -132,6 +132,7 @@ function updateStatisticsDisplay(
   elements: SummaryPanelElements,
   progressBar: ReturnType<typeof createProgressBar>,
   statsBarComponent?: ReturnType<typeof createStatsBar>,
+  autosaveCallback?: () => void,
 ) {
   const stats = cellularAutomata.getStatistics()
   const recentStats = stats.getRecentStats(1)
@@ -149,6 +150,11 @@ function updateStatisticsDisplay(
       100,
     )
     progressBar.set(Math.round(progressPercent))
+
+    // Check for autosave after updating progress
+    if (autosaveCallback) {
+      autosaveCallback()
+    }
   }
 
   // Update simulation metrics
@@ -333,10 +339,9 @@ export async function setupDesktopLayout(
   const header = createHeader()
   appRoot.appendChild(header.root)
 
-  // Create progress bar
+  // Create progress bar (no button - autosave enabled)
   const progressBar = createProgressBar({
     initialValue: 0,
-    buttonLabel: 'Save to Leaderboard',
   })
   const progressContainer = document.createElement('div')
   progressContainer.className =
@@ -1094,6 +1099,7 @@ export async function setupDesktopLayout(
           summaryPanel.elements,
           progressBar,
           statsBar,
+          checkAndAutosave,
         )
       }, 100)
     }
@@ -1121,6 +1127,7 @@ export async function setupDesktopLayout(
           summaryPanel.elements,
           progressBar,
           statsBar,
+          checkAndAutosave,
         )
       }, 100)
     }
@@ -1281,9 +1288,17 @@ export async function setupDesktopLayout(
     }, 2000)
   })
 
-  // Save button click handler
-  if (progressBar.elements.saveButton) {
-    addEventListener(progressBar.elements.saveButton, 'click', () => {
+  // Autosave logic: track progress and autosave when reaching 100%
+  let hasAutosaved = false
+
+  function checkAndAutosave() {
+    const progress = progressBar.value()
+
+    if (progress >= 100 && !hasAutosaved) {
+      hasAutosaved = true
+
+      console.log('[desktop] Progress reached 100%, autosaving...')
+
       // --- Gather statistics ---
       const stats = cellularAutomata.getStatistics()
       const metadata = stats.getMetadata()
@@ -1341,14 +1356,32 @@ export async function setupDesktopLayout(
         entitiesDied: recent.entitiesDied,
         interestScore,
         isStarred,
-        simVersion: 'v0.1.0',
+        simVersion: 'v0.1.0-desktop-autosave',
         engineCommit: undefined,
         extraScores: undefined,
       }
 
       // --- Fire and forget background save ---
-      setTimeout(() => saveRun(runPayload))
-    })
+      saveRun(runPayload)
+        .then(() => {
+          console.log('[desktop] Autosave successful')
+          // Wait 3 seconds, then auto-mutate
+          setTimeout(() => {
+            console.log('[desktop] Auto-mutating to new ruleset...')
+            btnMutate.click()
+            hasAutosaved = false // Reset for next cycle
+          }, 3000)
+        })
+        .catch((error) => {
+          console.error('[desktop] Autosave failed:', error)
+          // Still reset and mutate even if save failed
+          setTimeout(() => {
+            console.log('[desktop] Auto-mutating to new ruleset...')
+            btnMutate.click()
+            hasAutosaved = false
+          }, 3000)
+        })
+    }
   }
 
   // Mobile preview toggle
