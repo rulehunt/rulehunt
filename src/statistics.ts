@@ -58,6 +58,11 @@ export class StatisticsTracker {
   private useSparseEntityDetection = false // Disabled: no perf benefit for low-activity grids
   private sparseDetectionActivityThreshold = 0.3 // Use sparse if <30% of grid changed
 
+  // Sparse entropy calculation optimization
+  // Instead of checking every overlapping block, sample systematically with larger stride
+  private useSparseEntropyCalculation = true // Enable sparse entropy for performance
+  private entropyStrideFactor = 3 // Multiply default stride by this factor (3x = ~9x fewer blocks)
+
   private cachedEntityStats: {
     entityCount: number
     entityChange: number
@@ -301,7 +306,14 @@ export class StatisticsTracker {
   private calculateBlockEntropy(grid: Uint8Array, blockSize: number): number {
     // Calculate Shannon entropy of block patterns
     const blockCounts = new Map<number, number>()
-    const stride = Math.floor(blockSize / 2) // Overlapping blocks for better sampling
+
+    // Base stride: overlapping blocks for better sampling
+    const baseStride = Math.floor(blockSize / 2)
+
+    // Apply sparse sampling if enabled: use larger stride to check fewer blocks
+    const stride = this.useSparseEntropyCalculation
+      ? baseStride * this.entropyStrideFactor
+      : baseStride
 
     for (let y = 0; y <= this.gridRows - blockSize; y += stride) {
       for (let x = 0; x <= this.gridCols - blockSize; x += stride) {
