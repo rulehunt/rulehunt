@@ -26,13 +26,13 @@ export function createProgressBar(options: ProgressBarOptions = {}): {
 
   root.innerHTML = `
     <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-      <span>Progress to save this simulation to the leaderboard</span>
+      <span>Simulation progress (autosaves at 100%)</span>
       <span id="progress-label">${initialValue}%</span>
     </div>
     <div class="flex items-center gap-2 w-full">
       <div
         id="progress-root"
-        class="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex-[9]"
+        class="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden w-full"
         role="progressbar"
         aria-valuemin="0"
         aria-valuemax="100"
