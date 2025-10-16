@@ -40,9 +40,11 @@ export class StatisticsTracker {
   private previousEntityCount = 0
   private entityTracker: EntityTracker | null = null
 
-  // Entity detection sampling optimization
+  // Performance optimization: sampling intervals
   private internalStepCount = 0
   private entityDetectionInterval = 10 // Run entity detection every N steps
+  private entropyCalculationInterval = 10 // Run entropy calculation every N steps
+
   private cachedEntityStats: {
     entityCount: number
     entityChange: number
@@ -50,6 +52,12 @@ export class StatisticsTracker {
     uniquePatterns: number
     entitiesAlive: number
     entitiesDied: number
+  } | null = null
+
+  private cachedEntropyStats: {
+    entropy2x2: number
+    entropy4x4: number
+    entropy8x8: number
   } | null = null
 
   constructor(gridRows: number, gridCols: number) {
@@ -72,6 +80,7 @@ export class StatisticsTracker {
     this.previousGrid = null
     this.internalStepCount = 0
     this.cachedEntityStats = null
+    this.cachedEntropyStats = null
     if (this.entityTracker) {
       this.entityTracker.reset()
     }
@@ -191,13 +200,42 @@ export class StatisticsTracker {
       entitiesDied = cached.entitiesDied
     }
 
+    // Sampled entropy calculation: only run every N steps for performance
+    const shouldRunEntropyCalculation =
+      this.internalStepCount % this.entropyCalculationInterval === 0 ||
+      this.cachedEntropyStats === null
+
+    let entropy2x2: number
+    let entropy4x4: number
+    let entropy8x8: number
+
+    if (shouldRunEntropyCalculation) {
+      // Calculate all entropy scales
+      entropy2x2 = this.calculateBlockEntropy(grid, 2)
+      entropy4x4 = this.calculateBlockEntropy(grid, 4)
+      entropy8x8 = this.calculateBlockEntropy(grid, 8)
+
+      // Cache for reuse
+      this.cachedEntropyStats = {
+        entropy2x2,
+        entropy4x4,
+        entropy8x8,
+      }
+    } else {
+      // Reuse cached entropy stats
+      const cached = this.cachedEntropyStats!
+      entropy2x2 = cached.entropy2x2
+      entropy4x4 = cached.entropy4x4
+      entropy8x8 = cached.entropy8x8
+    }
+
     return {
       population,
       activity,
       populationChange,
-      entropy2x2: this.calculateBlockEntropy(grid, 2),
-      entropy4x4: this.calculateBlockEntropy(grid, 4),
-      entropy8x8: this.calculateBlockEntropy(grid, 8),
+      entropy2x2,
+      entropy4x4,
+      entropy8x8,
       entityCount,
       entityChange,
       totalEntitiesEverSeen,
@@ -413,6 +451,7 @@ export class StatisticsTracker {
     this.previousEntityCount = 0
     this.internalStepCount = 0
     this.cachedEntityStats = null
+    this.cachedEntropyStats = null
     if (this.entityTracker) {
       this.entityTracker.reset()
     }
