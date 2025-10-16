@@ -155,24 +155,13 @@ export async function runDataLoop(
       let lastThrottleTime = startTime
       let stepsAtLastUpdate = 0
 
-      // Debug logging at start of run
-      const initialSps = getStepsPerSecond()
-      console.log(`[DataRunner] Round ${roundCount} starting - target SPS: ${initialSps === 0 ? 'UNLIMITED' : initialSps}`)
-
       for (let step = 0; step < PROGRESS_BAR_STEPS; step++) {
         if (shouldStop) break
 
-        const stepStart = performance.now()
         ca.step(expandedRuleset)
-        const stepEnd = performance.now()
 
         const now = performance.now()
         const sps = getStepsPerSecond()
-
-        // Log every 50 steps to track performance
-        if (step % 50 === 0) {
-          console.log(`[DataRunner] Step ${step}: step() took ${(stepEnd - stepStart).toFixed(2)}ms, target SPS: ${sps === 0 ? 'UNLIMITED' : sps}`)
-        }
 
         // Update UI every 100ms
         if (
@@ -189,8 +178,6 @@ export async function runDataLoop(
             elapsedSinceUpdate > 0
               ? (stepsSinceUpdate / elapsedSinceUpdate) * 1000
               : 0
-
-          console.log(`[DataRunner] Progress update: ${stepsSinceUpdate} steps in ${elapsedSinceUpdate.toFixed(0)}ms = ${actualSps.toFixed(1)} SPS`)
 
           onProgress({
             roundCount,
@@ -212,11 +199,7 @@ export async function runDataLoop(
           const elapsedSinceLastThrottle = now - lastThrottleTime
 
           if (elapsedSinceLastThrottle < targetDelayMs) {
-            const delayAmount = targetDelayMs - elapsedSinceLastThrottle
-            if (step % 50 === 0) {
-              console.log(`[DataRunner] Throttling: delaying ${delayAmount.toFixed(2)}ms (target: ${targetDelayMs.toFixed(2)}ms/step)`)
-            }
-            await delay(delayAmount)
+            await delay(targetDelayMs - elapsedSinceLastThrottle)
             lastThrottleTime = performance.now()
           } else {
             lastThrottleTime = now
@@ -232,8 +215,6 @@ export async function runDataLoop(
           }
         }
       }
-
-      console.log(`[DataRunner] Round ${roundCount} completed in ${(performance.now() - startTime).toFixed(0)}ms`)
 
       if (shouldStop) break
 

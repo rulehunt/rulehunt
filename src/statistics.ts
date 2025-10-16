@@ -40,6 +40,18 @@ export class StatisticsTracker {
   private previousEntityCount = 0
   private entityTracker: EntityTracker | null = null
 
+  // Entity detection sampling optimization
+  private internalStepCount = 0
+  private entityDetectionInterval = 10 // Run entity detection every N steps
+  private cachedEntityStats: {
+    entityCount: number
+    entityChange: number
+    totalEntitiesEverSeen: number
+    uniquePatterns: number
+    entitiesAlive: number
+    entitiesDied: number
+  } | null = null
+
   constructor(gridRows: number, gridCols: number) {
     this.gridRows = gridRows
     this.gridCols = gridCols
@@ -58,6 +70,8 @@ export class StatisticsTracker {
     this.stepTimes = []
     this.history = []
     this.previousGrid = null
+    this.internalStepCount = 0
+    this.cachedEntityStats = null
     if (this.entityTracker) {
       this.entityTracker.reset()
     }
@@ -122,19 +136,59 @@ export class StatisticsTracker {
       ? population - this.calculatePopulation(this.previousGrid)
       : 0
 
-    // Convert to 2D grid for entity detection
-    const grid2D = this.convertTo2DGrid(grid)
-    const entities = detectEntities(grid2D, this.entityTracker || undefined)
-    const entityCount = entities.length
-    const entityChange = entityCount - this.previousEntityCount
-    this.previousEntityCount = entityCount
+    this.internalStepCount++
 
-    // Get entity identity statistics
-    const entityStats = this.entityTracker?.getStats() || {
-      totalEntities: entityCount,
-      uniquePatterns: entityCount,
-      entitiesAlive: entityCount,
-      entitiesDied: 0,
+    // Sampled entity detection: only run every N steps for performance
+    const shouldRunEntityDetection =
+      this.internalStepCount % this.entityDetectionInterval === 0 ||
+      this.cachedEntityStats === null
+
+    let entityCount: number
+    let entityChange: number
+    let totalEntitiesEverSeen: number
+    let uniquePatterns: number
+    let entitiesAlive: number
+    let entitiesDied: number
+
+    if (shouldRunEntityDetection) {
+      // Run full entity detection
+      const grid2D = this.convertTo2DGrid(grid)
+      const entities = detectEntities(grid2D, this.entityTracker || undefined)
+      entityCount = entities.length
+      entityChange = entityCount - this.previousEntityCount
+      this.previousEntityCount = entityCount
+
+      // Get entity identity statistics
+      const entityStats = this.entityTracker?.getStats() || {
+        totalEntities: entityCount,
+        uniquePatterns: entityCount,
+        entitiesAlive: entityCount,
+        entitiesDied: 0,
+      }
+
+      totalEntitiesEverSeen = entityStats.totalEntities
+      uniquePatterns = entityStats.uniquePatterns
+      entitiesAlive = entityStats.entitiesAlive
+      entitiesDied = entityStats.entitiesDied
+
+      // Cache for reuse
+      this.cachedEntityStats = {
+        entityCount,
+        entityChange,
+        totalEntitiesEverSeen,
+        uniquePatterns,
+        entitiesAlive,
+        entitiesDied,
+      }
+    } else {
+      // Reuse cached entity stats
+      const cached = this.cachedEntityStats!
+      entityCount = cached.entityCount
+      entityChange = 0 // No change detected between detection intervals
+      totalEntitiesEverSeen = cached.totalEntitiesEverSeen
+      uniquePatterns = cached.uniquePatterns
+      entitiesAlive = cached.entitiesAlive
+      entitiesDied = cached.entitiesDied
     }
 
     return {
@@ -146,10 +200,10 @@ export class StatisticsTracker {
       entropy8x8: this.calculateBlockEntropy(grid, 8),
       entityCount,
       entityChange,
-      totalEntitiesEverSeen: entityStats.totalEntities,
-      uniquePatterns: entityStats.uniquePatterns,
-      entitiesAlive: entityStats.entitiesAlive,
-      entitiesDied: entityStats.entitiesDied,
+      totalEntitiesEverSeen,
+      uniquePatterns,
+      entitiesAlive,
+      entitiesDied,
     }
   }
 
@@ -357,6 +411,8 @@ export class StatisticsTracker {
     this.metadata = null
     this.stepTimes = []
     this.previousEntityCount = 0
+    this.internalStepCount = 0
+    this.cachedEntityStats = null
     if (this.entityTracker) {
       this.entityTracker.reset()
     }
