@@ -206,6 +206,148 @@ export class EntityTracker {
   }
 }
 
+/**
+ * Build active regions from changed cells
+ * Expands the activity map by a border radius to catch entities near changes
+ * @param grid Current grid
+ * @param previousGrid Previous grid state
+ * @param borderRadius How many cells to expand around changes (default: 3)
+ * @returns Set of "y,x" coordinates to check
+ */
+export function buildActiveRegions(
+  grid: Grid,
+  previousGrid: Grid,
+  borderRadius = 3,
+): Set<string> {
+  const height = grid.length
+  const width = grid[0]?.length ?? 0
+  const activeRegions = new Set<string>()
+
+  if (height === 0 || width === 0) return activeRegions
+
+  // Find all changed cells
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (grid[y][x] !== previousGrid[y][x]) {
+        // Add this cell and surrounding region
+        for (let dy = -borderRadius; dy <= borderRadius; dy++) {
+          for (let dx = -borderRadius; dx <= borderRadius; dx++) {
+            const newY = (((y + dy) % height) + height) % height
+            const newX = (((x + dx) % width) + width) % width
+            activeRegions.add(`${newY},${newX}`)
+          }
+        }
+      }
+    }
+  }
+
+  return activeRegions
+}
+
+/**
+ * Detect entities in active regions only (sparse detection)
+ * @param grid Current grid state
+ * @param activeRegions Set of cell coordinates that changed or are near changes
+ * @param tracker Optional entity tracker for identity tracking
+ * @returns Array of detected entities
+ */
+export function detectEntitiesSparse(
+  grid: Grid,
+  activeRegions: Set<string>,
+  tracker?: EntityTracker,
+): Entity[] {
+  const height = grid.length
+  const width = grid[0]?.length ?? 0
+
+  if (height === 0 || width === 0 || activeRegions.size === 0) {
+    return []
+  }
+
+  const visited = Array(height)
+    .fill(null)
+    .map(() => Array(width).fill(false))
+  const entities: Entity[] = []
+
+  const getCell = (y: number, x: number): 0 | 1 => {
+    const wrappedY = ((y % height) + height) % height
+    const wrappedX = ((x % width) + width) % width
+    return grid[wrappedY][wrappedX]
+  }
+
+  const hasEmptyBorder = (cells: Coordinate[]): boolean => {
+    const borderCells = new Set<string>()
+
+    for (const { x, y } of cells) {
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          if (Math.abs(dy) === 2 || Math.abs(dx) === 2) {
+            borderCells.add(`${y + dy},${x + dx}`)
+          }
+        }
+      }
+    }
+
+    const entityCells = new Set(cells.map(({ x, y }) => `${y},${x}`))
+
+    for (const cellStr of borderCells) {
+      if (!entityCells.has(cellStr)) {
+        const [y, x] = cellStr.split(',').map(Number)
+        if (getCell(y, x) === 1) {
+          return false
+        }
+      }
+    }
+
+    return true
+  }
+
+  const bfs = (startY: number, startX: number): Coordinate[] => {
+    const queue: Coordinate[] = [{ x: startX, y: startY }]
+    const component: Coordinate[] = []
+    visited[startY][startX] = true
+
+    while (queue.length > 0) {
+      const coord = queue.shift()
+      if (!coord) continue
+      component.push(coord)
+
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dy === 0 && dx === 0) continue
+
+          const newY = (((coord.y + dy) % height) + height) % height
+          const newX = (((coord.x + dx) % width) + width) % width
+
+          if (!visited[newY][newX] && grid[newY][newX] === 1) {
+            visited[newY][newX] = true
+            queue.push({ x: newX, y: newY })
+          }
+        }
+      }
+    }
+
+    return component
+  }
+
+  // Only check cells in active regions
+  for (const coordStr of activeRegions) {
+    const [y, x] = coordStr.split(',').map(Number)
+    if (grid[y][x] === 1 && !visited[y][x]) {
+      const component = bfs(y, x)
+      if (hasEmptyBorder(component)) {
+        entities.push({ cells: component })
+      }
+    }
+  }
+
+  // If tracker is provided, track the entities
+  if (tracker) {
+    return tracker.trackEntities(entities)
+  }
+
+  return entities
+}
+
 export function detectEntities(grid: Grid, tracker?: EntityTracker): Entity[] {
   const height = grid.length
   const width = grid[0]?.length ?? 0

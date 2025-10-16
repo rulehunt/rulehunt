@@ -25,7 +25,12 @@ export interface SimulationMetadata {
   lastStepTime: number
 }
 
-import { EntityTracker, detectEntities } from './entityDetection'
+import {
+  EntityTracker,
+  buildActiveRegions,
+  detectEntities,
+  detectEntitiesSparse,
+} from './entityDetection'
 import type { Grid } from './schema'
 
 export class StatisticsTracker {
@@ -34,6 +39,7 @@ export class StatisticsTracker {
   private previousGrid: Uint8Array | null = null
   private gridRows: number
   private gridCols: number
+  private gridArea: number
   private metadata: SimulationMetadata | null = null
   private stepTimes: number[] = [] // Track last 20 step times for SPS calculation
   private maxStepTimes = 20
@@ -44,6 +50,18 @@ export class StatisticsTracker {
   private internalStepCount = 0
   private entityDetectionInterval = 10 // Run entity detection every N steps
   private entropyCalculationInterval = 10 // Run entropy calculation every N steps
+
+  // Sparse entity detection optimization
+  // Note: Testing showed sparse detection doesn't improve performance for typical CA patterns
+  // with very low activity (<0.5%). The overhead of building active regions outweighs benefits.
+  // Keeping implementation for potential future use with higher-activity scenarios.
+  private useSparseEntityDetection = false // Disabled: no perf benefit for low-activity grids
+  private sparseDetectionActivityThreshold = 0.3 // Use sparse if <30% of grid changed
+
+  // Sparse entropy calculation optimization
+  // Instead of checking every overlapping block, sample systematically with larger stride
+  private useSparseEntropyCalculation = true // Enable sparse entropy for performance
+  private entropyStrideFactor = 3 // Multiply default stride by this factor (3x = ~9x fewer blocks)
 
   private cachedEntityStats: {
     entityCount: number
@@ -63,6 +81,7 @@ export class StatisticsTracker {
   constructor(gridRows: number, gridCols: number) {
     this.gridRows = gridRows
     this.gridCols = gridCols
+    this.gridArea = gridRows * gridCols
     // Initialize entity tracker for all grid sizes
     this.entityTracker = new EntityTracker()
   }
@@ -160,9 +179,30 @@ export class StatisticsTracker {
     let entitiesDied: number
 
     if (shouldRunEntityDetection) {
-      // Run full entity detection
+      // Decide whether to use sparse or full entity detection
       const grid2D = this.convertTo2DGrid(grid)
-      const entities = detectEntities(grid2D, this.entityTracker || undefined)
+      const activityRatio = activity / this.gridArea
+      const useSparse =
+        this.useSparseEntityDetection &&
+        this.previousGrid !== null &&
+        activityRatio < this.sparseDetectionActivityThreshold
+
+      let entities: ReturnType<typeof detectEntities>
+
+      if (useSparse) {
+        // Sparse detection: only check active regions
+        const previousGrid2D = this.convertTo2DGrid(this.previousGrid!)
+        const activeRegions = buildActiveRegions(grid2D, previousGrid2D)
+        entities = detectEntitiesSparse(
+          grid2D,
+          activeRegions,
+          this.entityTracker || undefined,
+        )
+      } else {
+        // Full detection: check entire grid
+        entities = detectEntities(grid2D, this.entityTracker || undefined)
+      }
+
       entityCount = entities.length
       entityChange = entityCount - this.previousEntityCount
       this.previousEntityCount = entityCount
@@ -266,7 +306,14 @@ export class StatisticsTracker {
   private calculateBlockEntropy(grid: Uint8Array, blockSize: number): number {
     // Calculate Shannon entropy of block patterns
     const blockCounts = new Map<number, number>()
-    const stride = Math.floor(blockSize / 2) // Overlapping blocks for better sampling
+
+    // Base stride: overlapping blocks for better sampling
+    const baseStride = Math.floor(blockSize / 2)
+
+    // Apply sparse sampling if enabled: use larger stride to check fewer blocks
+    const stride = this.useSparseEntropyCalculation
+      ? baseStride * this.entropyStrideFactor
+      : baseStride
 
     for (let y = 0; y <= this.gridRows - blockSize; y += stride) {
       for (let x = 0; x <= this.gridCols - blockSize; x += stride) {
