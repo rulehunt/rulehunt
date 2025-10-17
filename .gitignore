@@ -36,3 +36,7 @@ d1-dump.csv
 
 # Auto-generated build info
 src/buildInfo.ts
+.loom/state.json
+.loom/worktrees/
+.loom/*.log
+.loom/*.sock
