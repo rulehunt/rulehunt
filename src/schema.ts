@@ -189,6 +189,7 @@ export const RunRecord = z
     runId: z.string().optional(),
     submittedAt: ISODateString.optional(),
     isStarred: z.boolean().optional().default(false),
+    shareCount: z.number().int().nonnegative().optional().default(0),
     ...UserIdentity.shape,
     ...SimulationInfo.shape,
     ...Scores.shape,
@@ -200,6 +201,7 @@ export const RunRecord = z
 export const RunSubmission = RunRecord.omit({
   runId: true,
   submittedAt: true,
+  shareCount: true,
 }).extend({
   // Make isStarred explicitly optional in submissions (defaults to false if omitted)
   isStarred: z.boolean().optional(),
@@ -233,6 +235,7 @@ export const LeaderboardEntry = z.object({
   watched_wall_ms: z.number().int().nonnegative(),
   interest_score: z.number().nonnegative(),
   entropy4x4: z.number().nonnegative(),
+  share_count: z.number().int().nonnegative().optional(),
   submitted_at: z.string().datetime(),
 })
 
