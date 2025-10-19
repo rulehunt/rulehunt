@@ -2,6 +2,7 @@
 import { GPU } from 'gpu.js'
 import { formatRulesetName, saveRun } from '../api/save'
 import { trackShare } from '../api/share'
+import { trackStatsView } from '../api/stats-view'
 import { CellularAutomata } from '../cellular-automata-cpu.ts'
 import { GPUCellularAutomata } from '../cellular-automata-gpu.ts'
 import type {
@@ -750,6 +751,7 @@ function saveRunStatistics(
 function createStatsButton(
   onShowStats: () => void,
   onResetFade?: () => void,
+  getLastRunHash?: () => string | undefined,
 ): { button: HTMLButtonElement; cleanup: () => void } {
   const { button, cleanup } = createRoundButton(
     {
@@ -762,6 +764,12 @@ function createStatsButton(
       onClick: () => {
         onShowStats()
         onResetFade?.()
+        
+        // Track the stats view if we have a runId
+        const runHash = getLastRunHash?.()
+        if (runHash) {
+          trackStatsView(runHash)
+        }
       },
       preventTransition: true,
     },
@@ -1153,6 +1161,7 @@ export async function setupMobileLayout(
   let statsBtn = createStatsButton(
     () => showStats(getCurrentRunData()),
     resetControlFade,
+    () => lastRunHash,
   )
   let starBtn = createStarButton({
     getIsStarred: () => currentIsStarred,
@@ -1257,6 +1266,7 @@ export async function setupMobileLayout(
       statsBtn = createStatsButton(
         () => showStats(getCurrentRunData()),
         resetControlFade,
+        () => lastRunHash,
       )
       starBtn = createStarButton({
         getIsStarred: () => currentIsStarred,
