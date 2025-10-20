@@ -8,6 +8,7 @@ const StatisticsResponse = z.object({
   stats: z.object({
     total_runs: z.number().int().nonnegative(),
     total_steps: z.number().nonnegative(),
+    total_processing_power: z.number().nonnegative(),
     total_starred: z.number().int().nonnegative(),
     unique_rulesets: z.number().int().nonnegative(),
     unique_users: z.number().int().nonnegative(),
@@ -55,6 +56,7 @@ export const onRequestGet = async (
         entropy4x4,
         interest_score,
         step_count,
+        grid_size,
         ruleset_hex,
         is_starred,
         user_id,
@@ -71,6 +73,7 @@ export const onRequestGet = async (
       entropy4x4: number
       interest_score: number
       step_count: number
+      grid_size: number | null
       ruleset_hex: string
       is_starred: number
       user_id: string
@@ -87,6 +90,7 @@ export const onRequestGet = async (
         stats: {
           total_runs: 0,
           total_steps: 0,
+          total_processing_power: 0,
           total_starred: 0,
           unique_rulesets: 0,
           unique_users: 0,
@@ -115,6 +119,12 @@ export const onRequestGet = async (
 
     // Basic stats
     const totalSteps = runs.reduce((sum, r) => sum + (r.step_count || 0), 0)
+    // Processing power = total cells computed across all runs
+    // For each run: steps * grid_size gives total cells updated
+    const totalProcessingPower = runs.reduce(
+      (sum, r) => sum + (r.step_count || 0) * (r.grid_size || 0),
+      0,
+    )
     const totalStarred = runs.filter((r) => r.is_starred === 1).length
     const uniqueRulesets = new Set(runs.map((r) => r.ruleset_hex)).size
 
@@ -240,6 +250,7 @@ export const onRequestGet = async (
       stats: {
         total_runs: totalRuns,
         total_steps: totalSteps,
+        total_processing_power: totalProcessingPower,
         total_starred: totalStarred,
         unique_rulesets: uniqueRulesets,
         unique_users: uniqueUsers,

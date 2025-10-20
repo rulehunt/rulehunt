@@ -27,6 +27,17 @@ Chart.register(
   Tooltip,
 )
 
+/**
+ * Format large numbers with SI prefixes (K, M, B, T)
+ */
+function formatLargeNumber(num: number): string {
+  if (num < 1000) return num.toString()
+  if (num < 1_000_000) return `${(num / 1000).toFixed(1)}K`
+  if (num < 1_000_000_000) return `${(num / 1_000_000).toFixed(1)}M`
+  if (num < 1_000_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`
+  return `${(num / 1_000_000_000_000).toFixed(1)}T`
+}
+
 export interface StatisticsPanelElements {
   container: HTMLDivElement
   refreshButton: HTMLButtonElement
@@ -166,6 +177,10 @@ export function renderStatistics(
     <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
       <div class="text-sm text-blue-600 dark:text-blue-400 font-medium">Total Steps</div>
       <div class="text-2xl font-bold text-blue-900 dark:text-blue-100">${data.total_steps.toLocaleString()}</div>
+    </div>
+    <div class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+      <div class="text-sm text-purple-600 dark:text-purple-400 font-medium">Processing Power</div>
+      <div class="text-2xl font-bold text-purple-900 dark:text-purple-100">${formatLargeNumber(data.total_processing_power)} cells</div>
     </div>
     <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
       <div class="text-sm text-yellow-600 dark:text-yellow-400 font-medium">Starred</div>

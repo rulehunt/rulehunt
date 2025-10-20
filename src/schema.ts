@@ -279,6 +279,7 @@ export const WolframClassification = z.object({
 export const StatisticsData = z.object({
   total_runs: z.number().int().nonnegative(),
   total_steps: z.number().int().nonnegative(),
+  total_processing_power: z.number().nonnegative(),
   total_starred: z.number().int().nonnegative(),
   unique_rulesets: z.number().int().nonnegative(),
   unique_users: z.number().int().nonnegative(),
