@@ -29,13 +29,18 @@ Chart.register(
 
 /**
  * Format large numbers with SI prefixes (K, M, B, T)
+ * Removes unnecessary decimal places for whole numbers
  */
 function formatLargeNumber(num: number): string {
   if (num < 1000) return num.toString()
-  if (num < 1_000_000) return `${(num / 1000).toFixed(1)}K`
-  if (num < 1_000_000_000) return `${(num / 1_000_000).toFixed(1)}M`
-  if (num < 1_000_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`
-  return `${(num / 1_000_000_000_000).toFixed(1)}T`
+  const format = (val: number, divisor: number, suffix: string) => {
+    const result = val / divisor
+    return `${result % 1 === 0 ? result : result.toFixed(1)}${suffix}`
+  }
+  if (num < 1_000_000) return format(num, 1000, 'K')
+  if (num < 1_000_000_000) return format(num, 1_000_000, 'M')
+  if (num < 1_000_000_000_000) return format(num, 1_000_000_000, 'B')
+  return format(num, 1_000_000_000_000, 'T')
 }
 
 export interface StatisticsPanelElements {
