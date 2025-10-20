@@ -27,9 +27,11 @@ import {
   updateURLWithoutReload,
 } from '../../urlState.ts'
 import { hexToC4Ruleset } from '../../utils.ts'
+import { AudioEngine } from '../audioEngine.ts'
 import { createAutoFadeContainer } from './buttonContainer.ts'
 import { createMobileHeader, setupMobileHeader } from './header.ts'
 import { createRoundButton } from './roundButton.ts'
+import { createSoundToggle } from './soundToggle.ts'
 import { createStarButton } from './starButton.ts'
 
 // --- Constants --------------------------------------------------------------
@@ -894,6 +896,37 @@ export async function setupMobileLayout(
     setupMobileHeader(headerElements, headerRoot, overlayWrapper)
   container.appendChild(headerWrapper)
 
+  // Audio engine setup
+  let audioEngine: AudioEngine | null = null
+  let audioEnabled = false
+  let audioInitialized = false
+
+  const toggleAudio = (enabled: boolean) => {
+    audioEnabled = enabled
+    if (enabled && !audioEngine) {
+      audioEngine = new AudioEngine(0.3) // 30% volume
+      const success = audioEngine.start()
+      audioInitialized = success
+      if (!success) {
+        console.warn('Failed to initialize audio engine')
+        return
+      }
+      startAudioUpdates()
+    } else if (!enabled && audioEngine) {
+      stopAudioUpdates()
+      audioEngine.stop()
+      audioEngine = null
+      audioInitialized = false
+    }
+  }
+
+  // Add sound toggle to header
+  const soundToggle = createSoundToggle(toggleAudio)
+  const soundContainer = headerRoot.querySelector('#sound-toggle-container')
+  if (soundContainer) {
+    soundContainer.appendChild(soundToggle)
+  }
+
   // Helper function to update header title color and reset fade
   const updateHeaderColor = (color: string) => {
     headerElements.titleElement.style.color = color
@@ -1089,6 +1122,33 @@ export async function setupMobileLayout(
     hideStats,
     () => updateStats(getCurrentRunData()), // refresh every second
   )
+
+  // Audio update loop (10 Hz / every 100ms)
+  let audioUpdateInterval: number | null = null
+  const startAudioUpdates = () => {
+    if (audioUpdateInterval) return
+    audioUpdateInterval = window.setInterval(() => {
+      if (audioEngine && audioEnabled && audioInitialized) {
+        const stats = onScreenCA.getStatistics()
+        const recent = stats.getRecentStats(1)[0]
+        if (recent) {
+          audioEngine.updateFromStats(recent)
+        }
+      }
+    }, 100) // 10 Hz update rate
+  }
+
+  const stopAudioUpdates = () => {
+    if (audioUpdateInterval) {
+      clearInterval(audioUpdateInterval)
+      audioUpdateInterval = null
+    }
+  }
+
+  // Start audio updates if audio is enabled
+  if (audioEnabled) {
+    startAudioUpdates()
+  }
 
   // Helper function to get current run data
   const getCurrentRunData = (): RunSubmission => {
@@ -1344,6 +1404,10 @@ export async function setupMobileLayout(
     cleanupControlContainer()
     cleanupHeader()
     cleanupStatsOverlay()
+    stopAudioUpdates()
+    if (audioEngine) {
+      audioEngine.stop()
+    }
     window.removeEventListener('resize', handleResize)
   }
 }
