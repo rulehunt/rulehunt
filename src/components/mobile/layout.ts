@@ -73,7 +73,7 @@ const DARK_FG_COLORS = [
 
 // --- Types ------------------------------------------------------------------
 
-export type CleanupFunction = () => void
+import type { CleanupFunction } from '../../types'
 
 // Runtime rule container used only on mobile.ts.
 // Combines a C4 or expanded ruleset plus optional cached expansion.

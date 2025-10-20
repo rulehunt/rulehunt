@@ -1,3 +1,4 @@
+import type { CleanupFunction } from '../../types'
 import { saveRun } from '../../api/save'
 import { CellularAutomata } from '../../cellular-automata-cpu.ts'
 import { outlierRule } from '../../outlier-rule.ts'
@@ -44,7 +45,6 @@ const GRID_ROWS = 400
 const GRID_COLS = 400
 
 // --- Types -----------------------------------------------------------------
-export type CleanupFunction = () => void
 type DisplayMode = 'orbits' | 'full'
 
 // --- Color Management ------------------------------------------------------

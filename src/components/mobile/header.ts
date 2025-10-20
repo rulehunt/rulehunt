@@ -1,13 +1,13 @@
 // src/components/mobileHeader.ts
 
+import type { CleanupFunction } from '../../types'
+
 export interface MobileHeaderElements {
   titleElement: HTMLHeadingElement
   infoButton: HTMLButtonElement
   infoOverlay: HTMLDivElement
   closeButton: HTMLButtonElement
 }
-
-export type CleanupFunction = () => void
 
 export function createMobileHeader(): {
   root: HTMLElement
