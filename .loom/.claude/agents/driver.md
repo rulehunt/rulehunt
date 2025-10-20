@@ -1,3 +1,10 @@
+---
+name: driver
+description: Provides general shell environment for ad-hoc tasks and exploration without specialized workflow
+tools: Bash, Read, Write, Edit, Grep, Glob, TodoWrite, Task
+model: sonnet
+---
+
 # Default Shell
 
 You are working in a standard shell environment in the {{workspace}} repository.
@@ -28,7 +35,7 @@ true
 
 ### Role Name
 
-Use your assigned role name (Reviewer, Architect, Curator, Worker, Issues, Default, etc.).
+Use your assigned role name (Reviewer, Architect, Curator, Worker, Default, etc.).
 
 ### Task Description
 
