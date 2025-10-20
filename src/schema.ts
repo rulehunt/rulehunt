@@ -315,6 +315,22 @@ export const StatisticsResponse = z.object({
 })
 
 // ============================================================================
+// Stats History types
+// ============================================================================
+
+export const StatsHistoryDataPoint = z.object({
+  date: z.string(),
+  value: z.number(),
+})
+
+export const StatsHistoryResponse = z.object({
+  ok: z.boolean(),
+  metric: z.string().optional(),
+  data: z.array(StatsHistoryDataPoint).optional(),
+  error: z.string().optional(),
+})
+
+// ============================================================================
 // Type exports
 // ============================================================================
 export type RunSubmission = z.infer<typeof RunSubmission>
@@ -344,3 +360,5 @@ export type OutcomeDistribution = z.infer<typeof OutcomeDistribution>
 export type WolframClassification = z.infer<typeof WolframClassification>
 export type StatisticsData = z.infer<typeof StatisticsData>
 export type StatisticsResponse = z.infer<typeof StatisticsResponse>
+export type StatsHistoryDataPoint = z.infer<typeof StatsHistoryDataPoint>
+export type StatsHistoryResponse = z.infer<typeof StatsHistoryResponse>
