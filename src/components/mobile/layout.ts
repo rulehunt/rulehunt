@@ -93,12 +93,14 @@ function createCA(
   gridCols: number,
   fgColor: string,
   bgColor: string,
+  onDiedOut?: () => void,
 ): ICellularAutomata {
   return createCellularAutomata(canvas, {
     gridRows,
     gridCols,
     fgColor,
     bgColor,
+    onDiedOut,
     // Use default threshold (250K cells = 500x500)
     // Mobile targets ~600K cells, so will use GPU on most devices
   })
@@ -796,7 +798,12 @@ function createStatsButton(
 function createSoftResetButton(
   onSoftReset: () => void,
   onResetFade?: () => void,
-): { button: HTMLButtonElement; cleanup: () => void } {
+): {
+  button: HTMLButtonElement
+  cleanup: () => void
+  startPulse: () => void
+  stopPulse: () => void
+} {
   const { button, cleanup: cleanupButton } = createRoundButton(
     {
       icon: `
@@ -809,12 +816,25 @@ function createSoftResetButton(
         if (isTransitioning) return
         onSoftReset()
         onResetFade?.()
+        stopPulse() // Stop pulse when user resets
       },
     },
     () => isTransitioning,
   )
 
-  return { button, cleanup: cleanupButton }
+  const startPulse = () => {
+    button.classList.add('animate-pulse')
+    button.style.borderColor = '#f97316' // Orange border
+    button.style.borderWidth = '2px'
+  }
+
+  const stopPulse = () => {
+    button.classList.remove('animate-pulse')
+    button.style.borderColor = ''
+    button.style.borderWidth = ''
+  }
+
+  return { button, cleanup: cleanupButton, startPulse, stopPulse }
 }
 
 // --- Share Button (copy shareable link to clipboard) -----------------------
@@ -1014,6 +1034,9 @@ export async function setupMobileLayout(
   // Set initial offscreen transform
   offScreenCanvas.style.transform = `translateY(${screenHeight}px)`
 
+  // Callback placeholder for died-out detection (set after button creation)
+  let onDiedOutCallback: (() => void) | undefined
+
   // Create cellular automata instances
   let onScreenCA = createCA(
     onScreenCanvas,
@@ -1021,6 +1044,7 @@ export async function setupMobileLayout(
     gridCols,
     palette[colorIndex],
     bgColor,
+    () => onDiedOutCallback?.(),
   )
 
   let offScreenCA = createCA(
@@ -1178,6 +1202,11 @@ export async function setupMobileLayout(
     softResetAutomata(onScreenCA)
     startAutomata(onScreenCA, onScreenRule)
   }, resetControlFade)
+
+  // Wire up died-out callback to pulse reset button
+  onDiedOutCallback = () => {
+    softResetButton.startPulse()
+  }
 
   controlContainer.appendChild(softResetButton.button)
   controlContainer.appendChild(starBtn.button)

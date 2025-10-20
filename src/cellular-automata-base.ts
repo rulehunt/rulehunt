@@ -55,11 +55,13 @@ export abstract class CellularAutomataBase {
 
   protected zoomLevel = 1
   protected displayZoom = 1
+  protected onDiedOut?: () => void
 
   constructor(
     canvas: HTMLCanvasElement | null,
     options: CellularAutomataOptions,
   ) {
+    this.onDiedOut = options.onDiedOut
     this.canvas = canvas
     this.ctx = canvas
       ? (canvas.getContext('2d', {
@@ -383,6 +385,12 @@ export abstract class CellularAutomataBase {
     const intervalMs = 1000 / stepsPerSecond
     this.playInterval = window.setInterval(() => {
       this.step(active_ruleset)
+
+      // Check for die-out after each step
+      if (this.isDiedOut()) {
+        this.pause()
+        this.onDiedOut?.()
+      }
     }, intervalMs)
   }
 
@@ -393,6 +401,22 @@ export abstract class CellularAutomataBase {
       clearInterval(this.playInterval)
       this.playInterval = null
     }
+  }
+
+  /**
+   * Check if the simulation has died out (no living cells).
+   * Uses population threshold: < 0.1% of grid is alive.
+   *
+   * @param threshold Population ratio threshold (default: 0.001 = 0.1%)
+   * @returns true if simulation has died out
+   */
+  protected isDiedOut(threshold = 0.001): boolean {
+    const recentStats = this.statistics.getRecentStats(1)
+    if (recentStats.length === 0) return false
+
+    const stats = recentStats[0]
+    const populationRatio = stats.population / this.gridArea
+    return populationRatio < threshold
   }
 
   /** Lightweight deterministic 32-bit hash (FNV-1a) */

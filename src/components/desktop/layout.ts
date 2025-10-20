@@ -526,11 +526,14 @@ export async function setupDesktopLayout(
 
   // Initialize cellular automata with colors
   const colors = getCurrentColors()
+  // Callback placeholder for died-out detection (set after simulation panel creation)
+  let onDiedOutCallback: (() => void) | undefined
   const cellularAutomata = new CellularAutomata(simCanvas, {
     gridRows: GRID_ROWS,
     gridCols: GRID_COLS,
     fgColor: colors.fgColor,
     bgColor: colors.bgColor,
+    onDiedOut: () => onDiedOutCallback?.(),
   })
 
   // Create tab container (must be after cellularAutomata is initialized)
@@ -1044,7 +1047,26 @@ export async function setupDesktopLayout(
     )
   })
 
+  // Pulse animation helpers for reset button
+  const startResetPulse = () => {
+    btnReset.classList.add('animate-pulse')
+    btnReset.style.borderColor = '#f97316' // Orange border
+    btnReset.style.borderWidth = '2px'
+  }
+
+  const stopResetPulse = () => {
+    btnReset.classList.remove('animate-pulse')
+    btnReset.style.borderColor = ''
+    btnReset.style.borderWidth = ''
+  }
+
+  // Wire up died-out callback to pulse reset button
+  onDiedOutCallback = startResetPulse
+
   addEventListener(btnReset, 'click', () => {
+    // Stop pulse when user manually resets
+    stopResetPulse()
+
     // Soft reset for patch and random modes (advances seed for new random ICs)
     // Center mode keeps existing behavior (deterministic single pixel)
     if (initialConditionType === 'patch' || initialConditionType === 'random') {
