@@ -1202,7 +1202,7 @@ export async function setupMobileLayout(
         const stats = onScreenCA.getStatistics()
         const recent = stats.getRecentStats(1)[0]
         if (recent) {
-          audioEngine.updateFromStats(recent)
+          ;(audioEngine as AudioEngine).updateFromStats(recent)
         }
       }
     }, 100) // 10 Hz update rate
@@ -1521,7 +1521,7 @@ export async function setupMobileLayout(
     cleanupStatsOverlay()
     stopAudioUpdates()
     if (audioEngine) {
-      audioEngine.stop()
+      ;(audioEngine as AudioEngine).stop()
     }
     window.removeEventListener('resize', handleResize)
   }
