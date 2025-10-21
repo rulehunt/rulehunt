@@ -25,9 +25,8 @@ export function createMobileHeader(): {
         RuleHunt
       </h1>
 
-      <!-- Right: Sound Toggle + Info Button -->
+      <!-- Right: Info Button -->
       <div class="flex items-center gap-2">
-        <div id="sound-toggle-container"></div>
         <button
           id="info-button"
           class="p-2 rounded-full hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"

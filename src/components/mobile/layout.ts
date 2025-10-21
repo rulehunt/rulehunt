@@ -29,11 +29,10 @@ import {
   updateURLWithoutReload,
 } from '../../urlState.ts'
 import { hexToC4Ruleset } from '../../utils.ts'
-import { AudioEngine } from '../audioEngine.ts'
+import type { AudioEngine } from '../audioEngine.ts'
 import { createAutoFadeContainer } from './buttonContainer.ts'
 import { createMobileHeader, setupMobileHeader } from './header.ts'
 import { createRoundButton } from './roundButton.ts'
-import { createSoundToggle } from './soundToggle.ts'
 import { createStarButton } from './starButton.ts'
 
 // --- Constants --------------------------------------------------------------
@@ -987,35 +986,11 @@ export async function setupMobileLayout(
   container.appendChild(headerWrapper)
 
   // Audio engine setup
-  let audioEngine: AudioEngine | null = null
-  let audioEnabled = false
-  let audioInitialized = false
-
-  const toggleAudio = (enabled: boolean) => {
-    audioEnabled = enabled
-    if (enabled && !audioEngine) {
-      audioEngine = new AudioEngine(0.3) // 30% volume
-      const success = audioEngine.start()
-      audioInitialized = success
-      if (!success) {
-        console.warn('Failed to initialize audio engine')
-        return
-      }
-      startAudioUpdates()
-    } else if (!enabled && audioEngine) {
-      stopAudioUpdates()
-      audioEngine.stop()
-      audioEngine = null
-      audioInitialized = false
-    }
-  }
-
-  // Add sound toggle to header
-  const soundToggle = createSoundToggle(toggleAudio)
-  const soundContainer = headerRoot.querySelector('#sound-toggle-container')
-  if (soundContainer) {
-    soundContainer.appendChild(soundToggle)
-  }
+  // Ensure sound is disabled by default on mobile
+  localStorage.setItem('sound-enabled', 'false')
+  const audioEngine: AudioEngine | null = null
+  const audioEnabled = false
+  const audioInitialized = false
 
   // Helper function to update header title color and reset fade
   const updateHeaderColor = (color: string) => {
