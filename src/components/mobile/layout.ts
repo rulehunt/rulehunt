@@ -900,7 +900,12 @@ function createShareButton(
           if (!runHash && getRunData && setLastRunHash) {
             // First share of this rule - save it now
             const { ca, rule, isStarred } = getRunData()
-            runHash = await saveRunStatistics(ca, rule.name, rule.hex, isStarred)
+            runHash = await saveRunStatistics(
+              ca,
+              rule.name,
+              rule.hex,
+              isStarred,
+            )
 
             if (runHash) {
               setLastRunHash(runHash)
