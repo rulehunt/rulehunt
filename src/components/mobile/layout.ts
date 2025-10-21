@@ -1,5 +1,7 @@
 // src/components/mobile.ts
 import { formatRulesetName, saveRun } from '../../api/save'
+import { trackShare } from '../../api/share'
+import { trackStatsView } from '../../api/stats-view'
 import { createCellularAutomata } from '../../cellular-automata-factory.ts'
 import type { ICellularAutomata } from '../../cellular-automata-interface.ts'
 import { getUserIdentity } from '../../identity.ts'
@@ -711,7 +713,7 @@ function saveRunStatistics(
   ruleName: string,
   ruleHex: string,
   isStarred = false,
-): void {
+): Promise<string | undefined> {
   const stats = cellularAutomata.getStatistics()
   const metadata = stats.getMetadata()
   const recent = stats.getRecentStats(1)[0] ?? {
@@ -764,13 +766,25 @@ function saveRunStatistics(
   }
 
   // --- Fire and forget background save ---
-  setTimeout(() => saveRun(payload))
+  return new Promise<string | undefined>((resolve) => {
+    setTimeout(async () => {
+      const result = await saveRun(payload)
+      resolve(result.ok ? result.runHash : undefined)
+    })
+  })
 }
 
 // --- Stats Button -----------------------------------------------------------
 function createStatsButton(
   onShowStats: () => void,
   onResetFade?: () => void,
+  getRunData?: () => {
+    ca: ICellularAutomata
+    rule: RuleData
+    isStarred: boolean
+  },
+  getLastRunHash?: () => string | undefined,
+  setLastRunHash?: (hash: string | undefined) => void,
 ): { button: HTMLButtonElement; cleanup: () => void } {
   const { button, cleanup } = createRoundButton(
     {
@@ -780,9 +794,30 @@ function createStatsButton(
           <path d="M3 13h2v8H3v-8zm4-4h2v12H7V9zm4-4h2v16h-2V5zm4 2h2v14h-2V7z"/>
         </svg>`,
       title: 'View statistics',
-      onClick: () => {
+      onClick: async () => {
         onShowStats()
         onResetFade?.()
+
+        // Get or create run hash
+        let runHash = getLastRunHash?.()
+
+        if (!runHash && getRunData && setLastRunHash) {
+          // First stats view of this rule - save it now
+          const { ca, rule, isStarred } = getRunData()
+          runHash = await saveRunStatistics(ca, rule.name, rule.hex, isStarred)
+
+          if (runHash) {
+            setLastRunHash(runHash)
+            console.log(
+              `[tracking] Saved and stored hash for ${rule.name}: ${runHash}`,
+            )
+          }
+        }
+
+        // Track the stats view
+        if (runHash) {
+          trackStatsView(runHash)
+        }
       },
       preventTransition: true,
     },
@@ -818,7 +853,16 @@ function createSoftResetButton(
 }
 
 // --- Share Button (copy shareable link to clipboard) -----------------------
-function createShareButton(onResetFade?: () => void): {
+function createShareButton(
+  onResetFade?: () => void,
+  getRunData?: () => {
+    ca: ICellularAutomata
+    rule: RuleData
+    isStarred: boolean
+  },
+  getLastRunHash?: () => string | undefined,
+  setLastRunHash?: (hash: string | undefined) => void,
+): {
   button: HTMLButtonElement
   cleanup: () => void
 } {
@@ -849,6 +893,32 @@ function createShareButton(onResetFade?: () => void): {
         try {
           await navigator.clipboard.writeText(shareURL)
           console.log('[share] Copied link to clipboard:', shareURL)
+
+          // Get or create run hash
+          let runHash = getLastRunHash?.()
+
+          if (!runHash && getRunData && setLastRunHash) {
+            // First share of this rule - save it now
+            const { ca, rule, isStarred } = getRunData()
+            runHash = await saveRunStatistics(
+              ca,
+              rule.name,
+              rule.hex,
+              isStarred,
+            )
+
+            if (runHash) {
+              setLastRunHash(runHash)
+              console.log(
+                `[tracking] Saved and stored hash for ${rule.name}: ${runHash}`,
+              )
+            }
+          }
+
+          // Track the share
+          if (runHash) {
+            trackShare(runHash)
+          }
 
           // Visual feedback - briefly change the button appearance
           button.innerHTML = checkIcon
@@ -1161,10 +1231,27 @@ export async function setupMobileLayout(
     className: 'flex flex-row-reverse space-x-reverse space-x-2',
   })
 
-  let shareBtn = createShareButton(resetControlFade)
+  // Closure variable to store hash for the currently visible rule
+  // Using a closure variable instead of per-object storage because rule objects
+  // are discarded after being swapped out (not reused in the dual-canvas architecture)
+  let currentlyVisibleRuleHash: string | undefined = undefined
+
+  let shareBtn = createShareButton(
+    resetControlFade,
+    () => ({ ca: onScreenCA, rule: onScreenRule, isStarred: currentIsStarred }),
+    () => currentlyVisibleRuleHash,
+    (hash) => {
+      currentlyVisibleRuleHash = hash
+    },
+  )
   let statsBtn = createStatsButton(
     () => showStats(getCurrentRunData()),
     resetControlFade,
+    () => ({ ca: onScreenCA, rule: onScreenRule, isStarred: currentIsStarred }),
+    () => currentlyVisibleRuleHash,
+    (hash) => {
+      currentlyVisibleRuleHash = hash
+    },
   )
   let starBtn = createStarButton({
     getIsStarred: () => currentIsStarred,
@@ -1200,12 +1287,9 @@ export async function setupMobileLayout(
         instruction.style.opacity = '0'
         setTimeout(() => instruction.remove(), 300)
       }
-      saveRunStatistics(
-        onScreenCA,
-        onScreenRule.name,
-        onScreenRule.hex,
-        currentIsStarred,
-      )
+
+      // Note: We save statistics on-demand when user clicks Share/Stats buttons
+      // This ensures hash is always available for the currently visible rule
 
       // Reset starred status for next simulation
       currentIsStarred = false
@@ -1214,6 +1298,12 @@ export async function setupMobileLayout(
       ;[onScreenCanvas, offScreenCanvas] = [offScreenCanvas, onScreenCanvas]
       ;[onScreenCA, offScreenCA] = [offScreenCA, onScreenCA]
       ;[onScreenRule, offScreenRule] = [offScreenRule, onScreenRule]
+
+      // Clear hash for newly visible rule (will be set when save completes)
+      currentlyVisibleRuleHash = undefined
+      console.log(
+        `[tracking] Hash cleared for newly visible rule: ${onScreenRule.name}`,
+      )
 
       // Update z-index and positioning explicitly
       const h = onScreenCanvas.height
@@ -1263,10 +1353,30 @@ export async function setupMobileLayout(
       starBtn.cleanup()
       statsBtn.cleanup()
 
-      shareBtn = createShareButton(resetControlFade)
+      shareBtn = createShareButton(
+        resetControlFade,
+        () => ({
+          ca: onScreenCA,
+          rule: onScreenRule,
+          isStarred: currentIsStarred,
+        }),
+        () => currentlyVisibleRuleHash,
+        (hash) => {
+          currentlyVisibleRuleHash = hash
+        },
+      )
       statsBtn = createStatsButton(
         () => showStats(getCurrentRunData()),
         resetControlFade,
+        () => ({
+          ca: onScreenCA,
+          rule: onScreenRule,
+          isStarred: currentIsStarred,
+        }),
+        () => currentlyVisibleRuleHash,
+        (hash) => {
+          currentlyVisibleRuleHash = hash
+        },
       )
       starBtn = createStarButton({
         getIsStarred: () => currentIsStarred,
