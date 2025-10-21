@@ -1,20 +1,13 @@
 // src/components/header.ts
 
 import type { CleanupFunction } from '../../types'
-
-export interface ThemeToggleElements {
-  light: HTMLButtonElement
-  dark: HTMLButtonElement
-  system: HTMLButtonElement
-}
+import type { ThemeToggleElements } from './theme'
 
 export interface HeaderElements {
   themeToggle: ThemeToggleElements
   githubLink: HTMLAnchorElement
   mobilePreviewButton?: HTMLButtonElement
 }
-
-export type Theme = 'light' | 'dark' | 'system'
 
 export function createHeader(): {
   root: HTMLElement
@@ -86,94 +79,4 @@ export function createHeader(): {
   }
 
   return { root, elements }
-}
-
-export function setupTheme(
-  themeButtons: ThemeToggleElements,
-  onThemeChange?: () => void,
-): CleanupFunction {
-  // Load saved theme
-  const savedTheme = (localStorage.getItem('theme') as Theme) || 'system'
-  let currentTheme: Theme = savedTheme
-
-  // Apply initial theme
-  applyTheme(currentTheme)
-  updateActiveButton(themeButtons, currentTheme)
-
-  // Create event handlers
-  const lightHandler = () => {
-    currentTheme = 'light'
-    localStorage.setItem('theme', currentTheme)
-    applyTheme(currentTheme)
-    updateActiveButton(themeButtons, currentTheme)
-    if (onThemeChange) onThemeChange()
-  }
-
-  const darkHandler = () => {
-    currentTheme = 'dark'
-    localStorage.setItem('theme', currentTheme)
-    applyTheme(currentTheme)
-    updateActiveButton(themeButtons, currentTheme)
-    if (onThemeChange) onThemeChange()
-  }
-
-  const systemHandler = () => {
-    currentTheme = 'system'
-    localStorage.setItem('theme', currentTheme)
-    applyTheme(currentTheme)
-    updateActiveButton(themeButtons, currentTheme)
-    if (onThemeChange) onThemeChange()
-  }
-
-  // Add event listeners
-  themeButtons.light.addEventListener('click', lightHandler)
-  themeButtons.dark.addEventListener('click', darkHandler)
-  themeButtons.system.addEventListener('click', systemHandler)
-
-  // Watch for system theme changes when in system mode
-  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-  const mediaQueryHandler = (e: MediaQueryListEvent) => {
-    if (currentTheme === 'system') {
-      document.documentElement.classList.toggle('dark', e.matches)
-      if (onThemeChange) onThemeChange()
-    }
-  }
-
-  mediaQuery.addEventListener('change', mediaQueryHandler)
-
-  // Return cleanup function
-  return () => {
-    themeButtons.light.removeEventListener('click', lightHandler)
-    themeButtons.dark.removeEventListener('click', darkHandler)
-    themeButtons.system.removeEventListener('click', systemHandler)
-    mediaQuery.removeEventListener('change', mediaQueryHandler)
-  }
-}
-
-function applyTheme(theme: Theme) {
-  if (theme === 'system') {
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    document.documentElement.classList.toggle('dark', isDark)
-  } else {
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-  }
-}
-
-function updateActiveButton(buttons: ThemeToggleElements, theme: Theme) {
-  // Reset all buttons
-  const baseClass = 'px-3 py-1 rounded text-sm transition-colors'
-  const activeClass = 'bg-white dark:bg-gray-700'
-
-  buttons.light.className = baseClass
-  buttons.dark.className = baseClass
-  buttons.system.className = baseClass
-
-  // Highlight active button
-  if (theme === 'light') {
-    buttons.light.className = `${baseClass} ${activeClass}`
-  } else if (theme === 'dark') {
-    buttons.dark.className = `${baseClass} ${activeClass}`
-  } else {
-    buttons.system.className = `${baseClass} ${activeClass}`
-  }
 }
