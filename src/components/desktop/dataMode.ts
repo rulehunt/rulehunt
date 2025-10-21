@@ -11,8 +11,9 @@ import {
 import type { C4OrbitsData } from '../../schema'
 import type { CleanupFunction } from '../../types'
 import { buildOrbitLookup } from '../../utils'
-import { createHeader, setupTheme } from './header'
+import { createHeader } from './header'
 import { createProgressBar } from './progressBar'
+import { setupTheme } from './theme'
 
 export async function setupDataModeLayout(
   appRoot: HTMLDivElement,
