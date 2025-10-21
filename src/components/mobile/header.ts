@@ -25,18 +25,21 @@ export function createMobileHeader(): {
         RuleHunt
       </h1>
 
-      <!-- Right: Info Button -->
-      <button 
-        id="info-button"
-        class="p-2 rounded-full hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
-        title="About RuleHunt"
-        aria-label="Show information"
-      >
-        <svg class="w-6 h-6 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="10" stroke-width="2"/>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/>
-        </svg>
-      </button>
+      <!-- Right: Sound Toggle + Info Button -->
+      <div class="flex items-center gap-2">
+        <div id="sound-toggle-container"></div>
+        <button
+          id="info-button"
+          class="p-2 rounded-full hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
+          title="About RuleHunt"
+          aria-label="Show information"
+        >
+          <svg class="w-6 h-6 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke-width="2"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/>
+          </svg>
+        </button>
+      </div>
     </div>
   `
 
