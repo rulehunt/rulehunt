@@ -1,7 +1,7 @@
 // src/components/statsOverlay.ts
 
-import type { CleanupFunction } from '../../types'
 import type { RunSubmission } from '../../schema.ts'
+import type { CleanupFunction } from '../../types'
 import {
   generateSimulationMetricsHTML,
   updateSimulationMetricsFields,
