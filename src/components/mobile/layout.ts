@@ -778,7 +778,13 @@ function saveRunStatistics(
 function createStatsButton(
   onShowStats: () => void,
   onResetFade?: () => void,
+  getRunData?: () => {
+    ca: ICellularAutomata
+    rule: RuleData
+    isStarred: boolean
+  },
   getLastRunHash?: () => string | undefined,
+  setLastRunHash?: (hash: string | undefined) => void,
 ): { button: HTMLButtonElement; cleanup: () => void } {
   const { button, cleanup } = createRoundButton(
     {
@@ -788,12 +794,27 @@ function createStatsButton(
           <path d="M3 13h2v8H3v-8zm4-4h2v12H7V9zm4-4h2v16h-2V5zm4 2h2v14h-2V7z"/>
         </svg>`,
       title: 'View statistics',
-      onClick: () => {
+      onClick: async () => {
         onShowStats()
         onResetFade?.()
 
-        // Track the stats view if we have a runId
-        const runHash = getLastRunHash?.()
+        // Get or create run hash
+        let runHash = getLastRunHash?.()
+
+        if (!runHash && getRunData && setLastRunHash) {
+          // First stats view of this rule - save it now
+          const { ca, rule, isStarred } = getRunData()
+          runHash = await saveRunStatistics(ca, rule.name, rule.hex, isStarred)
+
+          if (runHash) {
+            setLastRunHash(runHash)
+            console.log(
+              `[tracking] Saved and stored hash for ${rule.name}: ${runHash}`,
+            )
+          }
+        }
+
+        // Track the stats view
         if (runHash) {
           trackStatsView(runHash)
         }
@@ -834,7 +855,13 @@ function createSoftResetButton(
 // --- Share Button (copy shareable link to clipboard) -----------------------
 function createShareButton(
   onResetFade?: () => void,
+  getRunData?: () => {
+    ca: ICellularAutomata
+    rule: RuleData
+    isStarred: boolean
+  },
   getLastRunHash?: () => string | undefined,
+  setLastRunHash?: (hash: string | undefined) => void,
 ): {
   button: HTMLButtonElement
   cleanup: () => void
@@ -867,8 +894,23 @@ function createShareButton(
           await navigator.clipboard.writeText(shareURL)
           console.log('[share] Copied link to clipboard:', shareURL)
 
-          // Track the share if we have a runId
-          const runHash = getLastRunHash?.()
+          // Get or create run hash
+          let runHash = getLastRunHash?.()
+
+          if (!runHash && getRunData && setLastRunHash) {
+            // First share of this rule - save it now
+            const { ca, rule, isStarred } = getRunData()
+            runHash = await saveRunStatistics(ca, rule.name, rule.hex, isStarred)
+
+            if (runHash) {
+              setLastRunHash(runHash)
+              console.log(
+                `[tracking] Saved and stored hash for ${rule.name}: ${runHash}`,
+              )
+            }
+          }
+
+          // Track the share
           if (runHash) {
             trackShare(runHash)
           }
@@ -1191,12 +1233,20 @@ export async function setupMobileLayout(
 
   let shareBtn = createShareButton(
     resetControlFade,
+    () => ({ ca: onScreenCA, rule: onScreenRule, isStarred: currentIsStarred }),
     () => currentlyVisibleRuleHash,
+    (hash) => {
+      currentlyVisibleRuleHash = hash
+    },
   )
   let statsBtn = createStatsButton(
     () => showStats(getCurrentRunData()),
     resetControlFade,
+    () => ({ ca: onScreenCA, rule: onScreenRule, isStarred: currentIsStarred }),
     () => currentlyVisibleRuleHash,
+    (hash) => {
+      currentlyVisibleRuleHash = hash
+    },
   )
   let starBtn = createStarButton({
     getIsStarred: () => currentIsStarred,
@@ -1233,28 +1283,8 @@ export async function setupMobileLayout(
         setTimeout(() => instruction.remove(), 300)
       }
 
-      // Capture previous rule's hex for comparison (to prevent setting hash on wrong rule)
-      const previousRuleHex = onScreenRule.hex
-
-      // Save statistics for the rule that was just viewed
-      saveRunStatistics(
-        onScreenCA,
-        onScreenRule.name,
-        onScreenRule.hex,
-        currentIsStarred,
-      ).then((hash) => {
-        // Only set hash if this rule is still visible (user hasn't swiped again)
-        if (hash && previousRuleHex === onScreenRule.hex) {
-          currentlyVisibleRuleHash = hash
-          console.log(
-            `[tracking] Hash stored for rule ${onScreenRule.name}: ${hash}`,
-          )
-        } else if (hash) {
-          console.log(
-            `[tracking] Hash received for ${previousRuleHex.slice(0, 8)}... but rule no longer visible (current: ${onScreenRule.hex.slice(0, 8)}...)`,
-          )
-        }
-      })
+      // Note: We save statistics on-demand when user clicks Share/Stats buttons
+      // This ensures hash is always available for the currently visible rule
 
       // Reset starred status for next simulation
       currentIsStarred = false
@@ -1320,12 +1350,28 @@ export async function setupMobileLayout(
 
       shareBtn = createShareButton(
         resetControlFade,
+        () => ({
+          ca: onScreenCA,
+          rule: onScreenRule,
+          isStarred: currentIsStarred,
+        }),
         () => currentlyVisibleRuleHash,
+        (hash) => {
+          currentlyVisibleRuleHash = hash
+        },
       )
       statsBtn = createStatsButton(
         () => showStats(getCurrentRunData()),
         resetControlFade,
+        () => ({
+          ca: onScreenCA,
+          rule: onScreenRule,
+          isStarred: currentIsStarred,
+        }),
         () => currentlyVisibleRuleHash,
+        (hash) => {
+          currentlyVisibleRuleHash = hash
+        },
       )
       starBtn = createStarButton({
         getIsStarred: () => currentIsStarred,
