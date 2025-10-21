@@ -527,6 +527,7 @@ export async function setupDesktopLayout(
   // Initialize cellular automata with colors
   const colors = getCurrentColors()
   // Callback placeholder for died-out detection (set after simulation panel creation)
+  // biome-ignore lint/style/useConst: reassigned later at line 1064
   let onDiedOutCallback: (() => void) | undefined
   const cellularAutomata = new CellularAutomata(simCanvas, {
     gridRows: GRID_ROWS,

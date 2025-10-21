@@ -1035,6 +1035,7 @@ export async function setupMobileLayout(
   offScreenCanvas.style.transform = `translateY(${screenHeight}px)`
 
   // Callback placeholder for died-out detection (set after button creation)
+  // biome-ignore lint/style/useConst: reassigned later at line 1207
   let onDiedOutCallback: (() => void) | undefined
 
   // Create cellular automata instances
