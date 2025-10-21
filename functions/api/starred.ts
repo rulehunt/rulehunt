@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import type { D1Database, EventContext } from '@cloudflare/workers-types'
-import { z } from 'zod'
 import { StarredResponse } from '../../src/schema'
+import { handleApiError, jsonResponse } from '../utils/api-helpers'
 
 /**
  * GET /api/starred
@@ -15,12 +15,6 @@ import { StarredResponse } from '../../src/schema'
 export const onRequestGet = async (
   ctx: EventContext<{ DB: D1Database }, string, Record<string, unknown>>,
 ): Promise<Response> => {
-  const json = (data: unknown, status = 200) =>
-    new Response(JSON.stringify(data, null, 2), {
-      status,
-      headers: { 'Content-Type': 'application/json' },
-    })
-
   try {
     // --- Query for random starred pattern -----------------------------------
     // SQLite RANDOM() returns a random integer, ORDER BY it gives random ordering
@@ -45,7 +39,7 @@ export const onRequestGet = async (
         ok: true,
         pattern: null,
       })
-      return json(response)
+      return jsonResponse(response)
     }
 
     // --- Validate and return result -----------------------------------------
@@ -61,25 +55,8 @@ export const onRequestGet = async (
       pattern,
     })
 
-    return json(response)
+    return jsonResponse(response)
   } catch (error) {
-    // --- Zod validation errors ----------------------------------------------
-    if (error instanceof z.ZodError) {
-      console.error('Starred pattern validation error:', error.issues)
-      return json(
-        { ok: false, error: 'Invalid data format', details: error.issues },
-        500,
-      )
-    }
-
-    // --- Database errors ----------------------------------------------------
-    if (error instanceof Error && /D1|SQL|prepare|bind/i.test(error.message)) {
-      console.error('Database error fetching starred pattern:', error)
-      return json({ ok: false, error: 'Database query failed' }, 500)
-    }
-
-    // --- Unexpected errors --------------------------------------------------
-    console.error('Unexpected error in starred endpoint:', error)
-    return json({ ok: false, error: 'Internal server error' }, 500)
+    return handleApiError(error, 'starred')
   }
 }

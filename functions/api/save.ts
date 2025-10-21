@@ -1,22 +1,19 @@
 /// <reference types="@cloudflare/workers-types" />
 import type { D1Database, EventContext } from '@cloudflare/workers-types'
-import { z } from 'zod'
 import { RunSubmission } from '../../src/schema'
+import { handleApiError, jsonResponse } from '../utils/api-helpers'
 
 export const onRequestPost = async (
   ctx: EventContext<{ DB: D1Database }, string, Record<string, unknown>>,
 ): Promise<Response> => {
-  const json = (data: unknown, status = 200) =>
-    new Response(JSON.stringify(data, null, 2), {
-      status,
-      headers: { 'Content-Type': 'application/json' },
-    })
-
   try {
     // --- Parse & validate request ---
     const body = await ctx.request.json().catch(() => null)
     if (!body)
-      return json({ ok: false, error: 'Invalid JSON in request body' }, 400)
+      return jsonResponse(
+        { ok: false, error: 'Invalid JSON in request body' },
+        400,
+      )
 
     const data = RunSubmission.parse(body)
 
@@ -106,17 +103,8 @@ export const onRequestPost = async (
       )
       .run()
 
-    return json({ ok: true, runHash })
+    return jsonResponse({ ok: true, runHash })
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.warn('Run submission validation error:', error.issues)
-      return json(
-        { ok: false, error: 'Invalid run data format', details: error.issues },
-        400,
-      )
-    }
-
-    console.error('Error saving run:', error)
-    return json({ ok: false, error: 'Internal server error' }, 500)
+    return handleApiError(error, 'save')
   }
 }
