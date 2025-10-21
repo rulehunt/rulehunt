@@ -191,7 +191,12 @@ export class StatisticsTracker {
 
       if (useSparse) {
         // Sparse detection: only check active regions
-        const previousGrid2D = this.convertTo2DGrid(this.previousGrid!)
+        if (!this.previousGrid) {
+          throw new Error(
+            'previousGrid is required for sparse entity detection',
+          )
+        }
+        const previousGrid2D = this.convertTo2DGrid(this.previousGrid)
         const activeRegions = buildActiveRegions(grid2D, previousGrid2D)
         entities = detectEntitiesSparse(
           grid2D,
@@ -231,7 +236,12 @@ export class StatisticsTracker {
       }
     } else {
       // Reuse cached entity stats
-      const cached = this.cachedEntityStats!
+      if (!this.cachedEntityStats) {
+        throw new Error(
+          'cachedEntityStats is required when skipping entity detection',
+        )
+      }
+      const cached = this.cachedEntityStats
       entityCount = cached.entityCount
       entityChange = 0 // No change detected between detection intervals
       totalEntitiesEverSeen = cached.totalEntitiesEverSeen
@@ -263,7 +273,12 @@ export class StatisticsTracker {
       }
     } else {
       // Reuse cached entropy stats
-      const cached = this.cachedEntropyStats!
+      if (!this.cachedEntropyStats) {
+        throw new Error(
+          'cachedEntropyStats is required when skipping entropy calculation',
+        )
+      }
+      const cached = this.cachedEntropyStats
       entropy2x2 = cached.entropy2x2
       entropy4x4 = cached.entropy4x4
       entropy8x8 = cached.entropy8x8
