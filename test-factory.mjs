@@ -23,7 +23,7 @@ async function captureConsoleLogs(viewport, expectedImplementation) {
 
   // Collect console logs
   const logs = []
-  page.on('console', msg => {
+  page.on('console', (msg) => {
     const text = msg.text()
     logs.push(text)
     console.log(`[${viewport.width}x${viewport.height}] ${text}`)
@@ -33,10 +33,10 @@ async function captureConsoleLogs(viewport, expectedImplementation) {
   await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: TIMEOUT })
 
   // Wait for layout initialization
-  await new Promise(resolve => setTimeout(resolve, 3000))
+  await new Promise((resolve) => setTimeout(resolve, 3000))
 
   // Check for factory logs
-  const factoryLog = logs.find(log => log.includes('[CA Factory]'))
+  const factoryLog = logs.find((log) => log.includes('[CA Factory]'))
 
   await browser.close()
 
@@ -44,7 +44,7 @@ async function captureConsoleLogs(viewport, expectedImplementation) {
     viewport,
     logs,
     factoryLog,
-    success: factoryLog && factoryLog.includes(expectedImplementation)
+    success: factoryLog?.includes(expectedImplementation),
   }
 }
 
@@ -68,7 +68,7 @@ async function runTests() {
       name: 'Desktop (1920x1080)',
       viewport: { width: 1920, height: 1080 },
       expected: 'CPU', // Desktop currently uses CPU directly (no factory yet)
-    }
+    },
   ]
 
   const results = []
@@ -88,22 +88,24 @@ async function runTests() {
   }
 
   // Summary
-  console.log('\n' + '='.repeat(80))
+  console.log(`\n${'='.repeat(80)}`)
   console.log('SUMMARY')
   console.log('='.repeat(80))
 
-  results.forEach(r => {
+  for (const r of results) {
     const status = r.success ? '✅' : '❌'
-    console.log(`${status} ${r.name}: Expected ${r.expected}, Got: ${r.factoryLog || 'NO LOG'}`)
-  })
+    console.log(
+      `${status} ${r.name}: Expected ${r.expected}, Got: ${r.factoryLog || 'NO LOG'}`,
+    )
+  }
 
-  const allPassed = results.every(r => r.success)
-  console.log('\n' + (allPassed ? '✅ ALL TESTS PASSED' : '❌ SOME TESTS FAILED'))
+  const allPassed = results.every((r) => r.success)
+  console.log(`\n${allPassed ? '✅ ALL TESTS PASSED' : '❌ SOME TESTS FAILED'}`)
 
   process.exit(allPassed ? 0 : 1)
 }
 
-runTests().catch(err => {
+runTests().catch((err) => {
   console.error('Test error:', err)
   process.exit(1)
 })

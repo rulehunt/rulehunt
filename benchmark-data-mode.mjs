@@ -7,10 +7,10 @@ const browser = await puppeteer.launch({
 
 const page = await browser.newPage()
 
-let stepTimes = []
-let interestScores = []
+const stepTimes = []
+const interestScores = []
 let rounds = 0
-let roundSummaries = [] // Track per-round performance summaries
+const roundSummaries = [] // Track per-round performance summaries
 
 // Capture all console logs for debugging
 page.on('console', (msg) => {
@@ -20,7 +20,7 @@ page.on('console', (msg) => {
   if (text.includes('[Perf] Step')) {
     const timeMatch = text.match(/([\d.]+)ms/)
     if (timeMatch) {
-      stepTimes.push(parseFloat(timeMatch[1]))
+      stepTimes.push(Number.parseFloat(timeMatch[1]))
     }
   }
 
@@ -30,7 +30,7 @@ page.on('console', (msg) => {
       rounds++
       const scoreMatch = text.match(/score: ([\d.]+)/)
       if (scoreMatch) {
-        interestScores.push(parseFloat(scoreMatch[1]))
+        interestScores.push(Number.parseFloat(scoreMatch[1]))
       }
     }
     console.log(text)
@@ -43,11 +43,11 @@ page.on('console', (msg) => {
     )
     if (match) {
       roundSummaries.push({
-        round: parseInt(match[1]),
-        avg: parseFloat(match[2]),
-        p50: parseFloat(match[3]),
-        p90: parseFloat(match[4]),
-        p99: parseFloat(match[5]),
+        round: Number.parseInt(match[1]),
+        avg: Number.parseFloat(match[2]),
+        p50: Number.parseFloat(match[3]),
+        p90: Number.parseFloat(match[4]),
+        p99: Number.parseFloat(match[5]),
       })
     }
   }
@@ -83,13 +83,15 @@ console.log('[Benchmark] Waiting for data mode to initialize...')
 await new Promise((resolve) => setTimeout(resolve, 3000))
 
 // Let it run for 15 seconds to collect detailed breakdown
-console.log('[Benchmark] Running for 15 seconds to collect performance data...\n')
+console.log(
+  '[Benchmark] Running for 15 seconds to collect performance data...\n',
+)
 await new Promise((resolve) => setTimeout(resolve, 15000))
 
 console.log('\n[Benchmark] Stopping benchmark...')
 
 // Print comprehensive analysis
-console.log('\n' + '='.repeat(80))
+console.log(`\n${'='.repeat(80)}`)
 console.log('DATA MODE PERFORMANCE BENCHMARK - POST PHASE 2 OPTIMIZATIONS')
 console.log('='.repeat(80))
 
@@ -112,7 +114,8 @@ if (stepTimes.length > 0) {
 }
 
 if (interestScores.length > 0) {
-  const avgInterest = interestScores.reduce((a, b) => a + b, 0) / interestScores.length
+  const avgInterest =
+    interestScores.reduce((a, b) => a + b, 0) / interestScores.length
   const minInterest = Math.min(...interestScores)
   const maxInterest = Math.max(...interestScores)
 
@@ -139,14 +142,18 @@ if (roundSummaries.length > 0) {
       steadyStateRounds.reduce((sum, r) => sum + r.p50, 0) /
       steadyStateRounds.length
     const steadyStateSPS = 1000 / avgMedian
-    console.log(`\n  Steady-state median: ${avgMedian.toFixed(1)}ms → ${steadyStateSPS.toFixed(0)} SPS`)
+    console.log(
+      `\n  Steady-state median: ${avgMedian.toFixed(1)}ms → ${steadyStateSPS.toFixed(0)} SPS`,
+    )
   }
 }
 
 console.log('\n📊 Optimization Progress:')
 console.log('  Baseline (pre-optimization):     ~20ms/step → 50 SPS')
 console.log('  Phase 1 (sampling):              ~12ms/step → 83 SPS')
-console.log('  Phase 1+2 (sparse entropy):      ~7-8ms/step → 125-140 SPS (expected)')
+console.log(
+  '  Phase 1+2 (sparse entropy):      ~7-8ms/step → 125-140 SPS (expected)',
+)
 if (roundSummaries.length > 1) {
   const steadyStateRounds = roundSummaries.slice(1)
   const avgMedian =
@@ -167,7 +174,9 @@ if (stepTimes.length > 0) {
   if (actualSPS < 100) {
     console.log('  ⚠️  Performance below target - investigate further')
   } else if (actualSPS < 150) {
-    console.log('  ✅ Good performance - consider if further optimization needed')
+    console.log(
+      '  ✅ Good performance - consider if further optimization needed',
+    )
     console.log('  → Profile CA computation vs statistics breakdown')
     console.log('  → WebGPU if 200+ SPS target required')
   } else {
@@ -177,6 +186,6 @@ if (stepTimes.length > 0) {
   }
 }
 
-console.log('\n' + '='.repeat(80) + '\n')
+console.log(`\n${'='.repeat(80)}\n`)
 
 await browser.close()
