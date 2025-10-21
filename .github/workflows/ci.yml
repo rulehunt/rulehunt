@@ -23,10 +23,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --ignore-scripts
+
+      - name: Generate build info
+        run: node scripts/generate-build-info.cjs
 
       - name: Type check
         run: pnpm run check
