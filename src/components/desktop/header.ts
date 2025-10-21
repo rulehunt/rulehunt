@@ -1,6 +1,5 @@
 // src/components/header.ts
 
-import type { CleanupFunction } from '../../types'
 import type { ThemeToggleElements } from './theme'
 
 export interface HeaderElements {

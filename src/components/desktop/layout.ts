@@ -25,7 +25,8 @@ import { generateSimulationMetricsHTML } from '../shared/simulationInfo.ts'
 import { generateStatsHTML, getInterestColorClass } from '../shared/stats.ts'
 import { setupBenchmarkModal } from './benchmark.ts'
 import { setupDataModeLayout } from './dataMode.ts'
-import { createHeader, setupTheme } from './header.ts'
+import { createHeader } from './header.ts'
+import { setupTheme } from './theme.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import {
   type PatternInspectorData,
