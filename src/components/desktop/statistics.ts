@@ -14,6 +14,11 @@ import {
   Tooltip,
 } from 'chart.js'
 import type { StatisticsData } from '../../schema'
+import {
+  type StatsChartElements,
+  createStatsChartModal,
+  showStatsChart,
+} from '../shared/statsChart'
 
 // Register Chart.js components
 Chart.register(
@@ -53,6 +58,7 @@ export interface StatisticsPanelElements {
   populationCanvas: HTMLCanvasElement
   activityCanvas: HTMLCanvasElement
   entropyCanvas: HTMLCanvasElement
+  chartModal?: StatsChartElements
 }
 
 export function createStatisticsPanel(): {
@@ -142,6 +148,7 @@ export function createStatisticsPanel(): {
     ) as HTMLCanvasElement,
     activityCanvas: root.querySelector('#activity-chart') as HTMLCanvasElement,
     entropyCanvas: root.querySelector('#entropy-chart') as HTMLCanvasElement,
+    chartModal: createStatsChartModal(),
   }
 
   return { root, elements }
@@ -173,46 +180,60 @@ export function renderStatistics(
   }
 
   // Render summary cards - Automata stats first, then engagement stats
+  // Add data-metric attribute and cursor-pointer for clickable cards
   elements.summaryCards.innerHTML = `
     <!-- Automata Statistics -->
-    <div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-lg border border-violet-200 dark:border-violet-800">
+    <div data-metric="total_runs" class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-lg border border-violet-200 dark:border-violet-800 cursor-pointer hover:shadow-lg transition-shadow">
       <div class="text-sm text-violet-600 dark:text-violet-400 font-medium">Total Runs</div>
       <div class="text-2xl font-bold text-violet-900 dark:text-violet-100">${data.total_runs.toLocaleString()}</div>
     </div>
-    <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+    <div data-metric="total_steps" class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800 cursor-pointer hover:shadow-lg transition-shadow">
       <div class="text-sm text-blue-600 dark:text-blue-400 font-medium">Total Steps</div>
       <div class="text-2xl font-bold text-blue-900 dark:text-blue-100">${data.total_steps.toLocaleString()}</div>
     </div>
-    <div class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+    <div data-metric="total_processing_power" class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800 cursor-pointer hover:shadow-lg transition-shadow">
       <div class="text-sm text-purple-600 dark:text-purple-400 font-medium">Processing Power</div>
       <div class="text-2xl font-bold text-purple-900 dark:text-purple-100">${formatLargeNumber(data.total_processing_power)} cells</div>
     </div>
-    <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
+    <div data-metric="total_starred" class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800 cursor-pointer hover:shadow-lg transition-shadow">
       <div class="text-sm text-yellow-600 dark:text-yellow-400 font-medium">Starred</div>
       <div class="text-2xl font-bold text-yellow-900 dark:text-yellow-100">${data.total_starred.toLocaleString()}</div>
     </div>
-    <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
+    <div data-metric="unique_rulesets" class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800 cursor-pointer hover:shadow-lg transition-shadow">
       <div class="text-sm text-green-600 dark:text-green-400 font-medium">Unique Rulesets</div>
       <div class="text-2xl font-bold text-green-900 dark:text-green-100">${data.unique_rulesets.toLocaleString()}</div>
     </div>
     <!-- User Engagement Statistics -->
-    <div class="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg border border-indigo-200 dark:border-indigo-800">
+    <div data-metric="unique_users" class="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg border border-indigo-200 dark:border-indigo-800 cursor-pointer hover:shadow-lg transition-shadow">
       <div class="text-sm text-indigo-600 dark:text-indigo-400 font-medium">Unique Users</div>
       <div class="text-2xl font-bold text-indigo-900 dark:text-indigo-100">${data.unique_users.toLocaleString()}</div>
     </div>
-    <div class="bg-cyan-50 dark:bg-cyan-900/20 p-4 rounded-lg border border-cyan-200 dark:border-cyan-800">
+    <div class="bg-cyan-50 dark:bg-cyan-900/20 p-4 rounded-lg border border-cyan-200 dark:border-cyan-800 opacity-60">
       <div class="text-sm text-cyan-600 dark:text-cyan-400 font-medium">Avg Runs/User</div>
       <div class="text-2xl font-bold text-cyan-900 dark:text-cyan-100">${data.avg_runs_per_user.toFixed(1)}</div>
     </div>
-    <div class="bg-pink-50 dark:bg-pink-900/20 p-4 rounded-lg border border-pink-200 dark:border-pink-800">
+    <div data-metric="active_users_24h" class="bg-pink-50 dark:bg-pink-900/20 p-4 rounded-lg border border-pink-200 dark:border-pink-800 cursor-pointer hover:shadow-lg transition-shadow">
       <div class="text-sm text-pink-600 dark:text-pink-400 font-medium">Active (24h)</div>
       <div class="text-2xl font-bold text-pink-900 dark:text-pink-100">${data.active_users_24h.toLocaleString()}</div>
     </div>
-    <div class="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
+    <div data-metric="active_users_7d" class="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg border border-orange-200 dark:border-orange-800 cursor-pointer hover:shadow-lg transition-shadow">
       <div class="text-sm text-orange-600 dark:text-orange-400 font-medium">Active (7d)</div>
       <div class="text-2xl font-bold text-orange-900 dark:text-orange-100">${data.active_users_7d.toLocaleString()}</div>
     </div>
   `
+
+  // Add click handlers to stat cards
+  const statCards = elements.summaryCards.querySelectorAll('[data-metric]')
+  for (const card of statCards) {
+    card.addEventListener('click', () => {
+      const metric = card.getAttribute('data-metric')
+      const label =
+        card.querySelector('.font-medium')?.textContent || metric || ''
+      if (metric && elements.chartModal) {
+        showStatsChart(elements.chartModal, metric, label)
+      }
+    })
+  }
 
   // Common chart options (for bar charts)
   const commonOptions: Partial<ChartOptions> = {
