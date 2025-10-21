@@ -2,6 +2,7 @@
 import type { D1Database, EventContext } from '@cloudflare/workers-types'
 import { z } from 'zod'
 import { LeaderboardResponse } from '../../src/schema'
+import { handleApiError, jsonResponse } from '../utils/api-helpers'
 
 // --- Supported sort fields --------------------------------------------------
 const SORT_FIELDS = {
@@ -15,12 +16,6 @@ type SortMode = keyof typeof SORT_FIELDS
 export const onRequestGet = async (
   ctx: EventContext<{ DB: D1Database }, string, Record<string, unknown>>,
 ): Promise<Response> => {
-  const json = (data: unknown, status = 200) =>
-    new Response(JSON.stringify(data, null, 2), {
-      status,
-      headers: { 'Content-Type': 'application/json' },
-    })
-
   try {
     // --- Parse and validate query params -----------------------------------
     const url = new URL(ctx.request.url)
@@ -28,7 +23,10 @@ export const onRequestGet = async (
     const limit = Number(url.searchParams.get('limit')) || 10
 
     if (limit < 1 || limit > 100)
-      return json({ ok: false, error: 'Limit must be between 1 and 100' }, 400)
+      return jsonResponse(
+        { ok: false, error: 'Limit must be between 1 and 100' },
+        400,
+      )
 
     const sortField = SORT_FIELDS[sortParam] ?? SORT_FIELDS.longest
 
@@ -91,22 +89,8 @@ export const onRequestGet = async (
       results,
     })
 
-    return json(validated)
+    return jsonResponse(validated)
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.error('Leaderboard validation error:', error.issues)
-      return json(
-        { ok: false, error: 'Invalid data format', details: error.issues },
-        500,
-      )
-    }
-
-    if (error instanceof Error && /D1|SQL|prepare|bind/i.test(error.message)) {
-      console.error('Database error fetching leaderboard:', error)
-      return json({ ok: false, error: 'Database query failed' }, 500)
-    }
-
-    console.error('Unexpected error in leaderboard:', error)
-    return json({ ok: false, error: 'Internal server error' }, 500)
+    return handleApiError(error, 'leaderboard')
   }
 }

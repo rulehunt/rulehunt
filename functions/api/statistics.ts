@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import type { D1Database, EventContext } from '@cloudflare/workers-types'
 import { z } from 'zod'
+import { handleApiError, jsonResponse } from '../utils/api-helpers'
 
 // --- Statistics Response Schema ---------------------------------------------
 const StatisticsResponse = z.object({
@@ -41,12 +42,6 @@ const StatisticsResponse = z.object({
 export const onRequestGet = async (
   ctx: EventContext<{ DB: D1Database }, string, Record<string, unknown>>,
 ): Promise<Response> => {
-  const json = (data: unknown, status = 200) =>
-    new Response(JSON.stringify(data, null, 2), {
-      status,
-      headers: { 'Content-Type': 'application/json' },
-    })
-
   try {
     // --- Fetch all runs for statistics computation -------------------------
     const query = `
@@ -85,7 +80,7 @@ export const onRequestGet = async (
     const totalRuns = runs.length
 
     if (totalRuns === 0) {
-      return json({
+      return jsonResponse({
         ok: true,
         stats: {
           total_runs: 0,
@@ -282,22 +277,8 @@ export const onRequestGet = async (
 
     // Validate response
     const validated = StatisticsResponse.parse(response)
-    return json(validated)
+    return jsonResponse(validated)
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.error('Statistics validation error:', error.issues)
-      return json(
-        { ok: false, error: 'Invalid data format', details: error.issues },
-        500,
-      )
-    }
-
-    if (error instanceof Error && /D1|SQL|prepare|bind/i.test(error.message)) {
-      console.error('Database error fetching statistics:', error)
-      return json({ ok: false, error: 'Database query failed' }, 500)
-    }
-
-    console.error('Unexpected error in statistics:', error)
-    return json({ ok: false, error: 'Internal server error' }, 500)
+    return handleApiError(error, 'statistics')
   }
 }
