@@ -1184,14 +1184,19 @@ export async function setupMobileLayout(
     className: 'flex flex-row-reverse space-x-reverse space-x-2',
   })
 
+  // Closure variable to store hash for the currently visible rule
+  // Using a closure variable instead of per-object storage because rule objects
+  // are discarded after being swapped out (not reused in the dual-canvas architecture)
+  let currentlyVisibleRuleHash: string | undefined = undefined
+
   let shareBtn = createShareButton(
     resetControlFade,
-    () => (onScreenRule as any).runHash,
+    () => currentlyVisibleRuleHash,
   )
   let statsBtn = createStatsButton(
     () => showStats(getCurrentRunData()),
     resetControlFade,
-    () => (onScreenRule as any).runHash,
+    () => currentlyVisibleRuleHash,
   )
   let starBtn = createStarButton({
     getIsStarred: () => currentIsStarred,
@@ -1228,8 +1233,8 @@ export async function setupMobileLayout(
         setTimeout(() => instruction.remove(), 300)
       }
 
-      // Capture reference to the rule being saved before swapping
-      const previousRule = onScreenRule
+      // Capture previous rule's hex for comparison (to prevent setting hash on wrong rule)
+      const previousRuleHex = onScreenRule.hex
 
       // Save statistics for the rule that was just viewed
       saveRunStatistics(
@@ -1238,9 +1243,16 @@ export async function setupMobileLayout(
         onScreenRule.hex,
         currentIsStarred,
       ).then((hash) => {
-        // Store hash on the previous rule (for potential sharing later)
-        if (hash) {
-          ;(previousRule as any).runHash = hash
+        // Only set hash if this rule is still visible (user hasn't swiped again)
+        if (hash && previousRuleHex === onScreenRule.hex) {
+          currentlyVisibleRuleHash = hash
+          console.log(
+            `[tracking] Hash stored for rule ${onScreenRule.name}: ${hash}`,
+          )
+        } else if (hash) {
+          console.log(
+            `[tracking] Hash received for ${previousRuleHex.slice(0, 8)}... but rule no longer visible (current: ${onScreenRule.hex.slice(0, 8)}...)`,
+          )
         }
       })
 
@@ -1252,8 +1264,11 @@ export async function setupMobileLayout(
       ;[onScreenCA, offScreenCA] = [offScreenCA, onScreenCA]
       ;[onScreenRule, offScreenRule] = [offScreenRule, onScreenRule]
 
-      // Clear hash on newly visible rule (will be set when this rule is swiped away)
-      ;(onScreenRule as any).runHash = undefined
+      // Clear hash for newly visible rule (will be set when save completes)
+      currentlyVisibleRuleHash = undefined
+      console.log(
+        `[tracking] Hash cleared for newly visible rule: ${onScreenRule.name}`,
+      )
 
       // Update z-index and positioning explicitly
       const h = onScreenCanvas.height
@@ -1305,12 +1320,12 @@ export async function setupMobileLayout(
 
       shareBtn = createShareButton(
         resetControlFade,
-        () => (onScreenRule as any).runHash,
+        () => currentlyVisibleRuleHash,
       )
       statsBtn = createStatsButton(
         () => showStats(getCurrentRunData()),
         resetControlFade,
-        () => (onScreenRule as any).runHash,
+        () => currentlyVisibleRuleHash,
       )
       starBtn = createStarButton({
         getIsStarred: () => currentIsStarred,
