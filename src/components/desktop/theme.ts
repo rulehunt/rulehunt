@@ -68,24 +68,34 @@ export function setupTheme(
     onThemeChange?.()
   }
 
-  elements.light.addEventListener('click', () => setTheme('light'))
-  elements.dark.addEventListener('click', () => setTheme('dark'))
-  elements.system.addEventListener('click', () => setTheme('system'))
+  const lightHandler = () => setTheme('light')
+  const darkHandler = () => setTheme('dark')
+  const systemHandler = () => setTheme('system')
+
+  elements.light.addEventListener('click', lightHandler)
+  elements.dark.addEventListener('click', darkHandler)
+  elements.system.addEventListener('click', systemHandler)
 
   // Initialize theme
   const savedTheme = localStorage.getItem('theme') as Theme | null
   setTheme(savedTheme || 'system')
 
   // Listen for system theme changes
-  window
-    .matchMedia('(prefers-color-scheme: dark)')
-    .addEventListener('change', () => {
-      if (localStorage.getItem('theme') === 'system') {
-        setTheme('system')
-      }
-    })
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  const mediaQueryHandler = () => {
+    if (localStorage.getItem('theme') === 'system') {
+      setTheme('system')
+    }
+  }
+  mediaQuery.addEventListener('change', mediaQueryHandler)
 
-  return { setTheme }
+  // Return cleanup function
+  return () => {
+    elements.light.removeEventListener('click', lightHandler)
+    elements.dark.removeEventListener('click', darkHandler)
+    elements.system.removeEventListener('click', systemHandler)
+    mediaQuery.removeEventListener('change', mediaQueryHandler)
+  }
 }
 
 /** Apply the stored theme (without requiring UI elements). */

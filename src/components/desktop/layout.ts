@@ -26,7 +26,6 @@ import { generateStatsHTML, getInterestColorClass } from '../shared/stats.ts'
 import { setupBenchmarkModal } from './benchmark.ts'
 import { setupDataModeLayout } from './dataMode.ts'
 import { createHeader } from './header.ts'
-import { setupTheme } from './theme.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import {
   type PatternInspectorData,
@@ -39,6 +38,7 @@ import { createStatisticsPanel, renderStatistics } from './statistics.ts'
 import { createStatsBar } from './statsBar.ts'
 import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
 import { type TabId, createTabContainer } from './tabContainer.ts'
+import { setupTheme } from './theme.ts'
 import { createZoomSlider } from './zoomSlider.ts'
 
 const PROGRESS_BAR_STEPS = 500
