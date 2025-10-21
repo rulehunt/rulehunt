@@ -8,8 +8,3 @@
 -- ========================================================================
 
 ALTER TABLE runs ADD COLUMN stats_view_count INTEGER NOT NULL DEFAULT 0;
-
--- ========================================================================
--- Index for efficient queries of most viewed run stats
--- ========================================================================
-CREATE INDEX idx_runs_stats_view_count ON runs(stats_view_count DESC);

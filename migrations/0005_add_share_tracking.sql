@@ -8,8 +8,3 @@
 -- ========================================================================
 
 ALTER TABLE runs ADD COLUMN share_count INTEGER NOT NULL DEFAULT 0;
-
--- ========================================================================
--- Index for efficient queries of most shared runs
--- ========================================================================
-CREATE INDEX idx_runs_share_count ON runs(share_count DESC);

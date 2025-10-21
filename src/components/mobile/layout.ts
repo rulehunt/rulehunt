@@ -1172,9 +1172,6 @@ export async function setupMobileLayout(
   // Track starred status (resets to false after each swipe)
   let currentIsStarred = false
 
-  // Track last run hash for share tracking
-  let lastRunHash: string | undefined = undefined
-
   // Create control buttons with auto-fade container
   const {
     container: controlContainer,
@@ -1187,11 +1184,14 @@ export async function setupMobileLayout(
     className: 'flex flex-row-reverse space-x-reverse space-x-2',
   })
 
-  let shareBtn = createShareButton(resetControlFade, () => lastRunHash)
+  let shareBtn = createShareButton(
+    resetControlFade,
+    () => (onScreenRule as any).runHash,
+  )
   let statsBtn = createStatsButton(
     () => showStats(getCurrentRunData()),
     resetControlFade,
-    () => lastRunHash,
+    () => (onScreenRule as any).runHash,
   )
   let starBtn = createStarButton({
     getIsStarred: () => currentIsStarred,
@@ -1227,13 +1227,21 @@ export async function setupMobileLayout(
         instruction.style.opacity = '0'
         setTimeout(() => instruction.remove(), 300)
       }
+
+      // Capture reference to the rule being saved before swapping
+      const previousRule = onScreenRule
+
+      // Save statistics for the rule that was just viewed
       saveRunStatistics(
         onScreenCA,
         onScreenRule.name,
         onScreenRule.hex,
         currentIsStarred,
       ).then((hash) => {
-        lastRunHash = hash
+        // Store hash on the previous rule (for potential sharing later)
+        if (hash) {
+          ;(previousRule as any).runHash = hash
+        }
       })
 
       // Reset starred status for next simulation
@@ -1243,6 +1251,9 @@ export async function setupMobileLayout(
       ;[onScreenCanvas, offScreenCanvas] = [offScreenCanvas, onScreenCanvas]
       ;[onScreenCA, offScreenCA] = [offScreenCA, onScreenCA]
       ;[onScreenRule, offScreenRule] = [offScreenRule, onScreenRule]
+
+      // Clear hash on newly visible rule (will be set when this rule is swiped away)
+      ;(onScreenRule as any).runHash = undefined
 
       // Update z-index and positioning explicitly
       const h = onScreenCanvas.height
@@ -1292,11 +1303,14 @@ export async function setupMobileLayout(
       starBtn.cleanup()
       statsBtn.cleanup()
 
-      shareBtn = createShareButton(resetControlFade, () => lastRunHash)
+      shareBtn = createShareButton(
+        resetControlFade,
+        () => (onScreenRule as any).runHash,
+      )
       statsBtn = createStatsButton(
         () => showStats(getCurrentRunData()),
         resetControlFade,
-        () => lastRunHash,
+        () => (onScreenRule as any).runHash,
       )
       starBtn = createStarButton({
         getIsStarred: () => currentIsStarred,
