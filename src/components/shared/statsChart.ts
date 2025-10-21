@@ -47,20 +47,20 @@ export function createStatsChartModal(): StatsChartElements {
   overlay.style.display = 'none'
 
   overlay.innerHTML = `
-    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div role="dialog" aria-labelledby="chart-title" aria-modal="true" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <!-- Header -->
       <div class="flex justify-between items-center mb-6">
         <h2 id="chart-title" class="text-2xl font-bold text-gray-900 dark:text-white">
           Loading...
         </h2>
-        <button id="chart-close" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl font-bold">
+        <button id="chart-close" aria-label="Close chart" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl font-bold">
           ×
         </button>
       </div>
 
       <!-- Chart Container -->
       <div style="height: 400px; position: relative;">
-        <canvas id="history-chart"></canvas>
+        <canvas id="history-chart" aria-label="Stats history chart"></canvas>
       </div>
     </div>
   `
@@ -120,6 +120,12 @@ export async function showStatsChart(
     const response = await fetch(
       `/api/stats-history?metric=${metric}&days=${days}`,
     )
+
+    // Check HTTP status before parsing JSON
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
     const result: StatsHistoryResponse = await response.json()
 
     if (!result.ok || !result.data) {

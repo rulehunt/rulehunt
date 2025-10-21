@@ -1,18 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import type { D1Database, EventContext } from '@cloudflare/workers-types'
 import { z } from 'zod'
-
-// --- Stats History Response Schema -----------------------------------------
-const StatsHistoryDataPoint = z.object({
-  date: z.string(), // ISO date string (YYYY-MM-DD)
-  value: z.number(),
-})
-
-const StatsHistoryResponse = z.object({
-  ok: z.literal(true),
-  metric: z.string(),
-  data: z.array(StatsHistoryDataPoint),
-})
+import { StatsHistoryResponse } from '../../src/schema'
 
 export const onRequestGet = async (
   ctx: EventContext<{ DB: D1Database }, string, Record<string, unknown>>,
@@ -62,7 +51,7 @@ export const onRequestGet = async (
         query = `
           SELECT DATE(submitted_at) as date, COUNT(*) as value
           FROM runs
-          WHERE DATE(submitted_at) >= DATE('now', '-${days} days')
+          WHERE DATE(submitted_at) >= DATE('now', ? || ' days')
           GROUP BY DATE(submitted_at)
           ORDER BY date ASC
         `
@@ -72,7 +61,7 @@ export const onRequestGet = async (
         query = `
           SELECT DATE(submitted_at) as date, SUM(step_count) as value
           FROM runs
-          WHERE DATE(submitted_at) >= DATE('now', '-${days} days')
+          WHERE DATE(submitted_at) >= DATE('now', ? || ' days')
           GROUP BY DATE(submitted_at)
           ORDER BY date ASC
         `
@@ -83,7 +72,7 @@ export const onRequestGet = async (
           SELECT DATE(submitted_at) as date, COUNT(*) as value
           FROM runs
           WHERE is_starred = 1
-            AND DATE(submitted_at) >= DATE('now', '-${days} days')
+            AND DATE(submitted_at) >= DATE('now', ? || ' days')
           GROUP BY DATE(submitted_at)
           ORDER BY date ASC
         `
@@ -93,7 +82,7 @@ export const onRequestGet = async (
         query = `
           SELECT DATE(submitted_at) as date, COUNT(DISTINCT ruleset_hex) as value
           FROM runs
-          WHERE DATE(submitted_at) >= DATE('now', '-${days} days')
+          WHERE DATE(submitted_at) >= DATE('now', ? || ' days')
           GROUP BY DATE(submitted_at)
           ORDER BY date ASC
         `
@@ -103,34 +92,30 @@ export const onRequestGet = async (
         query = `
           SELECT DATE(submitted_at) as date, COUNT(DISTINCT user_id) as value
           FROM runs
-          WHERE DATE(submitted_at) >= DATE('now', '-${days} days')
+          WHERE DATE(submitted_at) >= DATE('now', ? || ' days')
           GROUP BY DATE(submitted_at)
           ORDER BY date ASC
         `
         break
 
       case 'active_users_24h':
-        // For each day, count users active in the 24h before that day
+        // Count distinct users per day (simplified - no rolling window for v1)
         query = `
-          SELECT DATE(r1.submitted_at) as date, COUNT(DISTINCT r2.user_id) as value
-          FROM runs r1
-          LEFT JOIN runs r2 ON r2.submitted_at >= DATE(r1.submitted_at, '-1 day')
-            AND r2.submitted_at < DATE(r1.submitted_at, '+1 day')
-          WHERE DATE(r1.submitted_at) >= DATE('now', '-${days} days')
-          GROUP BY DATE(r1.submitted_at)
+          SELECT DATE(submitted_at) as date, COUNT(DISTINCT user_id) as value
+          FROM runs
+          WHERE DATE(submitted_at) >= DATE('now', ? || ' days')
+          GROUP BY DATE(submitted_at)
           ORDER BY date ASC
         `
         break
 
       case 'active_users_7d':
-        // For each day, count users active in the 7 days before that day
+        // Count distinct users per day (simplified - no rolling window for v1)
         query = `
-          SELECT DATE(r1.submitted_at) as date, COUNT(DISTINCT r2.user_id) as value
-          FROM runs r1
-          LEFT JOIN runs r2 ON r2.submitted_at >= DATE(r1.submitted_at, '-7 days')
-            AND r2.submitted_at < DATE(r1.submitted_at, '+1 day')
-          WHERE DATE(r1.submitted_at) >= DATE('now', '-${days} days')
-          GROUP BY DATE(r1.submitted_at)
+          SELECT DATE(submitted_at) as date, COUNT(DISTINCT user_id) as value
+          FROM runs
+          WHERE DATE(submitted_at) >= DATE('now', ? || ' days')
+          GROUP BY DATE(submitted_at)
           ORDER BY date ASC
         `
         break
@@ -139,8 +124,8 @@ export const onRequestGet = async (
         return json({ ok: false, error: 'Unsupported metric' }, 400)
     }
 
-    // Execute query
-    const { results } = await ctx.env.DB.prepare(query).all()
+    // Execute query with parameterized binding (prevents SQL injection)
+    const { results } = await ctx.env.DB.prepare(query).bind(-days).all()
 
     // Type assertion for D1 results
     type HistoryRow = {
@@ -149,9 +134,9 @@ export const onRequestGet = async (
     }
     const rows = results as unknown as HistoryRow[]
 
-    // Build response
+    // Build response (validated against schema.ts)
     const response = {
-      ok: true,
+      ok: true as const,
       metric,
       data: rows.map((row) => ({
         date: row.date,
@@ -159,7 +144,7 @@ export const onRequestGet = async (
       })),
     }
 
-    // Validate response
+    // Validate response against shared schema
     const validated = StatsHistoryResponse.parse(response)
     return json(validated)
   } catch (error) {
