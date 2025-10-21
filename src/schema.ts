@@ -189,6 +189,8 @@ export const RunRecord = z
     runId: z.string().optional(),
     submittedAt: ISODateString.optional(),
     isStarred: z.boolean().optional().default(false),
+    shareCount: z.number().int().nonnegative().optional().default(0),
+    statsViewCount: z.number().int().nonnegative().optional().default(0),
     ...UserIdentity.shape,
     ...SimulationInfo.shape,
     ...Scores.shape,
@@ -200,6 +202,8 @@ export const RunRecord = z
 export const RunSubmission = RunRecord.omit({
   runId: true,
   submittedAt: true,
+  shareCount: true,
+  statsViewCount: true,
 }).extend({
   // Make isStarred explicitly optional in submissions (defaults to false if omitted)
   isStarred: z.boolean().optional(),
@@ -233,6 +237,8 @@ export const LeaderboardEntry = z.object({
   watched_wall_ms: z.number().int().nonnegative(),
   interest_score: z.number().nonnegative(),
   entropy4x4: z.number().nonnegative(),
+  share_count: z.number().int().nonnegative().optional(),
+  stats_view_count: z.number().int().nonnegative().optional(),
   submitted_at: z.string().datetime(),
 })
 
@@ -279,6 +285,8 @@ export const WolframClassification = z.object({
 export const StatisticsData = z.object({
   total_runs: z.number().int().nonnegative(),
   total_steps: z.number().int().nonnegative(),
+  /** Total cells computed across all runs (sum of steps × grid_size) */
+  total_processing_power: z.number().nonnegative(),
   total_starred: z.number().int().nonnegative(),
   unique_rulesets: z.number().int().nonnegative(),
   unique_users: z.number().int().nonnegative(),

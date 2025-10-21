@@ -1,5 +1,6 @@
 // src/components/dataMode.ts
 
+import type { CleanupFunction } from '../../types'
 import type { DataModeState } from '../../dataRunner'
 import { runDataLoop } from '../../dataRunner'
 import {
@@ -12,8 +13,6 @@ import type { C4OrbitsData } from '../../schema'
 import { buildOrbitLookup } from '../../utils'
 import { createHeader, setupTheme } from './header'
 import { createProgressBar } from './progressBar'
-
-export type CleanupFunction = () => void
 
 export async function setupDataModeLayout(
   appRoot: HTMLDivElement,

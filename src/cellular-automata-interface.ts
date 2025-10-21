@@ -52,4 +52,5 @@ export type CellularAutomataOptions = {
   gridCols: number
   fgColor: string
   bgColor: string
+  onDiedOut?: () => void // Callback when simulation dies out
 }

@@ -1,5 +1,7 @@
 // src/components/mobile.ts
 import { formatRulesetName, saveRun } from '../../api/save'
+import { trackShare } from '../../api/share'
+import { trackStatsView } from '../../api/stats-view'
 import { createCellularAutomata } from '../../cellular-automata-factory.ts'
 import type { ICellularAutomata } from '../../cellular-automata-interface.ts'
 import { getUserIdentity } from '../../identity.ts'
@@ -27,9 +29,11 @@ import {
   updateURLWithoutReload,
 } from '../../urlState.ts'
 import { hexToC4Ruleset } from '../../utils.ts'
+import { AudioEngine } from '../audioEngine.ts'
 import { createAutoFadeContainer } from './buttonContainer.ts'
 import { createMobileHeader, setupMobileHeader } from './header.ts'
 import { createRoundButton } from './roundButton.ts'
+import { createSoundToggle } from './soundToggle.ts'
 import { createStarButton } from './starButton.ts'
 
 // --- Constants --------------------------------------------------------------
@@ -73,7 +77,7 @@ const DARK_FG_COLORS = [
 
 // --- Types ------------------------------------------------------------------
 
-export type CleanupFunction = () => void
+import type { CleanupFunction } from '../../types'
 
 // Runtime rule container used only on mobile.ts.
 // Combines a C4 or expanded ruleset plus optional cached expansion.
@@ -93,12 +97,14 @@ function createCA(
   gridCols: number,
   fgColor: string,
   bgColor: string,
+  onDiedOut?: () => void,
 ): ICellularAutomata {
   return createCellularAutomata(canvas, {
     gridRows,
     gridCols,
     fgColor,
     bgColor,
+    onDiedOut,
     // Use default threshold (250K cells = 500x500)
     // Mobile targets ~600K cells, so will use GPU on most devices
   })
@@ -711,7 +717,7 @@ function saveRunStatistics(
   ruleName: string,
   ruleHex: string,
   isStarred = false,
-): void {
+): Promise<string | undefined> {
   const stats = cellularAutomata.getStatistics()
   const metadata = stats.getMetadata()
   const recent = stats.getRecentStats(1)[0] ?? {
@@ -764,13 +770,25 @@ function saveRunStatistics(
   }
 
   // --- Fire and forget background save ---
-  setTimeout(() => saveRun(payload))
+  return new Promise<string | undefined>((resolve) => {
+    setTimeout(async () => {
+      const result = await saveRun(payload)
+      resolve(result.ok ? result.runHash : undefined)
+    })
+  })
 }
 
 // --- Stats Button -----------------------------------------------------------
 function createStatsButton(
   onShowStats: () => void,
   onResetFade?: () => void,
+  getRunData?: () => {
+    ca: ICellularAutomata
+    rule: RuleData
+    isStarred: boolean
+  },
+  getLastRunHash?: () => string | undefined,
+  setLastRunHash?: (hash: string | undefined) => void,
 ): { button: HTMLButtonElement; cleanup: () => void } {
   const { button, cleanup } = createRoundButton(
     {
@@ -780,9 +798,30 @@ function createStatsButton(
           <path d="M3 13h2v8H3v-8zm4-4h2v12H7V9zm4-4h2v16h-2V5zm4 2h2v14h-2V7z"/>
         </svg>`,
       title: 'View statistics',
-      onClick: () => {
+      onClick: async () => {
         onShowStats()
         onResetFade?.()
+
+        // Get or create run hash
+        let runHash = getLastRunHash?.()
+
+        if (!runHash && getRunData && setLastRunHash) {
+          // First stats view of this rule - save it now
+          const { ca, rule, isStarred } = getRunData()
+          runHash = await saveRunStatistics(ca, rule.name, rule.hex, isStarred)
+
+          if (runHash) {
+            setLastRunHash(runHash)
+            console.log(
+              `[tracking] Saved and stored hash for ${rule.name}: ${runHash}`,
+            )
+          }
+        }
+
+        // Track the stats view
+        if (runHash) {
+          trackStatsView(runHash)
+        }
       },
       preventTransition: true,
     },
@@ -796,7 +835,12 @@ function createStatsButton(
 function createSoftResetButton(
   onSoftReset: () => void,
   onResetFade?: () => void,
-): { button: HTMLButtonElement; cleanup: () => void } {
+): {
+  button: HTMLButtonElement
+  cleanup: () => void
+  startPulse: () => void
+  stopPulse: () => void
+} {
   const { button, cleanup: cleanupButton } = createRoundButton(
     {
       icon: `
@@ -809,16 +853,38 @@ function createSoftResetButton(
         if (isTransitioning) return
         onSoftReset()
         onResetFade?.()
+        stopPulse() // Stop pulse when user resets
       },
     },
     () => isTransitioning,
   )
 
-  return { button, cleanup: cleanupButton }
+  const startPulse = () => {
+    button.classList.add('animate-pulse')
+    button.style.borderColor = '#f97316' // Orange border
+    button.style.borderWidth = '2px'
+  }
+
+  const stopPulse = () => {
+    button.classList.remove('animate-pulse')
+    button.style.borderColor = ''
+    button.style.borderWidth = ''
+  }
+
+  return { button, cleanup: cleanupButton, startPulse, stopPulse }
 }
 
 // --- Share Button (copy shareable link to clipboard) -----------------------
-function createShareButton(onResetFade?: () => void): {
+function createShareButton(
+  onResetFade?: () => void,
+  getRunData?: () => {
+    ca: ICellularAutomata
+    rule: RuleData
+    isStarred: boolean
+  },
+  getLastRunHash?: () => string | undefined,
+  setLastRunHash?: (hash: string | undefined) => void,
+): {
   button: HTMLButtonElement
   cleanup: () => void
 } {
@@ -849,6 +915,32 @@ function createShareButton(onResetFade?: () => void): {
         try {
           await navigator.clipboard.writeText(shareURL)
           console.log('[share] Copied link to clipboard:', shareURL)
+
+          // Get or create run hash
+          let runHash = getLastRunHash?.()
+
+          if (!runHash && getRunData && setLastRunHash) {
+            // First share of this rule - save it now
+            const { ca, rule, isStarred } = getRunData()
+            runHash = await saveRunStatistics(
+              ca,
+              rule.name,
+              rule.hex,
+              isStarred,
+            )
+
+            if (runHash) {
+              setLastRunHash(runHash)
+              console.log(
+                `[tracking] Saved and stored hash for ${rule.name}: ${runHash}`,
+              )
+            }
+          }
+
+          // Track the share
+          if (runHash) {
+            trackShare(runHash)
+          }
 
           // Visual feedback - briefly change the button appearance
           button.innerHTML = checkIcon
@@ -893,6 +985,37 @@ export async function setupMobileLayout(
   const { cleanup: cleanupHeader, resetFade: resetHeaderFade } =
     setupMobileHeader(headerElements, headerRoot, overlayWrapper)
   container.appendChild(headerWrapper)
+
+  // Audio engine setup
+  let audioEngine: AudioEngine | null = null
+  let audioEnabled = false
+  let audioInitialized = false
+
+  const toggleAudio = (enabled: boolean) => {
+    audioEnabled = enabled
+    if (enabled && !audioEngine) {
+      audioEngine = new AudioEngine(0.3) // 30% volume
+      const success = audioEngine.start()
+      audioInitialized = success
+      if (!success) {
+        console.warn('Failed to initialize audio engine')
+        return
+      }
+      startAudioUpdates()
+    } else if (!enabled && audioEngine) {
+      stopAudioUpdates()
+      audioEngine.stop()
+      audioEngine = null
+      audioInitialized = false
+    }
+  }
+
+  // Add sound toggle to header
+  const soundToggle = createSoundToggle(toggleAudio)
+  const soundContainer = headerRoot.querySelector('#sound-toggle-container')
+  if (soundContainer) {
+    soundContainer.appendChild(soundToggle)
+  }
 
   // Helper function to update header title color and reset fade
   const updateHeaderColor = (color: string) => {
@@ -1014,6 +1137,10 @@ export async function setupMobileLayout(
   // Set initial offscreen transform
   offScreenCanvas.style.transform = `translateY(${screenHeight}px)`
 
+  // Callback placeholder for died-out detection (set after button creation)
+  // biome-ignore lint/style/useConst: reassigned later at line 1207
+  let onDiedOutCallback: (() => void) | undefined
+
   // Create cellular automata instances
   let onScreenCA = createCA(
     onScreenCanvas,
@@ -1021,6 +1148,7 @@ export async function setupMobileLayout(
     gridCols,
     palette[colorIndex],
     bgColor,
+    () => onDiedOutCallback?.(),
   )
 
   let offScreenCA = createCA(
@@ -1089,6 +1217,33 @@ export async function setupMobileLayout(
     hideStats,
     () => updateStats(getCurrentRunData()), // refresh every second
   )
+
+  // Audio update loop (10 Hz / every 100ms)
+  let audioUpdateInterval: number | null = null
+  const startAudioUpdates = () => {
+    if (audioUpdateInterval) return
+    audioUpdateInterval = window.setInterval(() => {
+      if (audioEngine && audioEnabled && audioInitialized) {
+        const stats = onScreenCA.getStatistics()
+        const recent = stats.getRecentStats(1)[0]
+        if (recent) {
+          audioEngine.updateFromStats(recent)
+        }
+      }
+    }, 100) // 10 Hz update rate
+  }
+
+  const stopAudioUpdates = () => {
+    if (audioUpdateInterval) {
+      clearInterval(audioUpdateInterval)
+      audioUpdateInterval = null
+    }
+  }
+
+  // Start audio updates if audio is enabled
+  if (audioEnabled) {
+    startAudioUpdates()
+  }
 
   // Helper function to get current run data
   const getCurrentRunData = (): RunSubmission => {
@@ -1161,10 +1316,27 @@ export async function setupMobileLayout(
     className: 'flex flex-row-reverse space-x-reverse space-x-2',
   })
 
-  let shareBtn = createShareButton(resetControlFade)
+  // Closure variable to store hash for the currently visible rule
+  // Using a closure variable instead of per-object storage because rule objects
+  // are discarded after being swapped out (not reused in the dual-canvas architecture)
+  let currentlyVisibleRuleHash: string | undefined = undefined
+
+  let shareBtn = createShareButton(
+    resetControlFade,
+    () => ({ ca: onScreenCA, rule: onScreenRule, isStarred: currentIsStarred }),
+    () => currentlyVisibleRuleHash,
+    (hash) => {
+      currentlyVisibleRuleHash = hash
+    },
+  )
   let statsBtn = createStatsButton(
     () => showStats(getCurrentRunData()),
     resetControlFade,
+    () => ({ ca: onScreenCA, rule: onScreenRule, isStarred: currentIsStarred }),
+    () => currentlyVisibleRuleHash,
+    (hash) => {
+      currentlyVisibleRuleHash = hash
+    },
   )
   let starBtn = createStarButton({
     getIsStarred: () => currentIsStarred,
@@ -1178,6 +1350,11 @@ export async function setupMobileLayout(
     softResetAutomata(onScreenCA)
     startAutomata(onScreenCA, onScreenRule)
   }, resetControlFade)
+
+  // Wire up died-out callback to pulse reset button
+  onDiedOutCallback = () => {
+    softResetButton.startPulse()
+  }
 
   controlContainer.appendChild(softResetButton.button)
   controlContainer.appendChild(starBtn.button)
@@ -1200,12 +1377,9 @@ export async function setupMobileLayout(
         instruction.style.opacity = '0'
         setTimeout(() => instruction.remove(), 300)
       }
-      saveRunStatistics(
-        onScreenCA,
-        onScreenRule.name,
-        onScreenRule.hex,
-        currentIsStarred,
-      )
+
+      // Note: We save statistics on-demand when user clicks Share/Stats buttons
+      // This ensures hash is always available for the currently visible rule
 
       // Reset starred status for next simulation
       currentIsStarred = false
@@ -1214,6 +1388,12 @@ export async function setupMobileLayout(
       ;[onScreenCanvas, offScreenCanvas] = [offScreenCanvas, onScreenCanvas]
       ;[onScreenCA, offScreenCA] = [offScreenCA, onScreenCA]
       ;[onScreenRule, offScreenRule] = [offScreenRule, onScreenRule]
+
+      // Clear hash for newly visible rule (will be set when save completes)
+      currentlyVisibleRuleHash = undefined
+      console.log(
+        `[tracking] Hash cleared for newly visible rule: ${onScreenRule.name}`,
+      )
 
       // Update z-index and positioning explicitly
       const h = onScreenCanvas.height
@@ -1263,10 +1443,30 @@ export async function setupMobileLayout(
       starBtn.cleanup()
       statsBtn.cleanup()
 
-      shareBtn = createShareButton(resetControlFade)
+      shareBtn = createShareButton(
+        resetControlFade,
+        () => ({
+          ca: onScreenCA,
+          rule: onScreenRule,
+          isStarred: currentIsStarred,
+        }),
+        () => currentlyVisibleRuleHash,
+        (hash) => {
+          currentlyVisibleRuleHash = hash
+        },
+      )
       statsBtn = createStatsButton(
         () => showStats(getCurrentRunData()),
         resetControlFade,
+        () => ({
+          ca: onScreenCA,
+          rule: onScreenRule,
+          isStarred: currentIsStarred,
+        }),
+        () => currentlyVisibleRuleHash,
+        (hash) => {
+          currentlyVisibleRuleHash = hash
+        },
       )
       starBtn = createStarButton({
         getIsStarred: () => currentIsStarred,
@@ -1344,6 +1544,10 @@ export async function setupMobileLayout(
     cleanupControlContainer()
     cleanupHeader()
     cleanupStatsOverlay()
+    stopAudioUpdates()
+    if (audioEngine) {
+      audioEngine.stop()
+    }
     window.removeEventListener('resize', handleResize)
   }
 }

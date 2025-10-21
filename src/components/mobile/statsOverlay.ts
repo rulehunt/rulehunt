@@ -1,5 +1,6 @@
 // src/components/statsOverlay.ts
 
+import type { CleanupFunction } from '../../types'
 import type { RunSubmission } from '../../schema.ts'
 import {
   generateSimulationMetricsHTML,
@@ -17,8 +18,6 @@ export interface StatsOverlayElements {
   closeButton: HTMLButtonElement
   content: HTMLDivElement
 }
-
-export type CleanupFunction = () => void
 
 export function createStatsOverlay(parentElement?: HTMLElement): {
   elements: StatsOverlayElements
