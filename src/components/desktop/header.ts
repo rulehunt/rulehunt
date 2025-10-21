@@ -1,5 +1,7 @@
 // src/components/header.ts
 
+import type { CleanupFunction } from '../../types'
+
 export interface ThemeToggleElements {
   light: HTMLButtonElement
   dark: HTMLButtonElement
@@ -13,7 +15,6 @@ export interface HeaderElements {
 }
 
 export type Theme = 'light' | 'dark' | 'system'
-export type CleanupFunction = () => void
 
 export function createHeader(): {
   root: HTMLElement

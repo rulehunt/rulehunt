@@ -5,7 +5,7 @@
  * Separates layout/behavior concerns from button implementation.
  */
 
-export type CleanupFunction = () => void
+import type { CleanupFunction } from '../../types'
 
 export interface ButtonContainerPosition {
   top?: string
