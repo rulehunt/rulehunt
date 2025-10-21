@@ -30,6 +30,7 @@ import {
 } from '../../urlState.ts'
 import { hexToC4Ruleset } from '../../utils.ts'
 import type { AudioEngine } from '../audioEngine.ts'
+import { getVisualizationPalette } from '../shared/theme.ts'
 import { createAutoFadeContainer } from './buttonContainer.ts'
 import { createMobileHeader, setupMobileHeader } from './header.ts'
 import { createRoundButton } from './roundButton.ts'
@@ -49,30 +50,7 @@ const SWIPE_COMMIT_MIN_DISTANCE = 50
 const SWIPE_VELOCITY_THRESHOLD = -0.3
 const SWIPE_FAST_THROW_THRESHOLD = -0.5
 
-const LIGHT_FG_COLORS = [
-  '#2563eb', // blue-600
-  '#dc2626', // red-600
-  '#16a34a', // green-600
-  '#9333ea', // purple-600
-  '#ea580c', // orange-600
-  '#0891b2', // cyan-600
-  '#db2777', // pink-600
-  '#65a30d', // lime-600
-  '#7c3aed', // violet-600
-  '#0d9488', // teal-600
-]
-const DARK_FG_COLORS = [
-  '#60a5fa', // blue-400
-  '#f87171', // red-400
-  '#4ade80', // green-400
-  '#c084fc', // purple-400
-  '#fb923c', // orange-400
-  '#22d3ee', // cyan-400
-  '#f472b6', // pink-400
-  '#a3e635', // lime-400
-  '#a78bfa', // violet-400
-  '#2dd4bf', // teal-400
-]
+// Visualization palettes now managed by getVisualizationPalette() from '../shared/theme.ts'
 
 // --- Types ------------------------------------------------------------------
 
@@ -999,7 +977,7 @@ export async function setupMobileLayout(
   }
 
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  const palette = isDark ? DARK_FG_COLORS : LIGHT_FG_COLORS
+  const palette = getVisualizationPalette(isDark)
   const bgColor = isDark ? '#111827' : '#ffffff' // gray-900 : white
   let colorIndex = Math.floor(Math.random() * palette.length)
 

@@ -19,6 +19,7 @@ import {
   createStatsChartModal,
   showStatsChart,
 } from '../shared/statsChart'
+import { getCurrentThemeColors } from '../shared/theme'
 
 // Register Chart.js components
 Chart.register(
@@ -164,6 +165,7 @@ export function renderStatistics(
   // Color schemes
   const textColor = isDark ? '#f3f4f6' : '#1f2937'
   const gridColor = isDark ? '#374151' : '#e5e7eb'
+  const { accentColor } = getCurrentThemeColors()
 
   // Set explicit canvas dimensions to fill 300px containers
   const canvases = [
@@ -302,7 +304,7 @@ export function renderStatistics(
             data.wolfram_classification.class_iii,
             data.wolfram_classification.class_iv,
           ],
-          backgroundColor: ['#94a3b8', '#60a5fa', '#f59e0b', '#8b5cf6'],
+          backgroundColor: ['#94a3b8', '#60a5fa', '#f59e0b', accentColor],
         },
       ],
     },
@@ -338,7 +340,7 @@ export function renderStatistics(
         {
           label: 'Runs',
           data: data.interest_score_distribution,
-          backgroundColor: '#8b5cf6',
+          backgroundColor: accentColor,
         },
       ],
     },
