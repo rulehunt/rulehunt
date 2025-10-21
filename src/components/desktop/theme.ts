@@ -31,6 +31,19 @@ export function createThemeToggle(): {
 
 export type Theme = 'light' | 'dark' | 'system'
 
+/**
+ * Apply a theme to the DOM by toggling the 'dark' class on the document element.
+ * Handles both explicit themes ('light', 'dark') and 'system' which detects OS preference.
+ */
+function applyThemeToDOM(theme: Theme): void {
+  if (theme === 'system') {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    document.documentElement.classList.toggle('dark', isDark)
+  } else {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+  }
+}
+
 export function setupTheme(
   elements: ThemeToggleElements,
   onThemeChange?: () => void,
@@ -49,12 +62,7 @@ export function setupTheme(
     elements.system.className =
       theme === 'system' ? activeClasses : inactiveClasses
 
-    if (theme === 'system') {
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      document.documentElement.classList.toggle('dark', isDark)
-    } else {
-      document.documentElement.classList.toggle('dark', theme === 'dark')
-    }
+    applyThemeToDOM(theme)
 
     // Notify listeners that theme changed
     onThemeChange?.()
@@ -83,12 +91,7 @@ export function setupTheme(
 /** Apply the stored theme (without requiring UI elements). */
 export function applyThemeFromStorage() {
   const savedTheme = (localStorage.getItem('theme') as Theme | null) || 'system'
-  if (savedTheme === 'system') {
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    document.documentElement.classList.toggle('dark', isDark)
-  } else {
-    document.documentElement.classList.toggle('dark', savedTheme === 'dark')
-  }
+  applyThemeToDOM(savedTheme)
 }
 
 export function watchSystemThemeChange(onChange?: () => void) {

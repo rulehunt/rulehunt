@@ -236,12 +236,12 @@ export class StatisticsTracker {
       }
     } else {
       // Reuse cached entity stats
-      const cached = this.cachedEntityStats
-      if (!cached) {
+      if (!this.cachedEntityStats) {
         throw new Error(
-          'cachedEntityStats should exist when skipping detection',
+          'cachedEntityStats is required when skipping entity detection',
         )
       }
+      const cached = this.cachedEntityStats
       entityCount = cached.entityCount
       entityChange = 0 // No change detected between detection intervals
       totalEntitiesEverSeen = cached.totalEntitiesEverSeen
@@ -273,12 +273,12 @@ export class StatisticsTracker {
       }
     } else {
       // Reuse cached entropy stats
-      const cached = this.cachedEntropyStats
-      if (!cached) {
+      if (!this.cachedEntropyStats) {
         throw new Error(
-          'cachedEntropyStats should exist when skipping calculation',
+          'cachedEntropyStats is required when skipping entropy calculation',
         )
       }
+      const cached = this.cachedEntropyStats
       entropy2x2 = cached.entropy2x2
       entropy4x4 = cached.entropy4x4
       entropy8x8 = cached.entropy8x8
