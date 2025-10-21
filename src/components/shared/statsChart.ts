@@ -15,6 +15,7 @@ import {
   Tooltip,
 } from 'chart.js'
 import type { StatsHistoryResponse } from '../../schema'
+import { getCurrentThemeColors } from './theme'
 
 // Register Chart.js components for line charts
 Chart.register(
@@ -139,7 +140,8 @@ export async function showStatsChart(
     const isDark = document.documentElement.classList.contains('dark')
     const textColor = isDark ? '#f3f4f6' : '#1f2937'
     const gridColor = isDark ? '#374151' : '#e5e7eb'
-    const lineColor = '#8b5cf6' // violet-600
+    const { accentColor } = getCurrentThemeColors()
+    const lineColor = accentColor
     const fillColor = isDark
       ? 'rgba(139, 92, 246, 0.1)'
       : 'rgba(139, 92, 246, 0.2)'

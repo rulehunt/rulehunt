@@ -24,6 +24,7 @@ import {
 } from '../../urlState.ts'
 import { generateSimulationMetricsHTML } from '../shared/simulationInfo.ts'
 import { generateStatsHTML, getInterestColorClass } from '../shared/stats.ts'
+import { getCurrentThemeColors } from '../shared/theme.ts'
 import { setupBenchmarkModal } from './benchmark.ts'
 import { setupDataModeLayout } from './dataMode.ts'
 import { createHeader } from './header.ts'
@@ -50,13 +51,7 @@ const GRID_COLS = 400
 type DisplayMode = 'orbits' | 'full'
 
 // --- Color Management ------------------------------------------------------
-function getCurrentColors(): { fgColor: string; bgColor: string } {
-  const isDark = document.documentElement.classList.contains('dark')
-  return {
-    fgColor: isDark ? '#a78bfa' : '#9333ea', // violet-400 : violet-600
-    bgColor: isDark ? '#111827' : '#ffffff', // gray-900 : white
-  }
-}
+// Colors are now managed by getCurrentThemeColors() from '../shared/theme.ts'
 
 // --- Desktop-Specific Rendering --------------------------------------------
 function renderRule(
@@ -568,7 +563,7 @@ export async function setupDesktopLayout(
   console.log(`Loaded ${orbitsData.orbits.length} C4 orbits`)
 
   // Initialize cellular automata with colors
-  const colors = getCurrentColors()
+  const colors = getCurrentThemeColors()
   // Callback placeholder for died-out detection (set after simulation panel creation)
   // biome-ignore lint/style/useConst: reassigned later at line 1064
   let onDiedOutCallback: (() => void) | undefined
@@ -713,7 +708,7 @@ export async function setupDesktopLayout(
     const density = percentage / 100
     const ruleset = randomC4RulesetByDensity(density)
     currentRuleset = ruleset
-    const colors = getCurrentColors()
+    const colors = getCurrentThemeColors()
     renderRule(
       ruleset,
       orbitLookup,
@@ -827,7 +822,7 @@ export async function setupDesktopLayout(
 
   // Setup theme with re-render callback
   const cleanupTheme = setupTheme(header.elements.themeToggle, () => {
-    const newColors = getCurrentColors()
+    const newColors = getCurrentThemeColors()
     cellularAutomata.setColors(newColors.fgColor, newColors.bgColor)
     // Explicit render after color change
     cellularAutomata.render()
@@ -876,7 +871,7 @@ export async function setupDesktopLayout(
       (data) => patternInspector.update(data),
       (selection) => {
         selectedCell = selection
-        const colors = getCurrentColors()
+        const colors = getCurrentThemeColors()
         renderRule(
           currentRuleset,
           orbitLookup,
@@ -920,7 +915,7 @@ export async function setupDesktopLayout(
   addEventListener(btnConway, 'click', () => {
     const ruleset = makeC4Ruleset(conwayRule, orbitLookup)
     currentRuleset = ruleset
-    const colors = getCurrentColors()
+    const colors = getCurrentThemeColors()
     renderRule(
       ruleset,
       orbitLookup,
@@ -947,7 +942,7 @@ export async function setupDesktopLayout(
   addEventListener(btnOutlier, 'click', () => {
     const ruleset = makeC4Ruleset(outlierRule, orbitLookup)
     currentRuleset = ruleset
-    const colors = getCurrentColors()
+    const colors = getCurrentThemeColors()
     renderRule(
       ruleset,
       orbitLookup,
@@ -980,7 +975,7 @@ export async function setupDesktopLayout(
     const magnitude = mutationPercentage / 100
     const mutated = mutateC4Ruleset(currentRuleset, magnitude, true)
     currentRuleset = mutated
-    const colors = getCurrentColors()
+    const colors = getCurrentThemeColors()
     // Remove existing "(mutated)" suffix before adding a new one
     const baseName =
       ruleLabelDisplay.textContent?.replace(/\s*\(mutated\)$/, '') || 'Unknown'
@@ -1020,7 +1015,7 @@ export async function setupDesktopLayout(
   addEventListener(radioDisplayOrbits, 'change', () => {
     if (radioDisplayOrbits.checked) {
       displayMode = 'orbits'
-      const colors = getCurrentColors()
+      const colors = getCurrentThemeColors()
       renderRule(
         currentRuleset,
         orbitLookup,
@@ -1039,7 +1034,7 @@ export async function setupDesktopLayout(
   addEventListener(radioDisplayFull, 'change', () => {
     if (radioDisplayFull.checked) {
       displayMode = 'full'
-      const colors = getCurrentColors()
+      const colors = getCurrentThemeColors()
       renderRule(
         currentRuleset,
         orbitLookup,
