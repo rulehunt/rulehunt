@@ -1,5 +1,7 @@
 // src/components/mobile.ts
 import { formatRulesetName, saveRun } from '../../api/save'
+import { trackShare } from '../../api/share'
+import { trackStatsView } from '../../api/stats-view'
 import { createCellularAutomata } from '../../cellular-automata-factory.ts'
 import type { ICellularAutomata } from '../../cellular-automata-interface.ts'
 import { getUserIdentity } from '../../identity.ts'
@@ -711,7 +713,7 @@ function saveRunStatistics(
   ruleName: string,
   ruleHex: string,
   isStarred = false,
-): void {
+): Promise<string | undefined> {
   const stats = cellularAutomata.getStatistics()
   const metadata = stats.getMetadata()
   const recent = stats.getRecentStats(1)[0] ?? {
@@ -764,13 +766,19 @@ function saveRunStatistics(
   }
 
   // --- Fire and forget background save ---
-  setTimeout(() => saveRun(payload))
+  return new Promise<string | undefined>((resolve) => {
+    setTimeout(async () => {
+      const result = await saveRun(payload)
+      resolve(result.ok ? result.runHash : undefined)
+    })
+  })
 }
 
 // --- Stats Button -----------------------------------------------------------
 function createStatsButton(
   onShowStats: () => void,
   onResetFade?: () => void,
+  getLastRunHash?: () => string | undefined,
 ): { button: HTMLButtonElement; cleanup: () => void } {
   const { button, cleanup } = createRoundButton(
     {
@@ -783,6 +791,12 @@ function createStatsButton(
       onClick: () => {
         onShowStats()
         onResetFade?.()
+
+        // Track the stats view if we have a runId
+        const runHash = getLastRunHash?.()
+        if (runHash) {
+          trackStatsView(runHash)
+        }
       },
       preventTransition: true,
     },
@@ -818,7 +832,10 @@ function createSoftResetButton(
 }
 
 // --- Share Button (copy shareable link to clipboard) -----------------------
-function createShareButton(onResetFade?: () => void): {
+function createShareButton(
+  onResetFade?: () => void,
+  getLastRunHash?: () => string | undefined,
+): {
   button: HTMLButtonElement
   cleanup: () => void
 } {
@@ -849,6 +866,12 @@ function createShareButton(onResetFade?: () => void): {
         try {
           await navigator.clipboard.writeText(shareURL)
           console.log('[share] Copied link to clipboard:', shareURL)
+
+          // Track the share if we have a runId
+          const runHash = getLastRunHash?.()
+          if (runHash) {
+            trackShare(runHash)
+          }
 
           // Visual feedback - briefly change the button appearance
           button.innerHTML = checkIcon
@@ -1149,6 +1172,9 @@ export async function setupMobileLayout(
   // Track starred status (resets to false after each swipe)
   let currentIsStarred = false
 
+  // Track last run hash for share tracking
+  let lastRunHash: string | undefined = undefined
+
   // Create control buttons with auto-fade container
   const {
     container: controlContainer,
@@ -1161,10 +1187,11 @@ export async function setupMobileLayout(
     className: 'flex flex-row-reverse space-x-reverse space-x-2',
   })
 
-  let shareBtn = createShareButton(resetControlFade)
+  let shareBtn = createShareButton(resetControlFade, () => lastRunHash)
   let statsBtn = createStatsButton(
     () => showStats(getCurrentRunData()),
     resetControlFade,
+    () => lastRunHash,
   )
   let starBtn = createStarButton({
     getIsStarred: () => currentIsStarred,
@@ -1205,7 +1232,9 @@ export async function setupMobileLayout(
         onScreenRule.name,
         onScreenRule.hex,
         currentIsStarred,
-      )
+      ).then((hash) => {
+        lastRunHash = hash
+      })
 
       // Reset starred status for next simulation
       currentIsStarred = false
@@ -1263,10 +1292,11 @@ export async function setupMobileLayout(
       starBtn.cleanup()
       statsBtn.cleanup()
 
-      shareBtn = createShareButton(resetControlFade)
+      shareBtn = createShareButton(resetControlFade, () => lastRunHash)
       statsBtn = createStatsButton(
         () => showStats(getCurrentRunData()),
         resetControlFade,
+        () => lastRunHash,
       )
       starBtn = createStarButton({
         getIsStarred: () => currentIsStarred,
