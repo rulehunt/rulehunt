@@ -1,5 +1,6 @@
 import { saveRun } from '../../api/save'
 import { CellularAutomata } from '../../cellular-automata-cpu.ts'
+import { AudioEngine } from '../../components/audioEngine.ts'
 import { outlierRule } from '../../outlier-rule.ts'
 import type { C4OrbitsData, C4Ruleset, RunSubmission } from '../../schema.ts'
 import type { CleanupFunction } from '../../types'
@@ -134,6 +135,7 @@ function updateStatisticsDisplay(
   progressBar: ReturnType<typeof createProgressBar>,
   statsBarComponent?: ReturnType<typeof createStatsBar>,
   autosaveCallback?: () => void,
+  audioEngine?: AudioEngine | null,
 ) {
   const stats = cellularAutomata.getStatistics()
   const recentStats = stats.getRecentStats(1)
@@ -195,6 +197,11 @@ function updateStatisticsDisplay(
       interestScore,
       stepCount: metadata?.stepCount ?? 0,
     })
+  }
+
+  // Update audio engine with current statistics
+  if (audioEngine) {
+    audioEngine.updateFromStats(current)
   }
 }
 
@@ -336,9 +343,44 @@ export async function setupDesktopLayout(
     if (index > -1) intervals.splice(index, 1)
   }
 
-  // Create header
-  const header = createHeader()
+  // Create AudioEngine for sonification
+  let audioEngine: AudioEngine | null = null
+
+  const handleSoundToggle = (enabled: boolean) => {
+    if (enabled) {
+      // Get volume from localStorage (0-100) and convert to 0-1
+      const volumePercent = Number.parseInt(
+        localStorage.getItem('sound-volume') || '30',
+      )
+      const volume = volumePercent / 100
+      audioEngine = new AudioEngine(volume)
+      audioEngine.start()
+    } else {
+      audioEngine?.stop()
+      audioEngine = null
+    }
+  }
+
+  const handleVolumeChange = (volume: number) => {
+    if (audioEngine) {
+      audioEngine.setVolume(volume)
+    }
+  }
+
+  // Create header with sound controls
+  const header = createHeader(handleSoundToggle, handleVolumeChange)
   appRoot.appendChild(header.root)
+
+  // Restore sound state from localStorage on page load
+  const soundEnabled = localStorage.getItem('sound-enabled') === 'true'
+  if (soundEnabled) {
+    const volumePercent = Number.parseInt(
+      localStorage.getItem('sound-volume') || '30',
+    )
+    const volume = volumePercent / 100
+    audioEngine = new AudioEngine(volume)
+    audioEngine.start()
+  }
 
   // Create progress bar (no button - autosave enabled)
   const progressBar = createProgressBar({
@@ -620,6 +662,8 @@ export async function setupDesktopLayout(
       summaryPanel.elements,
       progressBar,
       statsBar,
+      undefined,
+      audioEngine,
     )
     initializeSimulationMetadata()
     updateURL()
@@ -792,6 +836,8 @@ export async function setupDesktopLayout(
       summaryPanel.elements,
       progressBar,
       statsBar,
+      undefined,
+      audioEngine,
     )
     renderRule(
       currentRuleset,
@@ -1046,6 +1092,8 @@ export async function setupDesktopLayout(
       summaryPanel.elements,
       progressBar,
       statsBar,
+      undefined,
+      audioEngine,
     )
   })
 
@@ -1082,6 +1130,8 @@ export async function setupDesktopLayout(
         summaryPanel.elements,
         progressBar,
         statsBar,
+        undefined,
+        audioEngine,
       )
       initializeSimulationMetadata()
       updateURL()
@@ -1124,6 +1174,7 @@ export async function setupDesktopLayout(
           progressBar,
           statsBar,
           checkAndAutosave,
+          audioEngine,
         )
       }, 100)
     }
@@ -1152,6 +1203,7 @@ export async function setupDesktopLayout(
           progressBar,
           statsBar,
           checkAndAutosave,
+          audioEngine,
         )
       }, 100)
     }
@@ -1543,6 +1595,9 @@ export async function setupDesktopLayout(
     }
     if (currentStatsChartCleanup) {
       currentStatsChartCleanup()
+    }
+    if (audioEngine) {
+      audioEngine.stop()
     }
     for (const id of intervals) {
       window.clearInterval(id)

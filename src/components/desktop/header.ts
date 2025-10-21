@@ -1,14 +1,22 @@
 // src/components/header.ts
 
+import {
+  type SoundControlsElements,
+  createSoundControls,
+} from './soundControls'
 import type { ThemeToggleElements } from './theme'
 
 export interface HeaderElements {
   themeToggle: ThemeToggleElements
   githubLink: HTMLAnchorElement
   mobilePreviewButton?: HTMLButtonElement
+  soundControls: SoundControlsElements
 }
 
-export function createHeader(): {
+export function createHeader(
+  onSoundToggle: (enabled: boolean) => void,
+  onVolumeChange: (volume: number) => void,
+): {
   root: HTMLElement
   elements: HeaderElements
 } {
@@ -28,8 +36,8 @@ export function createHeader(): {
         </span>
       </div>
 
-      <!-- Right: Mobile Preview + GitHub + Theme Toggle -->
-      <div class="flex items-center gap-4">
+      <!-- Right: Mobile Preview + Sound Controls + GitHub + Theme Toggle -->
+      <div id="header-controls" class="flex items-center gap-4">
         <!-- Mobile Preview Button (hidden on actual mobile) -->
         <button
           id="mobile-preview-button"
@@ -39,6 +47,8 @@ export function createHeader(): {
           <span class="text-lg">📱</span>
           <span class="hidden lg:inline">Mobile Preview</span>
         </button>
+
+        <!-- Sound Controls placeholder (will be inserted here) -->
 
         <!-- GitHub Link -->
         <a
@@ -65,6 +75,14 @@ export function createHeader(): {
     </div>
   `
 
+  // Create sound controls and insert them after mobile preview button
+  const soundControls = createSoundControls(onSoundToggle, onVolumeChange)
+  const headerControls = root.querySelector('#header-controls')
+  const githubLink = root.querySelector('#github-link')
+  if (headerControls && githubLink) {
+    headerControls.insertBefore(soundControls.root, githubLink)
+  }
+
   const elements: HeaderElements = {
     themeToggle: {
       light: root.querySelector('#theme-light') as HTMLButtonElement,
@@ -75,6 +93,7 @@ export function createHeader(): {
     mobilePreviewButton: root.querySelector(
       '#mobile-preview-button',
     ) as HTMLButtonElement,
+    soundControls: soundControls.elements,
   }
 
   return { root, elements }
