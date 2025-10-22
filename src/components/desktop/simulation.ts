@@ -14,6 +14,7 @@ export interface SimulationPanelElements {
   radioCenterSeed: HTMLInputElement
   radioRandomSeed: HTMLInputElement
   radioPatchSeed: HTMLInputElement
+  checkboxNewPatternOnReset: HTMLInputElement
 }
 
 export function createSimulationPanel(): {
@@ -39,6 +40,11 @@ export function createSimulationPanel(): {
         <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           <input type="radio" id="radio-center-seed" name="initial-condition" class="cursor-pointer" />
           <span>Center Seed</span>
+        </label>
+        <hr class="border-gray-300 dark:border-gray-600 my-1" />
+        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="When enabled, each reset generates a new random pattern. When disabled, resets reuse the same initial conditions for reproducible testing.">
+          <input type="checkbox" id="checkbox-new-pattern-on-reset" checked class="cursor-pointer" />
+          <span>Generate new pattern on reset</span>
         </label>
       </div>
       <button id="btn-reset" class="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2">
@@ -93,6 +99,9 @@ export function createSimulationPanel(): {
       '#radio-random-seed',
     ) as HTMLInputElement,
     radioPatchSeed: root.querySelector('#radio-patch-seed') as HTMLInputElement,
+    checkboxNewPatternOnReset: root.querySelector(
+      '#checkbox-new-pattern-on-reset',
+    ) as HTMLInputElement,
   }
 
   return { root, elements }
