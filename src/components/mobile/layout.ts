@@ -1,8 +1,5 @@
 // src/components/mobile.ts
-import { formatRulesetName, saveRun } from '../../api/save'
-import { trackShare } from '../../api/share'
-import { trackStatsView } from '../../api/stats-view'
-import { createCellularAutomata } from '../../cellular-automata-factory.ts'
+import { saveRun } from '../../api/save'
 import type { ICellularAutomata } from '../../cellular-automata-interface.ts'
 import { getUserIdentity } from '../../identity.ts'
 import type {
@@ -15,41 +12,48 @@ import {
   buildOrbitLookup,
   c4RulesetToHex,
   conwayRule,
-  expandC4Ruleset,
   makeC4Ruleset,
-  mutateC4Ruleset,
-  randomC4RulesetByDensity,
 } from '../../utils.ts'
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 
-import { fetchStarredPattern } from '../../api/starred.ts'
 import { getRunStatsSnapshot } from '../../api/statistics-utils.ts'
 import {
   parseURLRuleset,
   parseURLState,
   updateURLWithoutReload,
 } from '../../urlState.ts'
-import { hexToC4Ruleset } from '../../utils.ts'
 import type { AudioEngine } from '../audioEngine.ts'
 import { getVisualizationPalette } from '../shared/theme.ts'
 import { createAutoFadeContainer } from './buttonContainer.ts'
 import { createMobileHeader, setupMobileHeader } from './header.ts'
 import { createRoundButton } from './roundButton.ts'
 import { createStarButton } from './starButton.ts'
+import { createStatsButton } from './buttons/statsButton'
+import { createSoftResetButton } from './buttons/softResetButton'
+import { createShareButton } from './buttons/shareButton'
+import {
+  createCA,
+  prepareAutomata,
+  softResetAutomata,
+  startAutomata,
+} from './caLifecycle'
+import { generateNextRule } from './ruleGeneration'
 
 // --- Constants --------------------------------------------------------------
-const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 60
 const TARGET_GRID_SIZE = 600_000
-// Exploration/Exploitation/Mutation Strategy:
-// 20% random - Generate completely new random rule (exploration)
-// 10% exact starred - Load exact starred pattern from database (exploitation)
-// 70% mutated starred - Load starred pattern and mutate it with ramping magnitude (balanced)
 
+// Swipe gesture thresholds (used by setupDualCanvasSwipe)
 const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1
 const SWIPE_COMMIT_MIN_DISTANCE = 50
 const SWIPE_VELOCITY_THRESHOLD = -0.3
 const SWIPE_FAST_THROW_THRESHOLD = -0.5
+
+// Exploration/Exploitation/Mutation Strategy:
+// 20% random - Generate completely new random rule (exploration)
+// 10% exact starred - Load exact starred pattern from database (exploitation)
+// 70% mutated starred - Load starred pattern and mutate it with ramping magnitude (balanced)
+// Strategy implementation moved to ./ruleGeneration.ts
 
 // Visualization palettes now managed by getVisualizationPalette() from '../shared/theme.ts'
 
@@ -69,24 +73,7 @@ export type RuleData = {
 }
 
 // --- Cellular Automata Engine  ----------------------------------------------
-function createCA(
-  canvas: HTMLCanvasElement,
-  gridRows: number,
-  gridCols: number,
-  fgColor: string,
-  bgColor: string,
-  onDiedOut?: () => void,
-): ICellularAutomata {
-  return createCellularAutomata(canvas, {
-    gridRows,
-    gridCols,
-    fgColor,
-    bgColor,
-    onDiedOut,
-    // Use default threshold (250K cells = 500x500)
-    // Mobile targets ~600K cells, so will use GPU on most devices
-  })
-}
+// CA creation and lifecycle functions moved to ./caLifecycle.ts
 
 // --- Helpers ----------------------------------------------------------------
 function computeAdaptiveGrid(
@@ -580,135 +567,10 @@ function createZoomButtons(
 }
 
 // --- Helper: Rule generation and loading ------------------------------------
-function generateRandomRule(): RuleData {
-  const density = Math.random() * 0.6 + 0.2
-  const ruleset = randomC4RulesetByDensity(density, FORCE_RULE_ZERO_OFF)
-  return {
-    name: formatRulesetName('random', density * 100),
-    hex: c4RulesetToHex(ruleset),
-    ruleset,
-  }
-}
-
-/**
- * Exploration/Exploitation/Mutation Strategy:
- * - 0.0–0.2: return a brand new random rule
- * - 0.2–0.9: fetch a starred rule, then mutate it with increasing magnitude
- * - 0.9–1.0: fetch and return starred rule unmodified
- */
-async function generateNextRule(): Promise<RuleData> {
-  const r = Math.random()
-
-  // 20% random (0.0 - 0.2)
-  if (r < 0.2) {
-    console.log('[generateNextRule] Strategy: Random')
-    return generateRandomRule()
-  }
-
-  // Try to fetch a starred pattern for both exact and mutation cases
-  try {
-    const starred = await fetchStarredPattern()
-    if (!starred) {
-      console.warn(
-        '[generateNextRule] No starred pattern returned, using random',
-      )
-      return generateRandomRule()
-    }
-
-    const ruleset = hexToC4Ruleset(starred.ruleset_hex)
-
-    // 10% exact starred (0.9 - 1.0)
-    if (r > 0.9) {
-      console.log(
-        '[generateNextRule] Strategy: Exact starred -',
-        starred.ruleset_name,
-        'seed:',
-        starred.seed,
-      )
-      return {
-        name: starred.ruleset_name,
-        hex: starred.ruleset_hex,
-        ruleset,
-        seed: starred.seed, // Include saved seed for exact reproduction
-      }
-    }
-
-    // 70% mutated starred (0.2 - 0.9)
-    // Map r in [0.2, 0.9] to normalized value in [0.0, 1.0]
-    const normalized = (r - 0.2) / 0.7
-    // Then invert to get mutation magnitude: 1.0 at r=0.2, decreasing to 0.0 at r=0.9
-    const magnitude = 1.0 - normalized
-    const mutated = mutateC4Ruleset(ruleset, magnitude, FORCE_RULE_ZERO_OFF)
-    const mutatedHex = c4RulesetToHex(mutated)
-    console.log(
-      `[generateNextRule] Strategy: Mutated starred (magnitude=${magnitude.toFixed(2)}) - based on`,
-      starred.ruleset_name,
-    )
-    return {
-      name: `${starred.ruleset_name} (mutated)`,
-      hex: mutatedHex,
-      ruleset: mutated,
-      // Don't include seed - let it be random for mutations
-    }
-  } catch (err) {
-    console.warn(
-      '[generateNextRule] Failed to fetch starred pattern, falling back to random:',
-      err,
-    )
-    return generateRandomRule()
-  }
-}
+// Rule generation functions moved to ./ruleGeneration.ts
 
 // --- Explicit rule setup and play functions ---------------------------------
-
-/**
- * Prepare a CA with the given rule and seed, paused and rendered.
- * All operations are explicit - no hidden side effects.
- * If the rule contains a saved seed (from starred pattern), apply it for exact reproduction.
- */
-function prepareAutomata(
-  cellularAutomata: ICellularAutomata,
-  rule: RuleData,
-  orbitLookup: Uint8Array,
-  seedPercentage = 50,
-): void {
-  cellularAutomata.pause()
-  cellularAutomata.clearGrid()
-
-  // If rule has a saved seed (starred pattern), apply it for exact reproduction
-  if (rule.seed !== undefined) {
-    cellularAutomata.setSeed(rule.seed)
-    console.log('[prepareAutomata] Applied saved seed:', rule.seed)
-  }
-
-  cellularAutomata.patchSeed(seedPercentage)
-
-  if (!rule.expanded && (rule.ruleset as number[]).length === 140) {
-    rule.expanded = expandC4Ruleset(rule.ruleset as C4Ruleset, orbitLookup)
-  }
-  cellularAutomata.render()
-}
-
-/**
- * Soft reset the CA.
- */
-function softResetAutomata(cellularAutomata: ICellularAutomata): void {
-  cellularAutomata.pause()
-  cellularAutomata.clearGrid()
-  cellularAutomata.softReset()
-  cellularAutomata.render()
-}
-
-/**
- * Start or resume the CA with its expanded rule.
- */
-function startAutomata(
-  cellularAutomata: ICellularAutomata,
-  rule: RuleData,
-): void {
-  const expanded = rule.expanded ?? rule.ruleset
-  cellularAutomata.play(STEPS_PER_SECOND, expanded)
-}
+// prepareAutomata, softResetAutomata, startAutomata moved to ./caLifecycle.ts
 
 // --- Save run ---------------------------------------------------------------
 function saveRunStatistics(
@@ -763,185 +625,8 @@ function saveRunStatistics(
   })
 }
 
-// --- Stats Button -----------------------------------------------------------
-function createStatsButton(
-  onShowStats: () => void,
-  onResetFade?: () => void,
-  getRunData?: () => {
-    ca: ICellularAutomata
-    rule: RuleData
-    isStarred: boolean
-  },
-  getLastRunHash?: () => string | undefined,
-  setLastRunHash?: (hash: string | undefined) => void,
-): { button: HTMLButtonElement; cleanup: () => void } {
-  const { button, cleanup } = createRoundButton(
-    {
-      icon: `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-             fill="currentColor" class="w-6 h-6">
-          <path d="M3 13h2v8H3v-8zm4-4h2v12H7V9zm4-4h2v16h-2V5zm4 2h2v14h-2V7z"/>
-        </svg>`,
-      title: 'View statistics',
-      onClick: async () => {
-        onShowStats()
-        onResetFade?.()
-
-        // Get or create run hash
-        let runHash = getLastRunHash?.()
-
-        if (!runHash && getRunData && setLastRunHash) {
-          // First stats view of this rule - save it now
-          const { ca, rule, isStarred } = getRunData()
-          runHash = await saveRunStatistics(ca, rule.name, rule.hex, isStarred)
-
-          if (runHash) {
-            setLastRunHash(runHash)
-            console.log(
-              `[tracking] Saved and stored hash for ${rule.name}: ${runHash}`,
-            )
-          }
-        }
-
-        // Track the stats view
-        if (runHash) {
-          trackStatsView(runHash)
-        }
-      },
-      preventTransition: true,
-    },
-    () => isTransitioning,
-  )
-
-  return { button, cleanup }
-}
-
-// --- Soft Reset Button (new random initial conditions) -------------------------------------------------
-function createSoftResetButton(
-  onSoftReset: () => void,
-  onResetFade?: () => void,
-): {
-  button: HTMLButtonElement
-  cleanup: () => void
-  startPulse: () => void
-  stopPulse: () => void
-} {
-  const { button, cleanup: cleanupButton } = createRoundButton(
-    {
-      icon: `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-             fill="currentColor" class="w-6 h-6">
-          <path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/>
-        </svg>`,
-      title: 'Reload simulation',
-      onClick: () => {
-        if (isTransitioning) return
-        onSoftReset()
-        onResetFade?.()
-        stopPulse() // Stop pulse when user resets
-      },
-    },
-    () => isTransitioning,
-  )
-
-  const startPulse = () => {
-    button.classList.add('animate-pulse')
-    button.style.borderColor = '#f97316' // Orange border
-    button.style.borderWidth = '2px'
-  }
-
-  const stopPulse = () => {
-    button.classList.remove('animate-pulse')
-    button.style.borderColor = ''
-    button.style.borderWidth = ''
-  }
-
-  return { button, cleanup: cleanupButton, startPulse, stopPulse }
-}
-
-// --- Share Button (copy shareable link to clipboard) -----------------------
-function createShareButton(
-  onResetFade?: () => void,
-  getRunData?: () => {
-    ca: ICellularAutomata
-    rule: RuleData
-    isStarred: boolean
-  },
-  getLastRunHash?: () => string | undefined,
-  setLastRunHash?: (hash: string | undefined) => void,
-): {
-  button: HTMLButtonElement
-  cleanup: () => void
-} {
-  const linkIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-         fill="currentColor" class="w-6 h-6">
-      <path d="M13.544 10.456a4.368 4.368 0 0 0-6.176 0l-3.089 3.088a4.367 4.367 0 1 0 6.177 6.177L12 18.177a1 1 0 0 1 1.414 1.414l-1.544 1.544a6.368 6.368 0 0 1-9.005-9.005l3.089-3.088a6.367 6.367 0 0 1 9.005 0 1 1 0 1 1-1.415 1.414zm6.911-6.911a6.367 6.367 0 0 1 0 9.005l-3.089 3.088a6.367 6.367 0 0 1-9.005 0 1 1 0 1 1 1.415-1.414 4.368 4.368 0 0 0 6.176 0l3.089-3.088a4.367 4.367 0 1 0-6.177-6.177L12 6.503a1 1 0 0 1-1.414-1.414l1.544-1.544a6.367 6.367 0 0 1 9.005 0z"/>
-    </svg>`
-
-  const checkIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-         fill="currentColor" class="w-6 h-6">
-      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-    </svg>`
-
-  const { button, cleanup } = createRoundButton(
-    {
-      icon: linkIcon,
-      title: 'Copy shareable link',
-      onClick: async () => {
-        if (isTransitioning) return
-
-        onResetFade?.()
-
-        // URL is kept in sync automatically by PR #35, just copy current URL
-        const shareURL = window.location.href
-
-        try {
-          await navigator.clipboard.writeText(shareURL)
-          console.log('[share] Copied link to clipboard:', shareURL)
-
-          // Get or create run hash
-          let runHash = getLastRunHash?.()
-
-          if (!runHash && getRunData && setLastRunHash) {
-            // First share of this rule - save it now
-            const { ca, rule, isStarred } = getRunData()
-            runHash = await saveRunStatistics(
-              ca,
-              rule.name,
-              rule.hex,
-              isStarred,
-            )
-
-            if (runHash) {
-              setLastRunHash(runHash)
-              console.log(
-                `[tracking] Saved and stored hash for ${rule.name}: ${runHash}`,
-              )
-            }
-          }
-
-          // Track the share
-          if (runHash) {
-            trackShare(runHash)
-          }
-
-          // Visual feedback - briefly change the button appearance
-          button.innerHTML = checkIcon
-          setTimeout(() => {
-            button.innerHTML = linkIcon
-          }, 1500)
-        } catch (err) {
-          console.error('[share] Failed to copy link:', err)
-        }
-      },
-    },
-    () => isTransitioning,
-  )
-
-  return { button, cleanup }
-}
+// --- Button Factories -------------------------------------------------------
+// Button creation functions moved to ./buttons/ subdirectory
 
 // --- Main -------------------------------------------------------------------
 export async function setupMobileLayout(
@@ -1268,23 +953,35 @@ export async function setupMobileLayout(
   // are discarded after being swapped out (not reused in the dual-canvas architecture)
   let currentlyVisibleRuleHash: string | undefined = undefined
 
-  let shareBtn = createShareButton(
-    resetControlFade,
-    () => ({ ca: onScreenCA, rule: onScreenRule, isStarred: currentIsStarred }),
-    () => currentlyVisibleRuleHash,
-    (hash) => {
+  let shareBtn = createShareButton({
+    onResetFade: resetControlFade,
+    isTransitioning: () => isTransitioning,
+    getRunData: () => ({
+      ca: onScreenCA,
+      rule: onScreenRule,
+      isStarred: currentIsStarred,
+    }),
+    getLastRunHash: () => currentlyVisibleRuleHash,
+    setLastRunHash: (hash) => {
       currentlyVisibleRuleHash = hash
     },
-  )
-  let statsBtn = createStatsButton(
-    () => showStats(getCurrentRunData()),
-    resetControlFade,
-    () => ({ ca: onScreenCA, rule: onScreenRule, isStarred: currentIsStarred }),
-    () => currentlyVisibleRuleHash,
-    (hash) => {
+    saveRunStatistics,
+  })
+  let statsBtn = createStatsButton({
+    onShowStats: () => showStats(getCurrentRunData()),
+    onResetFade: resetControlFade,
+    isTransitioning: () => isTransitioning,
+    getRunData: () => ({
+      ca: onScreenCA,
+      rule: onScreenRule,
+      isStarred: currentIsStarred,
+    }),
+    getLastRunHash: () => currentlyVisibleRuleHash,
+    setLastRunHash: (hash) => {
       currentlyVisibleRuleHash = hash
     },
-  )
+    saveRunStatistics,
+  })
   let starBtn = createStarButton({
     getIsStarred: () => currentIsStarred,
     onToggle: (isStarred) => {
@@ -1293,10 +990,14 @@ export async function setupMobileLayout(
     onResetFade: resetControlFade,
     isTransitioning: () => isTransitioning,
   })
-  let softResetButton = createSoftResetButton(() => {
-    softResetAutomata(onScreenCA)
-    startAutomata(onScreenCA, onScreenRule)
-  }, resetControlFade)
+  let softResetButton = createSoftResetButton({
+    onSoftReset: () => {
+      softResetAutomata(onScreenCA)
+      startAutomata(onScreenCA, onScreenRule)
+    },
+    onResetFade: resetControlFade,
+    isTransitioning: () => isTransitioning,
+  })
 
   // Wire up died-out callback to pulse reset button
   onDiedOutCallback = () => {
@@ -1390,31 +1091,35 @@ export async function setupMobileLayout(
       starBtn.cleanup()
       statsBtn.cleanup()
 
-      shareBtn = createShareButton(
-        resetControlFade,
-        () => ({
+      shareBtn = createShareButton({
+        onResetFade: resetControlFade,
+        isTransitioning: () => isTransitioning,
+        getRunData: () => ({
           ca: onScreenCA,
           rule: onScreenRule,
           isStarred: currentIsStarred,
         }),
-        () => currentlyVisibleRuleHash,
-        (hash) => {
+        getLastRunHash: () => currentlyVisibleRuleHash,
+        setLastRunHash: (hash) => {
           currentlyVisibleRuleHash = hash
         },
-      )
-      statsBtn = createStatsButton(
-        () => showStats(getCurrentRunData()),
-        resetControlFade,
-        () => ({
+        saveRunStatistics,
+      })
+      statsBtn = createStatsButton({
+        onShowStats: () => showStats(getCurrentRunData()),
+        onResetFade: resetControlFade,
+        isTransitioning: () => isTransitioning,
+        getRunData: () => ({
           ca: onScreenCA,
           rule: onScreenRule,
           isStarred: currentIsStarred,
         }),
-        () => currentlyVisibleRuleHash,
-        (hash) => {
+        getLastRunHash: () => currentlyVisibleRuleHash,
+        setLastRunHash: (hash) => {
           currentlyVisibleRuleHash = hash
         },
-      )
+        saveRunStatistics,
+      })
       starBtn = createStarButton({
         getIsStarred: () => currentIsStarred,
         onToggle: (isStarred) => {
@@ -1423,10 +1128,14 @@ export async function setupMobileLayout(
         onResetFade: resetControlFade,
         isTransitioning: () => isTransitioning,
       })
-      softResetButton = createSoftResetButton(() => {
-        softResetAutomata(onScreenCA)
-        startAutomata(onScreenCA, onScreenRule)
-      }, resetControlFade)
+      softResetButton = createSoftResetButton({
+        onSoftReset: () => {
+          softResetAutomata(onScreenCA)
+          startAutomata(onScreenCA, onScreenRule)
+        },
+        onResetFade: resetControlFade,
+        isTransitioning: () => isTransitioning,
+      })
 
       controlContainer.innerHTML = ''
       controlContainer.appendChild(softResetButton.button)
