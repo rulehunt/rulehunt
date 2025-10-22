@@ -22,9 +22,7 @@ export interface SoftResetButtonDeps {
  * @param deps - Dependencies for button operation
  * @returns Button element, cleanup function, and pulse control methods
  */
-export function createSoftResetButton(
-  deps: SoftResetButtonDeps,
-): {
+export function createSoftResetButton(deps: SoftResetButtonDeps): {
   button: HTMLButtonElement
   cleanup: () => void
   startPulse: () => void

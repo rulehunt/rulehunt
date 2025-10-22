@@ -1,8 +1,8 @@
 // src/components/mobile/caLifecycle.ts
 
+import { createCellularAutomata } from '../../cellular-automata-factory'
 import type { ICellularAutomata } from '../../cellular-automata-interface'
 import type { C4Ruleset } from '../../schema'
-import { createCellularAutomata } from '../../cellular-automata-factory'
 import { expandC4Ruleset } from '../../utils'
 import type { RuleData } from './layout'
 

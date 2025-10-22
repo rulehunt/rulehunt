@@ -1,9 +1,9 @@
 // src/components/mobile/buttons/statsButton.ts
 
-import type { ICellularAutomata } from '../../../cellular-automata-interface'
-import { createRoundButton } from '../roundButton'
 import { trackStatsView } from '../../../api/stats-view'
+import type { ICellularAutomata } from '../../../cellular-automata-interface'
 import type { RuleData } from '../layout'
+import { createRoundButton } from '../roundButton'
 
 /**
  * Dependencies required by the stats button factory.
@@ -45,9 +45,10 @@ export interface StatsButtonDeps {
  * @param deps - Dependencies for button operation
  * @returns Button element and cleanup function
  */
-export function createStatsButton(
-  deps: StatsButtonDeps,
-): { button: HTMLButtonElement; cleanup: () => void } {
+export function createStatsButton(deps: StatsButtonDeps): {
+  button: HTMLButtonElement
+  cleanup: () => void
+} {
   const {
     onShowStats,
     onResetFade,
