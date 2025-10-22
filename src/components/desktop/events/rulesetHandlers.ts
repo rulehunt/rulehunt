@@ -1,6 +1,7 @@
 // src/components/desktop/events/rulesetHandlers.ts
 
 import type { CellularAutomata } from '../../../cellular-automata-cpu.ts'
+import { outlierRule } from '../../../outlier-rule.ts'
 import type { C4Ruleset } from '../../../schema.ts'
 import {
   conwayRule,
@@ -8,9 +9,8 @@ import {
   makeC4Ruleset,
   mutateC4Ruleset,
 } from '../../../utils.ts'
-import { outlierRule } from '../../../outlier-rule.ts'
-import { renderRule } from '../utils/ruleRenderer.ts'
 import { getCurrentThemeColors } from '../../shared/theme.ts'
+import { renderRule } from '../utils/ruleRenderer.ts'
 
 export interface RulesetHandlerDeps {
   cellularAutomata: CellularAutomata
@@ -58,7 +58,10 @@ export function setupConwayHandler(
     if (deps.cellularAutomata.isCurrentlyPlaying()) {
       deps.cellularAutomata.pause()
       const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value)
-      const expanded = expandC4Ruleset(deps.currentRuleset.value, deps.orbitLookup)
+      const expanded = expandC4Ruleset(
+        deps.currentRuleset.value,
+        deps.orbitLookup,
+      )
       deps.cellularAutomata.play(stepsPerSecond, expanded)
     }
   })
@@ -93,7 +96,10 @@ export function setupOutlierHandler(
     if (deps.cellularAutomata.isCurrentlyPlaying()) {
       deps.cellularAutomata.pause()
       const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value)
-      const expanded = expandC4Ruleset(deps.currentRuleset.value, deps.orbitLookup)
+      const expanded = expandC4Ruleset(
+        deps.currentRuleset.value,
+        deps.orbitLookup,
+      )
       deps.cellularAutomata.play(stepsPerSecond, expanded)
     }
   })
@@ -146,7 +152,10 @@ export function setupMutateHandler(
     if (deps.cellularAutomata.isCurrentlyPlaying()) {
       deps.cellularAutomata.pause()
       const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value)
-      const expanded = expandC4Ruleset(deps.currentRuleset.value, deps.orbitLookup)
+      const expanded = expandC4Ruleset(
+        deps.currentRuleset.value,
+        deps.orbitLookup,
+      )
       deps.cellularAutomata.play(stepsPerSecond, expanded)
     }
   })

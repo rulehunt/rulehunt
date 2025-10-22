@@ -3,11 +3,11 @@
 import type { CellularAutomata } from '../../../cellular-automata-cpu.ts'
 import type { C4Ruleset } from '../../../schema.ts'
 import { expandC4Ruleset } from '../../../utils.ts'
-import { updateStatisticsDisplay } from '../utils/statsUpdater.ts'
+import type { AudioEngine } from '../../audioEngine.ts'
 import type { createProgressBar } from '../progressBar.ts'
 import type { createStatsBar } from '../statsBar.ts'
 import type { SummaryPanelElements } from '../summary.ts'
-import type { AudioEngine } from '../../audioEngine.ts'
+import { updateStatisticsDisplay } from '../utils/statsUpdater.ts'
 
 export interface SimulationHandlerDeps {
   cellularAutomata: CellularAutomata
@@ -42,7 +42,10 @@ export function setupStepHandler(
         deps.statsUpdateInterval.value = null
       }
     }
-    const expanded = expandC4Ruleset(deps.currentRuleset.value, deps.orbitLookup)
+    const expanded = expandC4Ruleset(
+      deps.currentRuleset.value,
+      deps.orbitLookup,
+    )
     deps.cellularAutomata.step(expanded)
     updateStatisticsDisplay(
       deps.cellularAutomata,
@@ -139,7 +142,10 @@ export function setupPlayPauseHandler(
       }
     } else {
       const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value)
-      const expanded = expandC4Ruleset(deps.currentRuleset.value, deps.orbitLookup)
+      const expanded = expandC4Ruleset(
+        deps.currentRuleset.value,
+        deps.orbitLookup,
+      )
       deps.cellularAutomata.play(stepsPerSecond, expanded)
       btnPlay.textContent = 'Pause'
 
@@ -174,7 +180,10 @@ export function setupStepsPerSecondHandler(
     if (deps.cellularAutomata.isCurrentlyPlaying()) {
       deps.cellularAutomata.pause()
       const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
-      const expanded = expandC4Ruleset(deps.currentRuleset.value, deps.orbitLookup)
+      const expanded = expandC4Ruleset(
+        deps.currentRuleset.value,
+        deps.orbitLookup,
+      )
       deps.cellularAutomata.play(stepsPerSecond, expanded)
 
       const stats = deps.cellularAutomata.getStatistics()

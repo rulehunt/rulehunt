@@ -1,8 +1,8 @@
 // src/components/desktop/events/displayHandlers.ts
 
 import type { C4Ruleset } from '../../../schema.ts'
-import { renderRule } from '../utils/ruleRenderer.ts'
 import { getCurrentThemeColors } from '../../shared/theme.ts'
+import { renderRule } from '../utils/ruleRenderer.ts'
 
 export interface DisplayHandlerDeps {
   currentRuleset: { value: C4Ruleset }
@@ -70,7 +70,10 @@ export function setupSeedTypeHandlers(
   radioCenterSeed: HTMLInputElement,
   radioRandomSeed: HTMLInputElement,
   radioPatchSeed: HTMLInputElement,
-  deps: Pick<DisplayHandlerDeps, 'initialConditionType' | 'applyInitialCondition'>,
+  deps: Pick<
+    DisplayHandlerDeps,
+    'initialConditionType' | 'applyInitialCondition'
+  >,
 ) {
   radioCenterSeed.addEventListener('change', () => {
     if (radioCenterSeed.checked) {

@@ -109,7 +109,10 @@ export function setupCsvExportHandler(deps: ExportHandlerDeps) {
       ['Entropy 8x8', (recent?.entropy8x8 ?? 0).toFixed(4)],
       ['Entity Count', (recent?.entityCount ?? 0).toString()],
       ['Entity Change', (recent?.entityChange ?? 0).toString()],
-      ['Total Entities Ever Seen', (recent?.totalEntitiesEverSeen ?? 0).toString()],
+      [
+        'Total Entities Ever Seen',
+        (recent?.totalEntitiesEverSeen ?? 0).toString(),
+      ],
       ['Unique Patterns', (recent?.uniquePatterns ?? 0).toString()],
       ['Entities Alive', (recent?.entitiesAlive ?? 0).toString()],
       ['Entities Died', (recent?.entitiesDied ?? 0).toString()],

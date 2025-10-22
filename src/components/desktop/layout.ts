@@ -1,8 +1,13 @@
-import { saveRun } from '../../api/save'
+import { fetchStatistics } from '../../api/statistics.ts'
 import { CellularAutomata } from '../../cellular-automata-cpu.ts'
 import { AudioEngine } from '../../components/audioEngine.ts'
-import type { C4OrbitsData, C4Ruleset, RunSubmission } from '../../schema.ts'
+import type { C4OrbitsData, C4Ruleset } from '../../schema.ts'
 import type { CleanupFunction } from '../../types'
+import {
+  parseURLRuleset,
+  parseURLState,
+  updateURLWithoutReload,
+} from '../../urlState.ts'
 import {
   buildOrbitLookup,
   c4RulesetToHex,
@@ -11,17 +16,38 @@ import {
   makeC4Ruleset,
   randomC4RulesetByDensity,
 } from '../../utils.ts'
-
-import { getRunStatsSnapshot } from '../../api/statistics-utils.ts'
-import { fetchStatistics } from '../../api/statistics.ts'
-import {
-  parseURLRuleset,
-  parseURLState,
-  updateURLWithoutReload,
-} from '../../urlState.ts'
 import { getCurrentThemeColors } from '../shared/theme.ts'
 import { setupBenchmarkModal } from './benchmark.ts'
 import { setupDataModeLayout } from './dataMode.ts'
+import {
+  setupAliveSliderHandler,
+  setupDisplayModeHandlers,
+  setupSeedTypeHandlers,
+} from './events/displayHandlers.ts'
+import {
+  setupCsvExportHandler,
+  setupJsonExportHandler,
+} from './events/exportHandlers.ts'
+import {
+  setupBenchmarkHandler,
+  setupHeadlessHandler,
+  setupZoomHandlers,
+} from './events/miscHandlers.ts'
+import {
+  setupConwayHandler,
+  setupMutateHandler,
+  setupOutlierHandler,
+  setupRandomRulesetHandler,
+  setupSliderHandlers,
+  setupStarHandler,
+} from './events/rulesetHandlers.ts'
+import {
+  createResetPulseStarter,
+  setupPlayPauseHandler,
+  setupResetHandler,
+  setupStepHandler,
+  setupStepsPerSecondHandler,
+} from './events/simulationHandlers.ts'
 import { createHeader } from './header.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import { createPatternInspector } from './patternInspector.ts'
@@ -33,41 +59,11 @@ import { createStatsBar } from './statsBar.ts'
 import { createSummaryPanel } from './summary.ts'
 import { type TabId, createTabContainer } from './tabContainer.ts'
 import { setupTheme } from './theme.ts'
-import { createZoomSlider } from './zoomSlider.ts'
+import { handleCanvasClick } from './utils/canvasInteraction.ts'
 import { renderRule } from './utils/ruleRenderer.ts'
 import { updateStatisticsDisplay } from './utils/statsUpdater.ts'
-import { handleCanvasClick } from './utils/canvasInteraction.ts'
-import {
-  setupConwayHandler,
-  setupOutlierHandler,
-  setupRandomRulesetHandler,
-  setupMutateHandler,
-  setupStarHandler,
-  setupSliderHandlers,
-} from './events/rulesetHandlers.ts'
-import {
-  setupStepHandler,
-  setupResetHandler,
-  createResetPulseStarter,
-  setupPlayPauseHandler,
-  setupStepsPerSecondHandler,
-} from './events/simulationHandlers.ts'
-import {
-  setupDisplayModeHandlers,
-  setupSeedTypeHandlers,
-  setupAliveSliderHandler,
-} from './events/displayHandlers.ts'
-import {
-  setupJsonExportHandler,
-  setupCsvExportHandler,
-} from './events/exportHandlers.ts'
-import {
-  setupZoomHandlers,
-  setupBenchmarkHandler,
-  setupHeadlessHandler,
-} from './events/miscHandlers.ts'
+import { createZoomSlider } from './zoomSlider.ts'
 
-const PROGRESS_BAR_STEPS = 500
 const GRID_ROWS = 400
 const GRID_COLS = 400
 
@@ -396,24 +392,44 @@ export async function setupDesktopLayout(
 
   // Create ref objects for passing mutable state to event handlers
   const currentRulesetRef = {
-    get value() { return currentRuleset },
-    set value(v: C4Ruleset) { currentRuleset = v }
+    get value() {
+      return currentRuleset
+    },
+    set value(v: C4Ruleset) {
+      currentRuleset = v
+    },
   }
   const initialConditionTypeRef = {
-    get value() { return initialConditionType },
-    set value(v: 'center' | 'random' | 'patch') { initialConditionType = v }
+    get value() {
+      return initialConditionType
+    },
+    set value(v: 'center' | 'random' | 'patch') {
+      initialConditionType = v
+    },
   }
   const displayModeRef = {
-    get value() { return displayMode },
-    set value(v: DisplayMode) { displayMode = v }
+    get value() {
+      return displayMode
+    },
+    set value(v: DisplayMode) {
+      displayMode = v
+    },
   }
   const statsUpdateIntervalRef = {
-    get value() { return statsUpdateInterval },
-    set value(v: number | null) { statsUpdateInterval = v }
+    get value() {
+      return statsUpdateInterval
+    },
+    set value(v: number | null) {
+      statsUpdateInterval = v
+    },
   }
   const isStarredRef = {
-    get value() { return isStarred },
-    set value(v: boolean) { isStarred = v }
+    get value() {
+      return isStarred
+    },
+    set value(v: boolean) {
+      isStarred = v
+    },
   }
 
   // Apply URL seed if provided
@@ -731,7 +747,7 @@ export async function setupDesktopLayout(
     currentRuleset: currentRulesetRef,
     isStarred: isStarredRef,
     updateStarButtonAppearance,
-    applyInitialCondition
+    applyInitialCondition,
   }
 
   setupStarHandler(btnStar, isStarredRef, updateStarButtonAppearance)
@@ -739,7 +755,13 @@ export async function setupDesktopLayout(
   setupOutlierHandler(btnOutlier, rulesetHandlerDeps)
   setupRandomRulesetHandler(btnRandomC4Ruleset, generateRandomPatternRule)
   setupMutateHandler(btnMutate, rulesetHandlerDeps)
-  setupSliderHandlers(orbitSlider, orbitValue, mutationSlider, mutationValue, generateRandomPatternRule)
+  setupSliderHandlers(
+    orbitSlider,
+    orbitValue,
+    mutationSlider,
+    mutationValue,
+    generateRandomPatternRule,
+  )
 
   // Setup display mode handlers
   radioDisplayOrbits.checked = true
@@ -752,11 +774,20 @@ export async function setupDesktopLayout(
     ruleIdDisplay,
     displayMode: displayModeRef,
     applyInitialCondition,
-    initialConditionType: initialConditionTypeRef
+    initialConditionType: initialConditionTypeRef,
   }
 
-  setupDisplayModeHandlers(radioDisplayOrbits, radioDisplayFull, displayHandlerDeps)
-  setupSeedTypeHandlers(radioCenterSeed, radioRandomSeed, radioPatchSeed, displayHandlerDeps)
+  setupDisplayModeHandlers(
+    radioDisplayOrbits,
+    radioDisplayFull,
+    displayHandlerDeps,
+  )
+  setupSeedTypeHandlers(
+    radioCenterSeed,
+    radioRandomSeed,
+    radioPatchSeed,
+    displayHandlerDeps,
+  )
 
   // Setup simulation control handlers
   const simulationHandlerDeps = {
@@ -772,7 +803,7 @@ export async function setupDesktopLayout(
     applyInitialCondition,
     initialConditionType: initialConditionTypeRef,
     initializeSimulationMetadata,
-    updateURL
+    updateURL,
   }
 
   setupStepHandler(btnStep, btnPlay, simulationHandlerDeps)
@@ -798,94 +829,11 @@ export async function setupDesktopLayout(
   const exportHandlerDeps = {
     cellularAutomata,
     currentRuleset: currentRulesetRef,
-    summaryPanel
+    summaryPanel,
   }
 
   setupJsonExportHandler(exportHandlerDeps)
   setupCsvExportHandler(exportHandlerDeps)
-
-  // Autosave logic: track progress and autosave when reaching 100%
-  let hasAutosaved = false
-
-  // Currently unused but kept for future autosave feature
-  function _checkAndAutosave() {
-    const progress = progressBar.value()
-
-    if (progress >= 100 && !hasAutosaved) {
-      hasAutosaved = true
-
-      console.log('[desktop] Progress reached 100%, autosaving...')
-
-      // --- Gather statistics ---
-      const stats = cellularAutomata.getStatistics()
-      const { metadata, recent } = getRunStatsSnapshot(cellularAutomata)
-
-      // Always compute fresh hex from current ruleset to avoid placeholder text
-      const rulesetHex = c4RulesetToHex(currentRuleset)
-      const rulesetName = ruleLabelDisplay.textContent || 'Unknown'
-
-      const interestScore = stats.calculateInterestScore()
-      const watchedWallMs = stats.getElapsedTime()
-      const actualSps = stats.getActualStepsPerSecond()
-      const stepCount = metadata?.stepCount ?? 0
-
-      const runPayload: Omit<RunSubmission, 'userId' | 'userLabel'> = {
-        rulesetName,
-        rulesetHex,
-        seed: cellularAutomata.getSeed(),
-        seedType: (metadata?.seedType ?? 'patch') as
-          | 'center'
-          | 'random'
-          | 'patch',
-        seedPercentage: metadata?.seedPercentage,
-        stepCount,
-        watchedSteps: stepCount,
-        watchedWallMs,
-        gridSize: cellularAutomata.getGridSize(),
-        progress_bar_steps: PROGRESS_BAR_STEPS,
-        requestedSps: metadata?.requestedStepsPerSecond,
-        actualSps,
-        population: recent.population,
-        activity: recent.activity,
-        populationChange: recent.populationChange,
-        entropy2x2: recent.entropy2x2,
-        entropy4x4: recent.entropy4x4,
-        entropy8x8: recent.entropy8x8,
-        entityCount: recent.entityCount,
-        entityChange: recent.entityChange,
-        totalEntitiesEverSeen: recent.totalEntitiesEverSeen,
-        uniquePatterns: recent.uniquePatterns,
-        entitiesAlive: recent.entitiesAlive,
-        entitiesDied: recent.entitiesDied,
-        interestScore,
-        isStarred,
-        simVersion: 'v0.1.0-desktop-autosave',
-        engineCommit: undefined,
-        extraScores: undefined,
-      }
-
-      // --- Fire and forget background save ---
-      saveRun(runPayload)
-        .then(() => {
-          console.log('[desktop] Autosave successful')
-          // Wait 3 seconds, then auto-mutate
-          setTimeout(() => {
-            console.log('[desktop] Auto-mutating to new ruleset...')
-            btnMutate.click()
-            hasAutosaved = false // Reset for next cycle
-          }, 3000)
-        })
-        .catch((error) => {
-          console.error('[desktop] Autosave failed:', error)
-          // Still reset and mutate even if save failed
-          setTimeout(() => {
-            console.log('[desktop] Auto-mutating to new ruleset...')
-            btnMutate.click()
-            hasAutosaved = false
-          }, 3000)
-        })
-    }
-  }
 
   // Mobile preview toggle
   if (header.elements.mobilePreviewButton) {
