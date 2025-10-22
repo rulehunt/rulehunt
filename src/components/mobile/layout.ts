@@ -155,7 +155,6 @@ let isTransitioning = false
 let offscreenReady = false
 let swipeLockUntil = 0
 let gestureId = 0
-
 // Zoom Buttons (pinch gesture is hard!)
 
 function createZoomButtons(
@@ -712,6 +711,18 @@ export async function setupMobileLayout(
   // Track starred status (resets to false after each swipe)
   let currentIsStarred = false
 
+  // Rule history for bidirectional navigation (issue #170)
+  interface RuleHistoryEntry {
+    rule: RuleData
+    seed: number // Preserve exact seed for reproducible rendering
+    isStarred: boolean // Track starred state per pattern
+    timestamp: number
+  }
+
+  const HISTORY_SIZE = 50 // Keep last 50 rules
+  const ruleHistory: RuleHistoryEntry[] = []
+  let historyIndex = -1 // Current position in history (-1 = no history yet)
+
   // Create control buttons with auto-fade container
   const {
     container: controlContainer,
@@ -754,6 +765,13 @@ export async function setupMobileLayout(
     getIsStarred: () => currentIsStarred,
     onToggle: (isStarred) => {
       currentIsStarred = isStarred
+      // Update history entry if viewing historical pattern (issue #170)
+      if (historyIndex >= 0 && historyIndex < ruleHistory.length) {
+        ruleHistory[historyIndex].isStarred = isStarred
+        console.log(
+          `[history] Updated starred status at history[${historyIndex}] to ${isStarred}`,
+        )
+      }
     },
     onResetFade: resetControlFade,
     isTransitioning: () => isTransitioning,
@@ -798,7 +816,7 @@ export async function setupMobileLayout(
 
   const swipeCallbacks: SwipeGestureCallbacks = {
     // --- onCommit: Called AFTER animation, swaps and prepares for next -------
-    onCommit: () => {
+    onCommit: async (direction: 'up' | 'down') => {
       offscreenReady = false
 
       if (!hasSwipedOnce) {
@@ -810,13 +828,84 @@ export async function setupMobileLayout(
       // Note: We save statistics on-demand when user clicks Share/Stats buttons
       // This ensures hash is always available for the currently visible rule
 
-      // Reset starred status for next simulation
-      currentIsStarred = false
+      // Bidirectional navigation with history (issue #170)
+      let nextRule: RuleData
+      let nextSeed: number
+      let isFromHistory = false
 
+      if (direction === 'up') {
+        // Forward navigation
+        if (historyIndex < ruleHistory.length - 1) {
+          // Navigate forward in history
+          historyIndex++
+          const entry = ruleHistory[historyIndex]
+          nextRule = entry.rule
+          nextSeed = entry.seed
+          currentIsStarred = entry.isStarred
+          isFromHistory = true
+          console.log(
+            `[history] Navigate forward to history[${historyIndex}]: ${nextRule.name}`,
+          )
+        } else {
+          // At end of history → generate new rule
+          nextRule = await generateNextRule()
+          nextSeed = onScreenCA.getSeed()
+          currentIsStarred = false
+          console.log(`[history] Generate new rule at end: ${nextRule.name}`)
+        }
+      } else {
+        // Backward navigation (direction === 'down')
+        if (historyIndex > 0) {
+          // Navigate backward in history
+          historyIndex--
+          const entry = ruleHistory[historyIndex]
+          nextRule = entry.rule
+          nextSeed = entry.seed
+          currentIsStarred = entry.isStarred
+          isFromHistory = true
+          console.log(
+            `[history] Navigate backward to history[${historyIndex}]: ${nextRule.name}`,
+          )
+        } else {
+          // At start of history → generate new rule (symmetric behavior)
+          nextRule = await generateNextRule()
+          nextSeed = onScreenCA.getSeed()
+          currentIsStarred = false
+          console.log(`[history] Generate new rule at start: ${nextRule.name}`)
+        }
+      }
+
+      // Add newly generated rule to history
+      if (!isFromHistory) {
+        // Truncate history after current position (if user was browsing backward)
+        ruleHistory.splice(historyIndex + 1)
+
+        ruleHistory.push({
+          rule: nextRule,
+          seed: nextSeed,
+          isStarred: currentIsStarred,
+          timestamp: Date.now(),
+        })
+
+        // Limit history size (keep most recent N)
+        if (ruleHistory.length > HISTORY_SIZE) {
+          ruleHistory.shift()
+          // Adjust index since we removed from the start
+          if (historyIndex > 0) historyIndex--
+        }
+
+        historyIndex = ruleHistory.length - 1
+        console.log(
+          `[history] Added to history, now at index ${historyIndex}/${ruleHistory.length}`,
+        )
+      }
       // Swap references: incoming becomes onScreen, outgoing becomes offScreen
       ;[onScreenCanvas, offScreenCanvas] = [offScreenCanvas, onScreenCanvas]
       ;[onScreenCA, offScreenCA] = [offScreenCA, onScreenCA]
       ;[onScreenRule, offScreenRule] = [offScreenRule, onScreenRule]
+
+      // Update onScreenRule to the next rule
+      onScreenRule = nextRule
 
       // Clear hash for newly visible rule (will be set when save completes)
       currentlyVisibleRuleHash = undefined
@@ -846,13 +935,20 @@ export async function setupMobileLayout(
 
       // Defer CA operations by one frame to let layout settle
       setTimeout(async () => {
+        // Prepare the onScreen CA with the next rule
+        prepareAutomata(onScreenCA, onScreenRule, lookup, 50)
+        // If from history, use saved seed for exact reproduction
+        if (isFromHistory) {
+          onScreenCA.setSeed(nextSeed)
+        }
+
         initializeRunStats(onScreenCA, onScreenRule)
 
         // Start the newly visible CA and render
         startAutomata(onScreenCA, onScreenRule)
 
-        // Prepare offscreen CA for the next swipe with explicit render
-        // Use exploration/exploitation strategy (80% random, 20% starred)
+        // Prepare offscreen CA for the next swipe
+        // Always generate a new pattern for offscreen (will be used if navigating forward)
         offScreenRule = await generateNextRule()
         prepareAutomata(offScreenCA, offScreenRule, lookup, 50)
         offscreenReady = true
@@ -905,6 +1001,13 @@ export async function setupMobileLayout(
         getIsStarred: () => currentIsStarred,
         onToggle: (isStarred) => {
           currentIsStarred = isStarred
+          // Update history entry if viewing historical pattern (issue #170)
+          if (historyIndex >= 0 && historyIndex < ruleHistory.length) {
+            ruleHistory[historyIndex].isStarred = isStarred
+            console.log(
+              `[history] Updated starred status at history[${historyIndex}] to ${isStarred}`,
+            )
+          }
         },
         onResetFade: resetControlFade,
         isTransitioning: () => isTransitioning,

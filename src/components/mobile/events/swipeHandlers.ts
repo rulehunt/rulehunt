@@ -15,8 +15,8 @@ export const SWIPE_FAST_THROW_THRESHOLD = -0.5 // pixels/ms for fast flicks
  * These callbacks are invoked during different phases of the swipe lifecycle.
  */
 export interface SwipeGestureCallbacks {
-  /** Called when a swipe gesture is committed (user confirms navigation) */
-  onCommit: () => void
+  /** Called when a swipe gesture is committed (user confirms navigation), receives direction */
+  onCommit: (direction: 'up' | 'down') => void
   /** Called when a swipe gesture is cancelled (user releases without committing) */
   onCancel: () => void
   /** Optional: Called when drag starts (useful for pausing animations) */
@@ -164,20 +164,11 @@ export function setupDualCanvasSwipe(
     // Lock direction with a little hysteresis
     if (!directionLocked && absDy > 8) {
       directionLocked = dy < 0 ? 'up' : 'down'
-      // Pause only when we know it's an upward swipe (real intent)
-      if (directionLocked === 'up' && !pausedForDrag) {
+      // Pause for both up and down swipes (bidirectional navigation)
+      if (!pausedForDrag) {
         onDragStart?.()
         pausedForDrag = true
       }
-    }
-
-    // Reject downward gestures early & visibly snap back
-    if (directionLocked === 'down') {
-      dragging = false
-      const h = getHeight()
-      resetTransforms(h)
-      onCancel()
-      return
     }
 
     currentY = y
@@ -185,12 +176,21 @@ export function setupDualCanvasSwipe(
     const cutoff = e.timeStamp - 100
     while (samples.length > 2 && samples[0].t < cutoff) samples.shift()
 
-    const delta = Math.min(0, dy)
     const height = getHeight()
-
     const { onScreen, offScreen } = getCurrentCanvases()
-    onScreen.style.transform = `translateY(${delta}px)`
-    offScreen.style.transform = `translateY(${height + delta}px)`
+
+    // Support bidirectional dragging animation
+    if (directionLocked === 'up') {
+      // Upward drag: negative delta, offScreen comes from below
+      const delta = Math.min(0, dy)
+      onScreen.style.transform = `translateY(${delta}px)`
+      offScreen.style.transform = `translateY(${height + delta}px)`
+    } else if (directionLocked === 'down') {
+      // Downward drag: positive delta, offScreen comes from above
+      const delta = Math.max(0, dy)
+      onScreen.style.transform = `translateY(${delta}px)`
+      offScreen.style.transform = `translateY(${delta - height}px)`
+    }
   }
 
   const doCancel = async () => {
@@ -200,7 +200,11 @@ export function setupDualCanvasSwipe(
     const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1)`
 
     const targetOnScreen = 'translateY(0)'
-    const targetOffScreen = `translateY(${height}px)`
+    // offScreen position depends on direction: below for up swipes, above for down swipes
+    const targetOffScreenUp = `translateY(${height}px)`
+    const targetOffScreenDown = `translateY(-${height}px)`
+    const targetOffScreen =
+      directionLocked === 'down' ? targetOffScreenDown : targetOffScreenUp
 
     const curOnScreen = onScreen.style.transform || ''
     const curOffScreen = offScreen.style.transform || ''
@@ -245,12 +249,8 @@ export function setupDualCanvasSwipe(
     const dragDistance = Math.abs(delta)
     const tinyAccidentalMove = dragDistance < 15
 
-    if (
-      !wasDragging ||
-      forceCancel ||
-      lockedDirection === 'down' ||
-      tinyAccidentalMove
-    ) {
+    // Support bidirectional swipes (both up and down)
+    if (!wasDragging || forceCancel || !lockedDirection || tinyAccidentalMove) {
       await doCancel()
       state.setSwipeLockUntil(performance.now() + 350)
       return
@@ -267,12 +267,20 @@ export function setupDualCanvasSwipe(
       vy = (b.y - a.y) / dt
     }
 
-    const slowPullback = delta > 0
-    const fastFlick = vy < SWIPE_FAST_THROW_THRESHOLD
+    // Check velocity and distance for commit (support both up and down)
+    const isUpSwipe = lockedDirection === 'up'
+
+    // For up: negative delta, negative vy. For down: positive delta, positive vy
+    const slowPullback = isUpSwipe ? delta > 0 : delta < 0
+    const fastFlick = isUpSwipe
+      ? vy < SWIPE_FAST_THROW_THRESHOLD
+      : vy > -SWIPE_FAST_THROW_THRESHOLD
     const normalFlick =
       dragDistance > height * SWIPE_COMMIT_THRESHOLD_PERCENT ||
       (dragDistance > SWIPE_COMMIT_MIN_DISTANCE &&
-        vy < SWIPE_VELOCITY_THRESHOLD)
+        (isUpSwipe
+          ? vy < SWIPE_VELOCITY_THRESHOLD
+          : vy > -SWIPE_VELOCITY_THRESHOLD))
 
     const shouldCommit =
       height > 0 &&
@@ -317,9 +325,16 @@ export function setupDualCanvasSwipe(
         }
       })
 
-      // Normal upward slide
-      onScreen.style.transform = `translateY(-${height}px)`
-      offScreen.style.transform = 'translateY(0)'
+      // Slide animation (direction-aware)
+      if (isUpSwipe) {
+        // Upward slide: onScreen goes up, offScreen comes from below
+        onScreen.style.transform = `translateY(-${height}px)`
+        offScreen.style.transform = 'translateY(0)'
+      } else {
+        // Downward slide: onScreen goes down, offScreen comes from above
+        onScreen.style.transform = `translateY(${height}px)`
+        offScreen.style.transform = 'translateY(0)'
+      }
 
       await Promise.all([
         waitForTransitionEndScoped(onScreen, state.getGestureId()),
@@ -328,13 +343,19 @@ export function setupDualCanvasSwipe(
 
       onScreen.style.transition = 'none'
       offScreen.style.transition = 'none'
-      onScreen.style.transform = `translateY(-${height}px)`
-      offScreen.style.transform = 'translateY(0)'
+      if (isUpSwipe) {
+        onScreen.style.transform = `translateY(-${height}px)`
+        offScreen.style.transform = 'translateY(0)'
+      } else {
+        onScreen.style.transform = `translateY(${height}px)`
+        offScreen.style.transform = 'translateY(0)'
+      }
 
       // Toggle the tracking flag BEFORE calling onCommit
       canvas1IsOnScreen = !canvas1IsOnScreen
 
-      requestAnimationFrame(() => onCommit())
+      // Pass direction to onCommit callback
+      requestAnimationFrame(() => onCommit(lockedDirection))
     } else {
       await doCancel()
     }
