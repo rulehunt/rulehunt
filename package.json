@@ -17,7 +17,6 @@
     "generate:c4-orbits": "tsx scripts/generate-c4-orbits.ts && pnpm run format",
     "test": "vitest",
     "test:coverage": "vitest run --coverage.enabled",
-    "typecheck": "tsc --noEmit",
     "db-local:init": "bash scripts/local-db-init.bash",
     "db-local:run": "npx wrangler pages dev dist --d1=DB",
     "db-prod:migrate": "wrangler d1 migrations apply rulehunt-db --remote",
