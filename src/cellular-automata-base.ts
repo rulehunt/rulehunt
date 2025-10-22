@@ -56,6 +56,7 @@ export abstract class CellularAutomataBase {
   protected zoomLevel = 1
   protected displayZoom = 1
   protected onDiedOut?: () => void
+  protected consecutiveNoActivitySteps = 0
 
   constructor(
     canvas: HTMLCanvasElement | null,
@@ -382,6 +383,7 @@ export abstract class CellularAutomataBase {
 
     this.lastStepsPerSecond = stepsPerSecond
     this.isPlaying = true
+    this.consecutiveNoActivitySteps = 0 // Reset counter when starting playback
     const intervalMs = 1000 / stepsPerSecond
     this.playInterval = window.setInterval(() => {
       this.step(active_ruleset)
@@ -404,19 +406,26 @@ export abstract class CellularAutomataBase {
   }
 
   /**
-   * Check if the simulation has died out (no living cells).
-   * Uses population threshold: < 0.1% of grid is alive.
+   * Check if the simulation has died out or become static.
+   * Tracks consecutive steps with zero activity (no cell changes).
    *
-   * @param threshold Population ratio threshold (default: 0.001 = 0.1%)
-   * @returns true if simulation has died out
+   * @param noActivityThreshold Number of consecutive steps with no activity before pausing (default: 10)
+   * @returns true if simulation should be paused
    */
-  protected isDiedOut(threshold = 0.001): boolean {
+  protected isDiedOut(noActivityThreshold = 10): boolean {
     const recentStats = this.statistics.getRecentStats(1)
     if (recentStats.length === 0) return false
 
     const stats = recentStats[0]
-    const populationRatio = stats.population / this.gridArea
-    return populationRatio < threshold
+
+    // Check if there was any activity (cell changes) in the last step
+    if (stats.activity === 0) {
+      this.consecutiveNoActivitySteps++
+    } else {
+      this.consecutiveNoActivitySteps = 0
+    }
+
+    return this.consecutiveNoActivitySteps >= noActivityThreshold
   }
 
   /** Lightweight deterministic 32-bit hash (FNV-1a) */
@@ -433,6 +442,7 @@ export abstract class CellularAutomataBase {
     // Deterministic hash-chain evolution
     this.seed = this.fnv1a32(this.seed)
     this.rng = makeRng(this.seed)
+    this.consecutiveNoActivitySteps = 0 // Reset counter on soft reset
 
     switch (this.lastSeedMethod) {
       case 'center':
