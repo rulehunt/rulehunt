@@ -166,7 +166,7 @@ function setupDualCanvasSwipe(
   wrapper: HTMLElement,
   canvas1: HTMLCanvasElement,
   canvas2: HTMLCanvasElement,
-  onCommit: () => void,
+  onCommit: (direction: 'up' | 'down') => void,
   onCancel: () => void,
   onDragStart?: () => void,
 ): CleanupFunction {
@@ -188,12 +188,6 @@ function setupDualCanvasSwipe(
     return canvas1IsOnScreen
       ? { onScreen: canvas1, offScreen: canvas2 }
       : { onScreen: canvas2, offScreen: canvas1 }
-  }
-
-  const resetTransforms = (h: number) => {
-    const { onScreen, offScreen } = getCurrentCanvases()
-    onScreen.style.transform = 'translateY(0)'
-    offScreen.style.transform = `translateY(${h}px)`
   }
 
   function waitForTransitionEndScoped(
@@ -260,20 +254,11 @@ function setupDualCanvasSwipe(
     // Lock direction with a little hysteresis
     if (!directionLocked && absDy > 8) {
       directionLocked = dy < 0 ? 'up' : 'down'
-      // Pause only when we know it's an upward swipe (real intent)
-      if (directionLocked === 'up' && !pausedForDrag) {
+      // Pause for both up and down swipes (bidirectional navigation)
+      if (!pausedForDrag) {
         onDragStart?.()
         pausedForDrag = true
       }
-    }
-
-    // Reject downward gestures early & visibly snap back
-    if (directionLocked === 'down') {
-      dragging = false
-      const h = getHeight()
-      resetTransforms(h)
-      onCancel()
-      return
     }
 
     currentY = y
@@ -281,12 +266,21 @@ function setupDualCanvasSwipe(
     const cutoff = e.timeStamp - 100
     while (samples.length > 2 && samples[0].t < cutoff) samples.shift()
 
-    const delta = Math.min(0, dy)
     const height = getHeight()
-
     const { onScreen, offScreen } = getCurrentCanvases()
-    onScreen.style.transform = `translateY(${delta}px)`
-    offScreen.style.transform = `translateY(${height + delta}px)`
+
+    // Support bidirectional dragging animation
+    if (directionLocked === 'up') {
+      // Upward drag: negative delta, offScreen comes from below
+      const delta = Math.min(0, dy)
+      onScreen.style.transform = `translateY(${delta}px)`
+      offScreen.style.transform = `translateY(${height + delta}px)`
+    } else if (directionLocked === 'down') {
+      // Downward drag: positive delta, offScreen comes from above
+      const delta = Math.max(0, dy)
+      onScreen.style.transform = `translateY(${delta}px)`
+      offScreen.style.transform = `translateY(${delta - height}px)`
+    }
   }
 
   const doCancel = async () => {
@@ -296,7 +290,10 @@ function setupDualCanvasSwipe(
     const transition = `transform ${duration}s cubic-bezier(0.4,0,0.2,1)`
 
     const targetOnScreen = 'translateY(0)'
-    const targetOffScreen = `translateY(${height}px)`
+    // offScreen position depends on direction: below for up swipes, above for down swipes
+    const targetOffScreenUp = `translateY(${height}px)`
+    const targetOffScreenDown = `translateY(-${height}px)`
+    const targetOffScreen = directionLocked === 'down' ? targetOffScreenDown : targetOffScreenUp
 
     const curOnScreen = onScreen.style.transform || ''
     const curOffScreen = offScreen.style.transform || ''
@@ -341,10 +338,11 @@ function setupDualCanvasSwipe(
     const dragDistance = Math.abs(delta)
     const tinyAccidentalMove = dragDistance < 15
 
+    // Support bidirectional swipes (both up and down)
     if (
       !wasDragging ||
       forceCancel ||
-      lockedDirection === 'down' ||
+      !lockedDirection ||
       tinyAccidentalMove
     ) {
       await doCancel()
@@ -363,12 +361,18 @@ function setupDualCanvasSwipe(
       vy = (b.y - a.y) / dt
     }
 
-    const slowPullback = delta > 0
-    const fastFlick = vy < SWIPE_FAST_THROW_THRESHOLD
+    // Check velocity and distance for commit (support both up and down)
+    const isUpSwipe = lockedDirection === 'up'
+
+    // For up: negative delta, negative vy. For down: positive delta, positive vy
+    const slowPullback = isUpSwipe ? delta > 0 : delta < 0
+    const fastFlick = isUpSwipe
+      ? vy < SWIPE_FAST_THROW_THRESHOLD
+      : vy > -SWIPE_FAST_THROW_THRESHOLD
     const normalFlick =
       dragDistance > height * SWIPE_COMMIT_THRESHOLD_PERCENT ||
       (dragDistance > SWIPE_COMMIT_MIN_DISTANCE &&
-        vy < SWIPE_VELOCITY_THRESHOLD)
+        (isUpSwipe ? vy < SWIPE_VELOCITY_THRESHOLD : vy > -SWIPE_VELOCITY_THRESHOLD))
 
     const shouldCommit =
       height > 0 &&
@@ -413,9 +417,16 @@ function setupDualCanvasSwipe(
         }
       })
 
-      // Normal upward slide
-      onScreen.style.transform = `translateY(-${height}px)`
-      offScreen.style.transform = 'translateY(0)'
+      // Slide animation (direction-aware)
+      if (isUpSwipe) {
+        // Upward slide: onScreen goes up, offScreen comes from below
+        onScreen.style.transform = `translateY(-${height}px)`
+        offScreen.style.transform = 'translateY(0)'
+      } else {
+        // Downward slide: onScreen goes down, offScreen comes from above
+        onScreen.style.transform = `translateY(${height}px)`
+        offScreen.style.transform = 'translateY(0)'
+      }
 
       await Promise.all([
         waitForTransitionEndScoped(onScreen, gestureId),
@@ -424,13 +435,19 @@ function setupDualCanvasSwipe(
 
       onScreen.style.transition = 'none'
       offScreen.style.transition = 'none'
-      onScreen.style.transform = `translateY(-${height}px)`
-      offScreen.style.transform = 'translateY(0)'
+      if (isUpSwipe) {
+        onScreen.style.transform = `translateY(-${height}px)`
+        offScreen.style.transform = 'translateY(0)'
+      } else {
+        onScreen.style.transform = `translateY(${height}px)`
+        offScreen.style.transform = 'translateY(0)'
+      }
 
       // Toggle the tracking flag BEFORE calling onCommit
       canvas1IsOnScreen = !canvas1IsOnScreen
 
-      requestAnimationFrame(() => onCommit())
+      // Pass direction to onCommit callback
+      requestAnimationFrame(() => onCommit(lockedDirection!))
     } else {
       await doCancel()
     }
@@ -1251,6 +1268,18 @@ export async function setupMobileLayout(
   // Track starred status (resets to false after each swipe)
   let currentIsStarred = false
 
+  // Rule history for bidirectional navigation (issue #170)
+  interface RuleHistoryEntry {
+    rule: RuleData
+    seed: number // Preserve exact seed for reproducible rendering
+    isStarred: boolean // Track starred state per pattern
+    timestamp: number
+  }
+
+  const HISTORY_SIZE = 50 // Keep last 50 rules
+  const ruleHistory: RuleHistoryEntry[] = []
+  let historyIndex = -1 // Current position in history (-1 = no history yet)
+
   // Create control buttons with auto-fade container
   const {
     container: controlContainer,
@@ -1289,6 +1318,11 @@ export async function setupMobileLayout(
     getIsStarred: () => currentIsStarred,
     onToggle: (isStarred) => {
       currentIsStarred = isStarred
+      // Update history entry if viewing historical pattern (issue #170)
+      if (historyIndex >= 0 && historyIndex < ruleHistory.length) {
+        ruleHistory[historyIndex].isStarred = isStarred
+        console.log(`[history] Updated starred status at history[${historyIndex}] to ${isStarred}`)
+      }
     },
     onResetFade: resetControlFade,
     isTransitioning: () => isTransitioning,
@@ -1316,7 +1350,7 @@ export async function setupMobileLayout(
     onScreenCanvas,
     offScreenCanvas,
     // --- onCommit: Called AFTER animation, swaps and prepares for next -------
-    () => {
+    async (direction: 'up' | 'down') => {
       offscreenReady = false
 
       if (!hasSwipedOnce) {
@@ -1328,13 +1362,79 @@ export async function setupMobileLayout(
       // Note: We save statistics on-demand when user clicks Share/Stats buttons
       // This ensures hash is always available for the currently visible rule
 
-      // Reset starred status for next simulation
-      currentIsStarred = false
+      // Bidirectional navigation with history (issue #170)
+      let nextRule: RuleData
+      let nextSeed: number
+      let isFromHistory = false
+
+      if (direction === 'up') {
+        // Forward navigation
+        if (historyIndex < ruleHistory.length - 1) {
+          // Navigate forward in history
+          historyIndex++
+          const entry = ruleHistory[historyIndex]
+          nextRule = entry.rule
+          nextSeed = entry.seed
+          currentIsStarred = entry.isStarred
+          isFromHistory = true
+          console.log(`[history] Navigate forward to history[${historyIndex}]: ${nextRule.name}`)
+        } else {
+          // At end of history → generate new rule
+          nextRule = await generateNextRule()
+          nextSeed = onScreenCA.getSeed()
+          currentIsStarred = false
+          console.log(`[history] Generate new rule at end: ${nextRule.name}`)
+        }
+      } else {
+        // Backward navigation (direction === 'down')
+        if (historyIndex > 0) {
+          // Navigate backward in history
+          historyIndex--
+          const entry = ruleHistory[historyIndex]
+          nextRule = entry.rule
+          nextSeed = entry.seed
+          currentIsStarred = entry.isStarred
+          isFromHistory = true
+          console.log(`[history] Navigate backward to history[${historyIndex}]: ${nextRule.name}`)
+        } else {
+          // At start of history → generate new rule (symmetric behavior)
+          nextRule = await generateNextRule()
+          nextSeed = onScreenCA.getSeed()
+          currentIsStarred = false
+          console.log(`[history] Generate new rule at start: ${nextRule.name}`)
+        }
+      }
+
+      // Add newly generated rule to history
+      if (!isFromHistory) {
+        // Truncate history after current position (if user was browsing backward)
+        ruleHistory.splice(historyIndex + 1)
+
+        ruleHistory.push({
+          rule: nextRule,
+          seed: nextSeed,
+          isStarred: currentIsStarred,
+          timestamp: Date.now(),
+        })
+
+        // Limit history size (keep most recent N)
+        if (ruleHistory.length > HISTORY_SIZE) {
+          ruleHistory.shift()
+          // Adjust index since we removed from the start
+          if (historyIndex > 0) historyIndex--
+        }
+
+        historyIndex = ruleHistory.length - 1
+        console.log(`[history] Added to history, now at index ${historyIndex}/${ruleHistory.length}`)
+      }
 
       // Swap references: incoming becomes onScreen, outgoing becomes offScreen
       ;[onScreenCanvas, offScreenCanvas] = [offScreenCanvas, onScreenCanvas]
       ;[onScreenCA, offScreenCA] = [offScreenCA, onScreenCA]
       ;[onScreenRule, offScreenRule] = [offScreenRule, onScreenRule]
+
+      // Update onScreenRule to the next rule
+      onScreenRule = nextRule
 
       // Clear hash for newly visible rule (will be set when save completes)
       currentlyVisibleRuleHash = undefined
@@ -1364,13 +1464,20 @@ export async function setupMobileLayout(
 
       // Defer CA operations by one frame to let layout settle
       setTimeout(async () => {
+        // Prepare the onScreen CA with the next rule
+        prepareAutomata(onScreenCA, onScreenRule, lookup, 50)
+        // If from history, use saved seed for exact reproduction
+        if (isFromHistory) {
+          onScreenCA.setSeed(nextSeed)
+        }
+
         initializeRunStats(onScreenCA, onScreenRule)
 
         // Start the newly visible CA and render
         startAutomata(onScreenCA, onScreenRule)
 
-        // Prepare offscreen CA for the next swipe with explicit render
-        // Use exploration/exploitation strategy (80% random, 20% starred)
+        // Prepare offscreen CA for the next swipe
+        // Always generate a new pattern for offscreen (will be used if navigating forward)
         offScreenRule = await generateNextRule()
         prepareAutomata(offScreenCA, offScreenRule, lookup, 50)
         offscreenReady = true
@@ -1419,6 +1526,11 @@ export async function setupMobileLayout(
         getIsStarred: () => currentIsStarred,
         onToggle: (isStarred) => {
           currentIsStarred = isStarred
+          // Update history entry if viewing historical pattern (issue #170)
+          if (historyIndex >= 0 && historyIndex < ruleHistory.length) {
+            ruleHistory[historyIndex].isStarred = isStarred
+            console.log(`[history] Updated starred status at history[${historyIndex}] to ${isStarred}`)
+          }
         },
         onResetFade: resetControlFade,
         isTransitioning: () => isTransitioning,
