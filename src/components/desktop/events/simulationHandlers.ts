@@ -23,6 +23,7 @@ export interface SimulationHandlerDeps {
   initialConditionType: { value: 'center' | 'random' | 'patch' }
   initializeSimulationMetadata: () => void
   updateURL: () => void
+  checkboxNewPatternOnReset: HTMLInputElement
 }
 
 /**
@@ -75,6 +76,9 @@ export function setupResetHandler(
     // Stop pulse when user manually resets
     stopResetPulse()
 
+    // Determine whether to generate new pattern based on checkbox state
+    const shouldGenerateNewPattern = deps.checkboxNewPatternOnReset.checked
+
     // Soft reset for patch and random modes (advances seed for new random ICs)
     // Center mode keeps existing behavior (deterministic single pixel)
     if (
@@ -84,7 +88,16 @@ export function setupResetHandler(
       const wasPlaying = deps.cellularAutomata.isCurrentlyPlaying()
       deps.cellularAutomata.pause()
       deps.cellularAutomata.clearGrid()
-      deps.cellularAutomata.softReset()
+
+      if (shouldGenerateNewPattern) {
+        // Advance seed for new random pattern
+        deps.cellularAutomata.softReset()
+      } else {
+        // Reuse same seed for reproducible reset
+        // Re-apply the current initial condition without advancing seed
+        deps.applyInitialCondition()
+      }
+
       deps.cellularAutomata.render()
       updateStatisticsDisplay(
         deps.cellularAutomata,

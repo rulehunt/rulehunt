@@ -282,6 +282,7 @@ export async function setupDesktopLayout(
     radioCenterSeed,
     radioRandomSeed,
     radioPatchSeed,
+    checkboxNewPatternOnReset,
   } = simulationPanel.elements
 
   const {
@@ -804,6 +805,7 @@ export async function setupDesktopLayout(
     initialConditionType: initialConditionTypeRef,
     initializeSimulationMetadata,
     updateURL,
+    checkboxNewPatternOnReset,
   }
 
   setupStepHandler(btnStep, btnPlay, simulationHandlerDeps)
@@ -821,6 +823,20 @@ export async function setupDesktopLayout(
     aliveValue.textContent = `${aliveSlider.value}%`
   })
   setupAliveSliderHandler(aliveSlider, applyInitialCondition)
+
+  // Restore checkbox state from localStorage
+  const savedCheckboxState = localStorage.getItem('new-pattern-on-reset')
+  if (savedCheckboxState !== null) {
+    checkboxNewPatternOnReset.checked = savedCheckboxState === 'true'
+  }
+
+  // Save checkbox state to localStorage when it changes
+  checkboxNewPatternOnReset.addEventListener('change', () => {
+    localStorage.setItem(
+      'new-pattern-on-reset',
+      String(checkboxNewPatternOnReset.checked),
+    )
+  })
 
   // Setup zoom handlers
   setupZoomHandlers(zoomSlider, cellularAutomata)
