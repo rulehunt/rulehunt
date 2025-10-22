@@ -101,6 +101,21 @@ function computeAdaptiveGrid(
     ? containerElement.clientHeight
     : window.innerHeight
 
+  // Guard against zero or negative screen dimensions
+  if (screenWidth <= 0 || screenHeight <= 0) {
+    console.warn(
+      `[computeAdaptiveGrid] Invalid screen dimensions: ${screenWidth}×${screenHeight} - using fallback`,
+    )
+    return {
+      gridCols: 100,
+      gridRows: 100,
+      cellSize: 1,
+      totalCells: 10000,
+      screenWidth: 100,
+      screenHeight: 100,
+    }
+  }
+
   let cellSize = 1
   let gridCols = screenWidth
   let gridRows = screenHeight
@@ -112,6 +127,12 @@ function computeAdaptiveGrid(
     gridRows = Math.floor(screenHeight / cellSize)
     totalCells = gridCols * gridRows
   }
+
+  // Ensure we never return 0 dimensions
+  gridCols = Math.max(1, gridCols)
+  gridRows = Math.max(1, gridRows)
+  totalCells = gridCols * gridRows
+
   return { gridCols, gridRows, cellSize, totalCells, screenWidth, screenHeight }
 }
 

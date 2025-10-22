@@ -81,7 +81,7 @@ export abstract class CellularAutomataBase {
     this.grid = new Uint8Array(this.gridArea)
     this.statistics = new StatisticsTracker(this.gridRows, this.gridCols)
 
-    if (this.ctx) {
+    if (this.ctx && this.gridCols > 0 && this.gridRows > 0) {
       this.imageData = this.ctx.createImageData(this.gridCols, this.gridRows)
       this.pixelData = this.imageData.data
     } else {
@@ -455,6 +455,14 @@ export abstract class CellularAutomataBase {
     if (this.canvas) {
       this.canvas.width = this.canvas.clientWidth
       this.canvas.height = this.canvas.clientHeight
+    }
+
+    // Guard against invalid dimensions
+    if (newRows <= 0 || newCols <= 0) {
+      console.warn(
+        `[resize] Invalid grid dimensions: ${newCols}×${newRows} - skipping resize`,
+      )
+      return
     }
 
     this.gridRows = newRows
