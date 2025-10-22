@@ -18,6 +18,7 @@
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
+    "ci": "pnpm run check && pnpm run lint && pnpm run test:coverage",
     "db-local:init": "bash scripts/local-db-init.bash",
     "db-local:run": "npx wrangler pages dev dist --d1=DB",
     "db-prod:migrate": "wrangler d1 migrations apply rulehunt-db --remote",

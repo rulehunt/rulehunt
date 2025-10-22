@@ -5,6 +5,7 @@
       "node_modules/**",
       "dist/**",
       "build/**",
+      "coverage/**",
       "**/*.test.ts",
       "**/*.spec.ts",
       "tests/**",
