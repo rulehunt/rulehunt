@@ -94,12 +94,6 @@ export function setupDualCanvasSwipe(
       : { onScreen: canvas2, offScreen: canvas1 }
   }
 
-  const resetTransforms = (h: number) => {
-    const { onScreen, offScreen } = getCurrentCanvases()
-    onScreen.style.transform = 'translateY(0)'
-    offScreen.style.transform = `translateY(${h}px)`
-  }
-
   function waitForTransitionEndScoped(
     el: HTMLElement,
     id: number,
