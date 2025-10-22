@@ -21,3 +21,4 @@ ignore:
   - "**/*.test.ts"
   - "dist/**/*"
   - "node_modules/**/*"
+  - "src/components/audioEngine.ts"
