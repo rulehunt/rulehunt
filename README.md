@@ -178,8 +178,16 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ## 📬 Contact
 
-- GitHub: [@irgolic](https://github.com/irgolic) & [@rjwalters](https://github.com/rjwalters) 
+- GitHub: [@irgolic](https://github.com/irgolic) & [@rjwalters](https://github.com/rjwalters)
 - Live Site: [https://rulehunt.org/](https://rulehunt.org/)
+
+## 🔬 Research & Community
+
+RuleHunt is part of the broader Artificial Life (ALife) research community studying open-endedness, diversity, and novelty in computational systems.
+
+- **[ADANA Initiative](docs/ADANA.md)**: Learn about the ALife Diversity And Novelty Archive project
+- **Contribute**: Discoveries made in RuleHunt could contribute to ALife research datasets
+- **Contact**: Interested in research collaboration? See [ADANA.md](docs/ADANA.md) for details
 
 ---
 
