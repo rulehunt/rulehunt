@@ -9,5 +9,18 @@ export default defineConfig({
       'src/**/*.test.ts',
       'functions/**/*.test.ts',
     ],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html', 'lcov'],
+      exclude: [
+        'node_modules/',
+        'dist/',
+        'scripts/',
+        '.loom/worktrees/',
+        '**/*.config.{ts,js,mjs}',
+        '**/*.test.{ts,tsx}',
+        '**/types.ts',
+      ],
+    },
   },
 })

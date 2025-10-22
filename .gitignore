@@ -40,3 +40,7 @@ src/buildInfo.ts
 .loom/worktrees/
 .loom/*.log
 .loom/*.sock
+
+# Coverage reports
+coverage/
+*.lcov

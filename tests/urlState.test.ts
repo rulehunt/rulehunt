@@ -1,6 +1,11 @@
 // tests/urlState.test.ts
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { parseURLState, buildShareURL } from '../src/urlState'
+import {
+  parseURLState,
+  parseURLRuleset,
+  buildShareURL,
+  updateURLWithoutReload,
+} from '../src/urlState'
 
 describe('parseURLState', () => {
   beforeEach(() => {
@@ -193,6 +198,106 @@ describe('buildShareURL', () => {
     })
     expect(url).toBe(
       'https://rulehunt.org/path/to/page?rulesetHex=e6b83b0acaf6aa4326fc24869458b22a710',
+    )
+  })
+})
+
+describe('parseURLRuleset', () => {
+  beforeEach(() => {
+    delete (window as { location?: unknown }).location
+    ;(window as { location: { search: string } }).location = { search: '' }
+  })
+
+  it('should return null when no rulesetHex in URL', () => {
+    window.location.search = ''
+    const result = parseURLRuleset()
+    expect(result).toBeNull()
+  })
+
+  it('should return null for invalid rulesetHex', () => {
+    window.location.search = '?rulesetHex=invalid'
+    const result = parseURLRuleset()
+    expect(result).toBeNull()
+  })
+
+  it('should parse valid rulesetHex and return ruleset object', () => {
+    window.location.search = '?rulesetHex=e6b83b0acaf6aa4326fc24869458b22a710'
+    const result = parseURLRuleset()
+
+    expect(result).not.toBeNull()
+    expect(result?.hex).toBe('e6b83b0acaf6aa4326fc24869458b22a710')
+    expect(result?.ruleset).toBeDefined()
+    expect(result?.ruleset.length).toBe(140)
+  })
+
+  it('should handle all-zeros ruleset', () => {
+    const allZerosHex = '0'.repeat(35)
+    window.location.search = `?rulesetHex=${allZerosHex}`
+    const result = parseURLRuleset()
+
+    expect(result).not.toBeNull()
+    expect(result?.ruleset.every((v) => v === 0)).toBe(true)
+  })
+})
+
+describe('updateURLWithoutReload', () => {
+  beforeEach(() => {
+    delete (window as { location?: unknown }).location
+    delete (window as { history?: unknown }).history
+
+    // Mock window.location.href
+    ;(window as { location: { href: string; search: string } }).location = {
+      href: 'https://rulehunt.org/',
+      search: '',
+    }
+
+    // Mock window.history.replaceState
+    const mockReplaceState = vi.fn()
+    ;(window as { history: { replaceState: typeof mockReplaceState } }).history =
+      {
+        replaceState: mockReplaceState,
+      }
+  })
+
+  it('should call history.replaceState with built URL', () => {
+    const state = {
+      rulesetHex: 'e6b83b0acaf6aa4326fc24869458b22a710',
+      seed: 123,
+    }
+
+    updateURLWithoutReload(state)
+
+    expect(window.history.replaceState).toHaveBeenCalledWith(
+      {},
+      '',
+      'https://rulehunt.org/?rulesetHex=e6b83b0acaf6aa4326fc24869458b22a710&seed=123',
+    )
+  })
+
+  it('should update URL with empty state', () => {
+    updateURLWithoutReload({})
+
+    expect(window.history.replaceState).toHaveBeenCalledWith(
+      {},
+      '',
+      'https://rulehunt.org/',
+    )
+  })
+
+  it('should update URL with all parameters', () => {
+    const state = {
+      rulesetHex: 'e6b83b0acaf6aa4326fc24869458b22a710',
+      seed: 456,
+      seedType: 'center' as const,
+      seedPercentage: 75,
+    }
+
+    updateURLWithoutReload(state)
+
+    expect(window.history.replaceState).toHaveBeenCalledWith(
+      {},
+      '',
+      'https://rulehunt.org/?rulesetHex=e6b83b0acaf6aa4326fc24869458b22a710&seed=456&seedType=center&seedPercentage=75',
     )
   })
 })
