@@ -20,8 +20,11 @@ export async function setupDataModeLayout(
 ): Promise<CleanupFunction> {
   console.log('[DataMode] Setting up data mode layout')
 
-  // Create header
-  const header = createHeader()
+  // Create header (no audio controls in data mode)
+  const header = createHeader(
+    () => {}, // onSoundToggle
+    () => {}, // onVolumeChange
+  )
   appRoot.appendChild(header.root)
 
   // Create main content

@@ -1,7 +1,7 @@
 // src/components/desktop/utils/statsUpdater.ts
 
-import type { AudioEngine } from '../../../components/audioEngine.ts'
 import type { CellularAutomata } from '../../../cellular-automata-cpu.ts'
+import type { AudioEngine } from '../../../components/audioEngine.ts'
 import { generateSimulationMetricsHTML } from '../../shared/simulationInfo.ts'
 import { generateStatsHTML, getInterestColorClass } from '../../shared/stats.ts'
 import type { createProgressBar } from '../progressBar.ts'

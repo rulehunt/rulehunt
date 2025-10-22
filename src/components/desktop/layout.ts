@@ -34,10 +34,10 @@ import { createStatsBar } from './statsBar.ts'
 import { createSummaryPanel } from './summary.ts'
 import { type TabId, createTabContainer } from './tabContainer.ts'
 import { setupTheme } from './theme.ts'
-import { createZoomSlider } from './zoomSlider.ts'
+import { handleCanvasClick } from './utils/canvasInteraction.ts'
 import { renderRule } from './utils/ruleRenderer.ts'
 import { updateStatisticsDisplay } from './utils/statsUpdater.ts'
-import { handleCanvasClick } from './utils/canvasInteraction.ts'
+import { createZoomSlider } from './zoomSlider.ts'
 
 const PROGRESS_BAR_STEPS = 500
 const GRID_ROWS = 400

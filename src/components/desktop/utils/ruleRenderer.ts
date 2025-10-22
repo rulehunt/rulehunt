@@ -1,7 +1,12 @@
 // src/components/desktop/utils/ruleRenderer.ts
 
 import type { C4Ruleset } from '../../../schema.ts'
-import { c4RulesetToHex, coords10x14, coords32x16, expandC4Ruleset } from '../../../utils.ts'
+import {
+  c4RulesetToHex,
+  coords10x14,
+  coords32x16,
+  expandC4Ruleset,
+} from '../../../utils.ts'
 
 type DisplayMode = 'orbits' | 'full'
 
