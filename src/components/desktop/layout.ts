@@ -8,8 +8,6 @@ import {
   buildOrbitLookup,
   c4RulesetToHex,
   conwayRule,
-  coords10x14,
-  coords32x16,
   expandC4Ruleset,
   makeC4Ruleset,
   mutateC4Ruleset,
@@ -22,26 +20,24 @@ import {
   parseURLState,
   updateURLWithoutReload,
 } from '../../urlState.ts'
-import { generateSimulationMetricsHTML } from '../shared/simulationInfo.ts'
-import { generateStatsHTML, getInterestColorClass } from '../shared/stats.ts'
 import { getCurrentThemeColors } from '../shared/theme.ts'
 import { setupBenchmarkModal } from './benchmark.ts'
 import { setupDataModeLayout } from './dataMode.ts'
 import { createHeader } from './header.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
-import {
-  type PatternInspectorData,
-  createPatternInspector,
-} from './patternInspector.ts'
+import { createPatternInspector } from './patternInspector.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
 import { createSimulationPanel } from './simulation.ts'
 import { createStatisticsPanel, renderStatistics } from './statistics.ts'
 import { createStatsBar } from './statsBar.ts'
-import { type SummaryPanelElements, createSummaryPanel } from './summary.ts'
+import { createSummaryPanel } from './summary.ts'
 import { type TabId, createTabContainer } from './tabContainer.ts'
 import { setupTheme } from './theme.ts'
 import { createZoomSlider } from './zoomSlider.ts'
+import { renderRule } from './utils/ruleRenderer.ts'
+import { updateStatisticsDisplay } from './utils/statsUpdater.ts'
+import { handleCanvasClick } from './utils/canvasInteraction.ts'
 
 const PROGRESS_BAR_STEPS = 500
 const GRID_ROWS = 400
@@ -52,242 +48,7 @@ type DisplayMode = 'orbits' | 'full'
 
 // --- Color Management ------------------------------------------------------
 // Colors are now managed by getCurrentThemeColors() from '../shared/theme.ts'
-
-// --- Desktop-Specific Rendering --------------------------------------------
-function renderRule(
-  ruleset: C4Ruleset,
-  orbitLookup: Uint8Array,
-  ctx: CanvasRenderingContext2D,
-  canvas: HTMLCanvasElement,
-  ruleLabelDisplay: HTMLElement,
-  ruleIdDisplay: HTMLElement,
-  ruleLabel: string,
-  displayMode: DisplayMode,
-  fgColor: string,
-  bgColor: string,
-  selectedCell?: { type: 'orbit' | 'pattern'; index: number } | null,
-) {
-  if (displayMode === 'orbits') {
-    const cols = 10
-    const rows = 14
-    const cellW = canvas.width / cols
-    const cellH = canvas.height / rows
-
-    ctx.fillStyle = bgColor
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = fgColor
-
-    for (let orbit = 0; orbit < 140; orbit++) {
-      if (ruleset[orbit]) {
-        const { x, y } = coords10x14(orbit)
-        ctx.fillRect(x * cellW, y * cellH, cellW, cellH)
-      }
-    }
-
-    // Draw blue border around selected cell
-    if (selectedCell && selectedCell.type === 'orbit') {
-      const { x, y } = coords10x14(selectedCell.index)
-      ctx.strokeStyle = '#3b82f6' // blue-500
-      ctx.lineWidth = 3
-      ctx.strokeRect(x * cellW, y * cellH, cellW, cellH)
-    }
-  } else {
-    const cols = 32
-    const rows = 16
-    const cellW = canvas.width / cols
-    const cellH = canvas.height / rows
-
-    ctx.fillStyle = bgColor
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = fgColor
-
-    const expandedRuleset = expandC4Ruleset(ruleset, orbitLookup)
-
-    for (let pattern = 0; pattern < 512; pattern++) {
-      if (expandedRuleset[pattern]) {
-        const { x, y } = coords32x16(pattern)
-        ctx.fillRect(x * cellW, y * cellH, cellW, cellH)
-      }
-    }
-
-    // Draw blue border around selected cell
-    if (selectedCell && selectedCell.type === 'pattern') {
-      const { x, y } = coords32x16(selectedCell.index)
-      ctx.strokeStyle = '#3b82f6' // blue-500
-      ctx.lineWidth = 3
-      ctx.strokeRect(x * cellW, y * cellH, cellW, cellH)
-    }
-  }
-
-  const hex35 = c4RulesetToHex(ruleset)
-  ruleLabelDisplay.textContent = `${ruleLabel}`
-  ruleIdDisplay.textContent = `${hex35}`
-}
-
-function updateStatisticsDisplay(
-  cellularAutomata: CellularAutomata,
-  elements: SummaryPanelElements,
-  progressBar: ReturnType<typeof createProgressBar>,
-  statsBarComponent?: ReturnType<typeof createStatsBar>,
-  autosaveCallback?: () => void,
-  audioEngine?: AudioEngine | null,
-) {
-  const stats = cellularAutomata.getStatistics()
-  const recentStats = stats.getRecentStats(1)
-  const metadata = stats.getMetadata()
-
-  if (recentStats.length === 0) return
-
-  const current = recentStats[0]
-  const interestScore = stats.calculateInterestScore()
-
-  if (metadata) {
-    const stepCount = metadata.stepCount
-    const progressPercent = Math.min(
-      (stepCount / PROGRESS_BAR_STEPS) * 100,
-      100,
-    )
-    progressBar.set(Math.round(progressPercent))
-
-    // Check for autosave after updating progress
-    if (autosaveCallback) {
-      autosaveCallback()
-    }
-  }
-
-  // Update simulation metrics
-  if (metadata) {
-    const metricsData = {
-      rulesetName: metadata.rulesetName,
-      rulesetHex: metadata.rulesetHex,
-      seedType: metadata.seedType,
-      seedPercentage: metadata.seedPercentage,
-      stepCount: metadata.stepCount,
-      elapsedTime: stats.getElapsedTime(),
-      actualSps: stats.getActualStepsPerSecond(),
-      requestedSps: metadata.requestedStepsPerSecond,
-      gridSize: cellularAutomata.getGridSize(),
-    }
-    elements.metricsContainer.innerHTML =
-      generateSimulationMetricsHTML(metricsData)
-  }
-
-  // Generate stats HTML and update the container
-  const statsData = { ...current, interestScore }
-  elements.statsContainer.innerHTML = generateStatsHTML(statsData)
-
-  // Apply interest score color to the interest field
-  const interestField = elements.statsContainer.querySelector(
-    '[data-field="interest"]',
-  )
-  if (interestField) {
-    interestField.className = `text-gray-900 dark:text-white font-semibold text-lg ${getInterestColorClass(interestScore)}`
-  }
-
-  // Update stats bar (for Explore tab)
-  if (statsBarComponent) {
-    statsBarComponent.update({
-      population: current.population,
-      activity: current.activity,
-      interestScore,
-      stepCount: metadata?.stepCount ?? 0,
-    })
-  }
-
-  // Update audio engine with current statistics
-  if (audioEngine) {
-    audioEngine.updateFromStats(current)
-  }
-}
-
-function handleCanvasClick(
-  event: MouseEvent,
-  canvas: HTMLCanvasElement,
-  currentRuleset: C4Ruleset,
-  orbitsData: C4OrbitsData,
-  orbitLookup: Uint8Array,
-  displayMode: DisplayMode,
-  onPatternClick: (data: PatternInspectorData) => void,
-  onSelectionChange: (selection: {
-    type: 'orbit' | 'pattern'
-    index: number
-  }) => void,
-) {
-  const rect = canvas.getBoundingClientRect()
-  const x = event.clientX - rect.left
-  const y = event.clientY - rect.top
-
-  if (displayMode === 'orbits') {
-    const cols = 10
-    const rows = 14
-    const cellW = canvas.width / cols
-    const cellH = canvas.height / rows
-
-    const gridX = Math.floor(x / cellW)
-    const gridY = Math.floor(y / cellH)
-    const orbitIndex = gridY * cols + gridX
-
-    if (orbitIndex < 0 || orbitIndex >= 140) return
-
-    const orbit = orbitsData.orbits[orbitIndex]
-    const output = currentRuleset[orbitIndex]
-    const representative = orbit.representative
-
-    const bits = []
-    for (let i = 0; i < 9; i++) {
-      bits.push((representative >> i) & 1)
-    }
-
-    onPatternClick({
-      type: 'orbit',
-      index: orbitIndex,
-      output,
-      bits,
-      stabilizer: orbit.stabilizer,
-      size: orbit.size,
-    })
-
-    onSelectionChange({ type: 'orbit', index: orbitIndex })
-  } else {
-    const cols = 32
-    const rows = 16
-    const cellW = canvas.width / cols
-    const cellH = canvas.height / rows
-
-    const gridX = Math.floor(x / cellW)
-    const gridY = Math.floor(y / cellH)
-
-    let patternIndex = -1
-    for (let p = 0; p < 512; p++) {
-      const coord = coords32x16(p)
-      if (coord.x === gridX && coord.y === gridY) {
-        patternIndex = p
-        break
-      }
-    }
-
-    if (patternIndex === -1) return
-
-    const expandedRuleset = expandC4Ruleset(currentRuleset, orbitLookup)
-    const output = expandedRuleset[patternIndex]
-    const orbitId = orbitLookup[patternIndex]
-
-    const bits = []
-    for (let i = 0; i < 9; i++) {
-      bits.push((patternIndex >> i) & 1)
-    }
-
-    onPatternClick({
-      type: 'pattern',
-      index: patternIndex,
-      output,
-      bits,
-      orbitId,
-    })
-
-    onSelectionChange({ type: 'pattern', index: patternIndex })
-  }
-}
+// (previously getCurrentColors(), now extracted to utils/colorUtils.ts)
 
 // --- Desktop Layout ---------------------------------------------------------
 export async function setupDesktopLayout(
