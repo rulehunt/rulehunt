@@ -1,9 +1,9 @@
 // src/components/mobile/buttons/shareButton.ts
 
-import type { ICellularAutomata } from '../../../cellular-automata-interface'
-import { createRoundButton } from '../roundButton'
 import { trackShare } from '../../../api/share'
+import type { ICellularAutomata } from '../../../cellular-automata-interface'
 import type { RuleData } from '../layout'
+import { createRoundButton } from '../roundButton'
 
 /**
  * Dependencies required by the share button factory.
@@ -44,9 +44,7 @@ export interface ShareButtonDeps {
  * @param deps - Dependencies for button operation
  * @returns Button element and cleanup function
  */
-export function createShareButton(
-  deps: ShareButtonDeps,
-): {
+export function createShareButton(deps: ShareButtonDeps): {
   button: HTMLButtonElement
   cleanup: () => void
 } {

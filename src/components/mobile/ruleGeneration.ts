@@ -1,13 +1,13 @@
 // src/components/mobile/ruleGeneration.ts
 
+import { formatRulesetName } from '../../api/save'
+import { fetchStarredPattern } from '../../api/starred'
 import {
-  randomC4RulesetByDensity,
   c4RulesetToHex,
   hexToC4Ruleset,
   mutateC4Ruleset,
+  randomC4RulesetByDensity,
 } from '../../utils'
-import { formatRulesetName } from '../../api/save'
-import { fetchStarredPattern } from '../../api/starred'
 import type { RuleData } from './layout'
 
 /**
