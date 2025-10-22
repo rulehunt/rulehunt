@@ -16,6 +16,7 @@ import {
   randomC4RulesetByDensity,
 } from '../../utils.ts'
 
+import { getRunStatsSnapshot } from '../../api/statistics-utils.ts'
 import { fetchStatistics } from '../../api/statistics.ts'
 import {
   parseURLRuleset,
@@ -1372,21 +1373,7 @@ export async function setupDesktopLayout(
 
       // --- Gather statistics ---
       const stats = cellularAutomata.getStatistics()
-      const metadata = stats.getMetadata()
-      const recent = stats.getRecentStats(1)[0] ?? {
-        population: 0,
-        activity: 0,
-        populationChange: 0,
-        entropy2x2: 0,
-        entropy4x4: 0,
-        entropy8x8: 0,
-        entityCount: 0,
-        entityChange: 0,
-        totalEntitiesEverSeen: 0,
-        uniquePatterns: 0,
-        entitiesAlive: 0,
-        entitiesDied: 0,
-      }
+      const { metadata, recent } = getRunStatsSnapshot(cellularAutomata)
 
       // Always compute fresh hex from current ruleset to avoid placeholder text
       const rulesetHex = c4RulesetToHex(currentRuleset)
