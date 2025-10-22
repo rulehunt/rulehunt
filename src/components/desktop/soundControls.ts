@@ -17,7 +17,7 @@ export function createSoundControls(
 ): { root: HTMLDivElement; elements: SoundControlsElements } {
   // Get initial state from localStorage
   const soundEnabled = localStorage.getItem('sound-enabled') === 'true'
-  const soundVolume = localStorage.getItem('sound-volume') || '30'
+  const soundVolume = localStorage.getItem('sound-volume') || '15'
 
   const root = document.createElement('div')
   root.className =

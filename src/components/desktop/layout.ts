@@ -131,7 +131,7 @@ export async function setupDesktopLayout(
     if (enabled) {
       // Get volume from localStorage (0-100) and convert to 0-1
       const volumePercent = Number.parseInt(
-        localStorage.getItem('sound-volume') || '30',
+        localStorage.getItem('sound-volume') || '15',
       )
       const volume = volumePercent / 100
       audioEngine = new AudioEngine(volume)
@@ -156,7 +156,7 @@ export async function setupDesktopLayout(
   const soundEnabled = localStorage.getItem('sound-enabled') === 'true'
   if (soundEnabled) {
     const volumePercent = Number.parseInt(
-      localStorage.getItem('sound-volume') || '30',
+      localStorage.getItem('sound-volume') || '15',
     )
     const volume = volumePercent / 100
     audioEngine = new AudioEngine(volume)
