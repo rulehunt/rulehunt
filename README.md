@@ -1,5 +1,7 @@
 # RuleHunt 🔍
 
+[![codecov](https://codecov.io/gh/rjwalters/rulehunt/branch/main/graph/badge.svg)](https://codecov.io/gh/rjwalters/rulehunt)
+
 **A distributed exploration of the vast universe of cellular automata rules**
 
 RuleHunt is a web-based platform for discovering interesting patterns in the combinatorial space of 2D cellular automata. We're building a TikTok-style interface where visitors can contribute their device's computing power to explore and catalog fascinating emergent behaviors hidden in the 2^512 possible rules.
