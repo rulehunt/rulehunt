@@ -111,13 +111,6 @@ export async function setupDesktopLayout(
     })
   }
 
-  // Interval tracking for cleanup (currently unused but kept for future use)
-  // const setInterval = (handler: () => void, ms: number): number => {
-  //   const id = window.setInterval(handler, ms)
-  //   intervals.push(id)
-  //   return id
-  // }
-
   const clearInterval = (id: number) => {
     window.clearInterval(id)
     const index = intervals.indexOf(id)
