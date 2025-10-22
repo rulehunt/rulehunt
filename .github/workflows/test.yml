@@ -38,13 +38,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxi-dev libxext-dev libx11-dev mesa-common-dev libglu1-mesa-dev
-
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --ignore-scripts
 
       - name: Run tests with coverage
         run: pnpm test:coverage

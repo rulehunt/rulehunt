@@ -14,9 +14,9 @@ export class AudioEngine {
   private lfo: OscillatorNode | null = null
   private filterNode: BiquadFilterNode | null = null
   private isPlaying = false
-  private volume = 0.3 // Default 30% volume
+  private volume = 0.15 // Default 15% volume
 
-  constructor(volume = 0.3) {
+  constructor(volume = 0.15) {
     this.volume = Math.max(0, Math.min(1, volume))
   }
 
@@ -61,7 +61,8 @@ export class AudioEngine {
 
       // Create main gain node
       this.gainNode = this.audioContext.createGain()
-      this.gainNode.gain.value = this.volume
+      // Start at 0 for fade-in
+      this.gainNode.gain.value = 0
 
       // Connect nodes: Oscillator → Filter → Gain → Destination
       this.oscillator.connect(this.filterNode)
@@ -76,6 +77,10 @@ export class AudioEngine {
       this.oscillator.start()
       this.lfo.start()
       this.isPlaying = true
+
+      // Fade in over 1 second (exponential ramp)
+      const now = this.audioContext.currentTime
+      this.gainNode.gain.setTargetAtTime(this.volume, now, 0.3)
 
       return true
     } catch (error) {
@@ -134,22 +139,34 @@ export class AudioEngine {
     if (!this.isPlaying) return
 
     try {
-      this.oscillator?.stop()
-      this.lfo?.stop()
-      this.oscillator?.disconnect()
-      this.lfo?.disconnect()
-      this.filterNode?.disconnect()
-      this.lfoGain?.disconnect()
-      this.gainNode?.disconnect()
-      this.audioContext?.close()
+      const now = this.audioContext?.currentTime || 0
 
-      this.oscillator = null
-      this.lfo = null
-      this.filterNode = null
-      this.lfoGain = null
-      this.gainNode = null
-      this.audioContext = null
-      this.isPlaying = false
+      // Fade out over 0.5 seconds before stopping (exponential ramp)
+      this.gainNode?.gain.setTargetAtTime(0, now, 0.15)
+
+      // Schedule cleanup after fade completes
+      setTimeout(() => {
+        try {
+          this.oscillator?.stop()
+          this.lfo?.stop()
+          this.oscillator?.disconnect()
+          this.lfo?.disconnect()
+          this.filterNode?.disconnect()
+          this.lfoGain?.disconnect()
+          this.gainNode?.disconnect()
+          this.audioContext?.close()
+
+          this.oscillator = null
+          this.lfo = null
+          this.filterNode = null
+          this.lfoGain = null
+          this.gainNode = null
+          this.audioContext = null
+          this.isPlaying = false
+        } catch (cleanupError) {
+          console.error('Error during audio cleanup:', cleanupError)
+        }
+      }, 500) // Match fade-out duration
     } catch (error) {
       console.error('Error stopping audio engine:', error)
     }
