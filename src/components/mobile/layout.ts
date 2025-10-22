@@ -1,7 +1,5 @@
 // src/components/mobile.ts
 import { formatRulesetName, saveRun } from '../../api/save'
-import { trackShare } from '../../api/share'
-import { trackStatsView } from '../../api/stats-view'
 import { createCellularAutomata } from '../../cellular-automata-factory.ts'
 import type { ICellularAutomata } from '../../cellular-automata-interface.ts'
 import { getUserIdentity } from '../../identity.ts'
@@ -33,9 +31,17 @@ import { hexToC4Ruleset } from '../../utils.ts'
 import type { AudioEngine } from '../audioEngine.ts'
 import { getVisualizationPalette } from '../shared/theme.ts'
 import { createAutoFadeContainer } from './buttonContainer.ts'
+import {
+  type SwipeGestureCallbacks,
+  type SwipeModuleState,
+  setupDualCanvasSwipe,
+} from './events/swipeHandlers.ts'
 import { createMobileHeader, setupMobileHeader } from './header.ts'
 import { createRoundButton } from './roundButton.ts'
 import { createStarButton } from './starButton.ts'
+import { createShareButton } from './ui/shareButton.ts'
+import { createSoftResetButton } from './ui/softResetButton.ts'
+import { createStatsButton } from './ui/statsButton.ts'
 
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
@@ -45,11 +51,6 @@ const TARGET_GRID_SIZE = 600_000
 // 20% random - Generate completely new random rule (exploration)
 // 10% exact starred - Load exact starred pattern from database (exploitation)
 // 70% mutated starred - Load starred pattern and mutate it with ramping magnitude (balanced)
-
-const SWIPE_COMMIT_THRESHOLD_PERCENT = 0.1
-const SWIPE_COMMIT_MIN_DISTANCE = 50
-const SWIPE_VELOCITY_THRESHOLD = -0.3
-const SWIPE_FAST_THROW_THRESHOLD = -0.5
 
 // Visualization palettes now managed by getVisualizationPalette() from '../shared/theme.ts'
 
@@ -148,16 +149,8 @@ function initializeRunStats(ca: ICellularAutomata, rule: RuleData) {
   })
 }
 
-// --- Dual-Canvas Swipe Handler ----------------------------------------------
-// Swipe Flow (timing carefully orchestrated to prevent flashing):
-// 1. Touch start → pause onScreen CA (both canvases now static)
-// 2. Touch move → animate both static canvases (TikTok-style scroll)
-// 3. Commit decision → run transition animation (incoming canvas already has next rule)
-// 4. After animation → wait one frame, then onCommit swaps references
-// 5. onCommit defers CA operations by 16ms to let browser finish compositing:
-//    - Starts playing new onScreen CA
-//    - Prepares offScreen canvas with fresh rule for NEXT swap
-// This timing eliminates race conditions and prevents visible flashes
+// --- Module-level state for swipe gesture system ----------------------------
+// These values are accessed by the swipe handler via the state interface
 let isTransitioning = false
 let offscreenReady = false
 let swipeLockUntil = 0
@@ -728,7 +721,7 @@ function startAutomata(
 }
 
 // --- Save run ---------------------------------------------------------------
-function saveRunStatistics(
+export function saveRunStatistics(
   cellularAutomata: ICellularAutomata,
   ruleName: string,
   ruleHex: string,
@@ -778,186 +771,6 @@ function saveRunStatistics(
       resolve(result.ok ? result.runHash : undefined)
     })
   })
-}
-
-// --- Stats Button -----------------------------------------------------------
-function createStatsButton(
-  onShowStats: () => void,
-  onResetFade?: () => void,
-  getRunData?: () => {
-    ca: ICellularAutomata
-    rule: RuleData
-    isStarred: boolean
-  },
-  getLastRunHash?: () => string | undefined,
-  setLastRunHash?: (hash: string | undefined) => void,
-): { button: HTMLButtonElement; cleanup: () => void } {
-  const { button, cleanup } = createRoundButton(
-    {
-      icon: `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-             fill="currentColor" class="w-6 h-6">
-          <path d="M3 13h2v8H3v-8zm4-4h2v12H7V9zm4-4h2v16h-2V5zm4 2h2v14h-2V7z"/>
-        </svg>`,
-      title: 'View statistics',
-      onClick: async () => {
-        onShowStats()
-        onResetFade?.()
-
-        // Get or create run hash
-        let runHash = getLastRunHash?.()
-
-        if (!runHash && getRunData && setLastRunHash) {
-          // First stats view of this rule - save it now
-          const { ca, rule, isStarred } = getRunData()
-          runHash = await saveRunStatistics(ca, rule.name, rule.hex, isStarred)
-
-          if (runHash) {
-            setLastRunHash(runHash)
-            console.log(
-              `[tracking] Saved and stored hash for ${rule.name}: ${runHash}`,
-            )
-          }
-        }
-
-        // Track the stats view
-        if (runHash) {
-          trackStatsView(runHash)
-        }
-      },
-      preventTransition: true,
-    },
-    () => isTransitioning,
-  )
-
-  return { button, cleanup }
-}
-
-// --- Soft Reset Button (new random initial conditions) -------------------------------------------------
-function createSoftResetButton(
-  onSoftReset: () => void,
-  onResetFade?: () => void,
-): {
-  button: HTMLButtonElement
-  cleanup: () => void
-  startPulse: () => void
-  stopPulse: () => void
-} {
-  const { button, cleanup: cleanupButton } = createRoundButton(
-    {
-      icon: `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-             fill="currentColor" class="w-6 h-6">
-          <path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/>
-        </svg>`,
-      title: 'Reload simulation',
-      onClick: () => {
-        if (isTransitioning) return
-        onSoftReset()
-        onResetFade?.()
-        stopPulse() // Stop pulse when user resets
-      },
-    },
-    () => isTransitioning,
-  )
-
-  const startPulse = () => {
-    button.classList.add('animate-pulse')
-    button.style.borderColor = '#f97316' // Orange border
-    button.style.borderWidth = '2px'
-  }
-
-  const stopPulse = () => {
-    button.classList.remove('animate-pulse')
-    button.style.borderColor = ''
-    button.style.borderWidth = ''
-  }
-
-  return { button, cleanup: cleanupButton, startPulse, stopPulse }
-}
-
-// --- Share Button (copy shareable link to clipboard) -----------------------
-function createShareButton(
-  onResetFade?: () => void,
-  getRunData?: () => {
-    ca: ICellularAutomata
-    rule: RuleData
-    isStarred: boolean
-  },
-  getLastRunHash?: () => string | undefined,
-  setLastRunHash?: (hash: string | undefined) => void,
-): {
-  button: HTMLButtonElement
-  cleanup: () => void
-} {
-  const linkIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-         fill="currentColor" class="w-6 h-6">
-      <path d="M13.544 10.456a4.368 4.368 0 0 0-6.176 0l-3.089 3.088a4.367 4.367 0 1 0 6.177 6.177L12 18.177a1 1 0 0 1 1.414 1.414l-1.544 1.544a6.368 6.368 0 0 1-9.005-9.005l3.089-3.088a6.367 6.367 0 0 1 9.005 0 1 1 0 1 1-1.415 1.414zm6.911-6.911a6.367 6.367 0 0 1 0 9.005l-3.089 3.088a6.367 6.367 0 0 1-9.005 0 1 1 0 1 1 1.415-1.414 4.368 4.368 0 0 0 6.176 0l3.089-3.088a4.367 4.367 0 1 0-6.177-6.177L12 6.503a1 1 0 0 1-1.414-1.414l1.544-1.544a6.367 6.367 0 0 1 9.005 0z"/>
-    </svg>`
-
-  const checkIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-         fill="currentColor" class="w-6 h-6">
-      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-    </svg>`
-
-  const { button, cleanup } = createRoundButton(
-    {
-      icon: linkIcon,
-      title: 'Copy shareable link',
-      onClick: async () => {
-        if (isTransitioning) return
-
-        onResetFade?.()
-
-        // URL is kept in sync automatically by PR #35, just copy current URL
-        const shareURL = window.location.href
-
-        try {
-          await navigator.clipboard.writeText(shareURL)
-          console.log('[share] Copied link to clipboard:', shareURL)
-
-          // Get or create run hash
-          let runHash = getLastRunHash?.()
-
-          if (!runHash && getRunData && setLastRunHash) {
-            // First share of this rule - save it now
-            const { ca, rule, isStarred } = getRunData()
-            runHash = await saveRunStatistics(
-              ca,
-              rule.name,
-              rule.hex,
-              isStarred,
-            )
-
-            if (runHash) {
-              setLastRunHash(runHash)
-              console.log(
-                `[tracking] Saved and stored hash for ${rule.name}: ${runHash}`,
-              )
-            }
-          }
-
-          // Track the share
-          if (runHash) {
-            trackShare(runHash)
-          }
-
-          // Visual feedback - briefly change the button appearance
-          button.innerHTML = checkIcon
-          setTimeout(() => {
-            button.innerHTML = linkIcon
-          }, 1500)
-        } catch (err) {
-          console.error('[share] Failed to copy link:', err)
-        }
-      },
-    },
-    () => isTransitioning,
-  )
-
-  return { button, cleanup }
 }
 
 // --- Main -------------------------------------------------------------------
@@ -1304,6 +1117,8 @@ export async function setupMobileLayout(
     (hash) => {
       currentlyVisibleRuleHash = hash
     },
+    saveRunStatistics,
+    () => isTransitioning,
   )
   let statsBtn = createStatsButton(
     () => showStats(getCurrentRunData()),
@@ -1313,6 +1128,8 @@ export async function setupMobileLayout(
     (hash) => {
       currentlyVisibleRuleHash = hash
     },
+    saveRunStatistics,
+    () => isTransitioning,
   )
   let starBtn = createStarButton({
     getIsStarred: () => currentIsStarred,
@@ -1327,10 +1144,14 @@ export async function setupMobileLayout(
     onResetFade: resetControlFade,
     isTransitioning: () => isTransitioning,
   })
-  let softResetButton = createSoftResetButton(() => {
-    softResetAutomata(onScreenCA)
-    startAutomata(onScreenCA, onScreenRule)
-  }, resetControlFade)
+  let softResetButton = createSoftResetButton(
+    () => {
+      softResetAutomata(onScreenCA)
+      startAutomata(onScreenCA, onScreenRule)
+    },
+    resetControlFade,
+    () => isTransitioning,
+  )
 
   // Wire up died-out callback to pulse reset button
   onDiedOutCallback = () => {
@@ -1345,12 +1166,25 @@ export async function setupMobileLayout(
   resetControlFade()
 
   let hasSwipedOnce = false
-  const cleanupSwipe = setupDualCanvasSwipe(
-    wrapper,
-    onScreenCanvas,
-    offScreenCanvas,
+
+  // Create state accessors for swipe handler
+  const swipeState: SwipeModuleState = {
+    isTransitioning: () => isTransitioning,
+    setIsTransitioning: (value: boolean) => {
+      isTransitioning = value
+    },
+    isOffscreenReady: () => offscreenReady,
+    getSwipeLockUntil: () => swipeLockUntil,
+    setSwipeLockUntil: (timestamp: number) => {
+      swipeLockUntil = timestamp
+    },
+    getGestureId: () => gestureId,
+    incrementGestureId: () => ++gestureId,
+  }
+
+  const swipeCallbacks: SwipeGestureCallbacks = {
     // --- onCommit: Called AFTER animation, swaps and prepares for next -------
-    async (direction: 'up' | 'down') => {
+    onCommit: async (direction: 'up' | 'down') => {
       offscreenReady = false
 
       if (!hasSwipedOnce) {
@@ -1508,6 +1342,8 @@ export async function setupMobileLayout(
         (hash) => {
           currentlyVisibleRuleHash = hash
         },
+        saveRunStatistics,
+        () => isTransitioning,
       )
       statsBtn = createStatsButton(
         () => showStats(getCurrentRunData()),
@@ -1521,6 +1357,8 @@ export async function setupMobileLayout(
         (hash) => {
           currentlyVisibleRuleHash = hash
         },
+        saveRunStatistics,
+        () => isTransitioning,
       )
       starBtn = createStarButton({
         getIsStarred: () => currentIsStarred,
@@ -1535,10 +1373,14 @@ export async function setupMobileLayout(
         onResetFade: resetControlFade,
         isTransitioning: () => isTransitioning,
       })
-      softResetButton = createSoftResetButton(() => {
-        softResetAutomata(onScreenCA)
-        startAutomata(onScreenCA, onScreenRule)
-      }, resetControlFade)
+      softResetButton = createSoftResetButton(
+        () => {
+          softResetAutomata(onScreenCA)
+          startAutomata(onScreenCA, onScreenRule)
+        },
+        resetControlFade,
+        () => isTransitioning,
+      )
 
       controlContainer.innerHTML = ''
       controlContainer.appendChild(softResetButton.button)
@@ -1550,9 +1392,17 @@ export async function setupMobileLayout(
       console.log(`Switched to: ${onScreenRule.name}`)
     },
     // --- onCancel: Resume playing onScreen CA if user cancels swipe ----------
-    () => onScreenCA.play(STEPS_PER_SECOND),
+    onCancel: () => onScreenCA.play(STEPS_PER_SECOND),
     // --- onDragStart: Pause onScreen CA so both canvases are static ----------
-    () => onScreenCA.pause(),
+    onDragStart: () => onScreenCA.pause(),
+  }
+
+  const cleanupSwipe = setupDualCanvasSwipe(
+    wrapper,
+    onScreenCanvas,
+    offScreenCanvas,
+    swipeCallbacks,
+    swipeState,
   )
 
   const handleResize = () => {
