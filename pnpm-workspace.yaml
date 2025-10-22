@@ -1,5 +1,7 @@
 packages:
-  - '.'
+  - .
 
 onlyBuiltDependencies:
   - canvas
+  - puppeteer
+  - workerd
