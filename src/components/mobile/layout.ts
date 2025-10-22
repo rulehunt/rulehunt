@@ -23,6 +23,7 @@ import {
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 
 import { fetchStarredPattern } from '../../api/starred.ts'
+import { getRunStatsSnapshot } from '../../api/statistics-utils.ts'
 import {
   parseURLRuleset,
   parseURLState,
@@ -718,21 +719,7 @@ function saveRunStatistics(
   isStarred = false,
 ): Promise<string | undefined> {
   const stats = cellularAutomata.getStatistics()
-  const metadata = stats.getMetadata()
-  const recent = stats.getRecentStats(1)[0] ?? {
-    population: 0,
-    activity: 0,
-    populationChange: 0,
-    entropy2x2: 0,
-    entropy4x4: 0,
-    entropy8x8: 0,
-    entityCount: 0,
-    entityChange: 0,
-    totalEntitiesEverSeen: 0,
-    uniquePatterns: 0,
-    entitiesAlive: 0,
-    entitiesDied: 0,
-  }
+  const { metadata, recent } = getRunStatsSnapshot(cellularAutomata)
 
   const payload: RunSubmission = {
     userId: getUserIdentity().userId,
@@ -1223,21 +1210,7 @@ export async function setupMobileLayout(
   // Helper function to get current run data
   const getCurrentRunData = (): RunSubmission => {
     const stats = onScreenCA.getStatistics()
-    const metadata = stats.getMetadata()
-    const recent = stats.getRecentStats(1)[0] ?? {
-      population: 0,
-      activity: 0,
-      populationChange: 0,
-      entropy2x2: 0,
-      entropy4x4: 0,
-      entropy8x8: 0,
-      entityCount: 0,
-      entityChange: 0,
-      totalEntitiesEverSeen: 0,
-      uniquePatterns: 0,
-      entitiesAlive: 0,
-      entitiesDied: 0,
-    }
+    const { metadata, recent } = getRunStatsSnapshot(onScreenCA)
 
     return {
       userId: getUserIdentity().userId,
