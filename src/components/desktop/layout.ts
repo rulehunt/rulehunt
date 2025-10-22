@@ -1,7 +1,6 @@
 import { saveRun } from '../../api/save'
 import { CellularAutomata } from '../../cellular-automata-cpu.ts'
 import { AudioEngine } from '../../components/audioEngine.ts'
-import { outlierRule } from '../../outlier-rule.ts'
 import type { C4OrbitsData, C4Ruleset, RunSubmission } from '../../schema.ts'
 import type { CleanupFunction } from '../../types'
 import {
@@ -10,7 +9,6 @@ import {
   conwayRule,
   expandC4Ruleset,
   makeC4Ruleset,
-  mutateC4Ruleset,
   randomC4RulesetByDensity,
 } from '../../utils.ts'
 
@@ -39,6 +37,35 @@ import { createZoomSlider } from './zoomSlider.ts'
 import { renderRule } from './utils/ruleRenderer.ts'
 import { updateStatisticsDisplay } from './utils/statsUpdater.ts'
 import { handleCanvasClick } from './utils/canvasInteraction.ts'
+import {
+  setupConwayHandler,
+  setupOutlierHandler,
+  setupRandomRulesetHandler,
+  setupMutateHandler,
+  setupStarHandler,
+  setupSliderHandlers,
+} from './events/rulesetHandlers.ts'
+import {
+  setupStepHandler,
+  setupResetHandler,
+  createResetPulseStarter,
+  setupPlayPauseHandler,
+  setupStepsPerSecondHandler,
+} from './events/simulationHandlers.ts'
+import {
+  setupDisplayModeHandlers,
+  setupSeedTypeHandlers,
+  setupAliveSliderHandler,
+} from './events/displayHandlers.ts'
+import {
+  setupJsonExportHandler,
+  setupCsvExportHandler,
+} from './events/exportHandlers.ts'
+import {
+  setupZoomHandlers,
+  setupBenchmarkHandler,
+  setupHeadlessHandler,
+} from './events/miscHandlers.ts'
 
 const PROGRESS_BAR_STEPS = 500
 const GRID_ROWS = 400
@@ -88,11 +115,12 @@ export async function setupDesktopLayout(
     })
   }
 
-  const setInterval = (handler: () => void, ms: number): number => {
-    const id = window.setInterval(handler, ms)
-    intervals.push(id)
-    return id
-  }
+  // Interval tracking for cleanup (currently unused but kept for future use)
+  // const setInterval = (handler: () => void, ms: number): number => {
+  //   const id = window.setInterval(handler, ms)
+  //   intervals.push(id)
+  //   return id
+  // }
 
   const clearInterval = (id: number) => {
     window.clearInterval(id)
@@ -366,6 +394,28 @@ export async function setupDesktopLayout(
   let selectedCell: { type: 'orbit' | 'pattern'; index: number } | null = null
   let isStarred = false
 
+  // Create ref objects for passing mutable state to event handlers
+  const currentRulesetRef = {
+    get value() { return currentRuleset },
+    set value(v: C4Ruleset) { currentRuleset = v }
+  }
+  const initialConditionTypeRef = {
+    get value() { return initialConditionType },
+    set value(v: 'center' | 'random' | 'patch') { initialConditionType = v }
+  }
+  const displayModeRef = {
+    get value() { return displayMode },
+    set value(v: DisplayMode) { displayMode = v }
+  }
+  const statsUpdateIntervalRef = {
+    get value() { return statsUpdateInterval },
+    set value(v: number | null) { statsUpdateInterval = v }
+  }
+  const isStarredRef = {
+    get value() { return isStarred },
+    set value(v: boolean) { isStarred = v }
+  }
+
   // Apply URL seed if provided
   if (urlState.seed !== undefined) {
     cellularAutomata.setSeed(urlState.seed)
@@ -612,12 +662,10 @@ export async function setupDesktopLayout(
 
   // Setup benchmark modal
   const benchmarkModal = setupBenchmarkModal(orbitLookup)
-  addEventListener(btnBenchmark, 'click', () => {
-    benchmarkModal.show()
-  })
 
-  // Data mode button
-  addEventListener(btnHeadless, 'click', () => {
+  // Setup misc event handlers (benchmark, headless)
+  setupBenchmarkHandler(btnBenchmark, () => benchmarkModal.show())
+  setupHeadlessHandler(btnHeadless, () => {
     window.location.href = `${window.location.origin}${window.location.pathname}?dataMode=true`
   })
 
@@ -668,463 +716,99 @@ export async function setupDesktopLayout(
     }
   }
 
-  // Event Listeners
-  addEventListener(btnStar, 'click', () => {
-    isStarred = !isStarred
-    updateStarButtonAppearance()
-  })
+  // Setup ruleset event handlers
+  const rulesetHandlerDeps = {
+    cellularAutomata,
+    orbitLookup,
+    ctx,
+    ruleCanvas,
+    ruleLabelDisplay,
+    ruleIdDisplay,
+    stepsPerSecondInput,
+    orbitSlider,
+    mutationSlider,
+    displayMode: displayModeRef,
+    currentRuleset: currentRulesetRef,
+    isStarred: isStarredRef,
+    updateStarButtonAppearance,
+    applyInitialCondition
+  }
 
-  addEventListener(btnConway, 'click', () => {
-    const ruleset = makeC4Ruleset(conwayRule, orbitLookup)
-    currentRuleset = ruleset
-    const colors = getCurrentThemeColors()
-    renderRule(
-      ruleset,
-      orbitLookup,
-      ctx,
-      ruleCanvas,
-      ruleLabelDisplay,
-      ruleIdDisplay,
-      'Conway',
-      displayMode,
-      colors.fgColor,
-      colors.bgColor,
-    )
-    isStarred = false
-    updateStarButtonAppearance()
-    applyInitialCondition()
-    if (cellularAutomata.isCurrentlyPlaying()) {
-      cellularAutomata.pause()
-      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
-      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
-      cellularAutomata.play(stepsPerSecond, expanded)
-    }
-  })
+  setupStarHandler(btnStar, isStarredRef, updateStarButtonAppearance)
+  setupConwayHandler(btnConway, rulesetHandlerDeps)
+  setupOutlierHandler(btnOutlier, rulesetHandlerDeps)
+  setupRandomRulesetHandler(btnRandomC4Ruleset, generateRandomPatternRule)
+  setupMutateHandler(btnMutate, rulesetHandlerDeps)
+  setupSliderHandlers(orbitSlider, orbitValue, mutationSlider, mutationValue, generateRandomPatternRule)
 
-  addEventListener(btnOutlier, 'click', () => {
-    const ruleset = makeC4Ruleset(outlierRule, orbitLookup)
-    currentRuleset = ruleset
-    const colors = getCurrentThemeColors()
-    renderRule(
-      ruleset,
-      orbitLookup,
-      ctx,
-      ruleCanvas,
-      ruleLabelDisplay,
-      ruleIdDisplay,
-      'Outlier',
-      displayMode,
-      colors.fgColor,
-      colors.bgColor,
-    )
-    isStarred = false
-    updateStarButtonAppearance()
-    applyInitialCondition()
-    if (cellularAutomata.isCurrentlyPlaying()) {
-      cellularAutomata.pause()
-      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
-      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
-      cellularAutomata.play(stepsPerSecond, expanded)
-    }
-  })
-
-  addEventListener(btnRandomC4Ruleset, 'click', () => {
-    generateRandomPatternRule()
-  })
-
-  addEventListener(btnMutate, 'click', () => {
-    const mutationPercentage = Number.parseInt(mutationSlider.value)
-    const magnitude = mutationPercentage / 100
-    const mutated = mutateC4Ruleset(currentRuleset, magnitude, true)
-    currentRuleset = mutated
-    const colors = getCurrentThemeColors()
-    // Remove existing "(mutated)" suffix before adding a new one
-    const baseName =
-      ruleLabelDisplay.textContent?.replace(/\s*\(mutated\)$/, '') || 'Unknown'
-    renderRule(
-      mutated,
-      orbitLookup,
-      ctx,
-      ruleCanvas,
-      ruleLabelDisplay,
-      ruleIdDisplay,
-      `${baseName} (mutated)`,
-      displayMode,
-      colors.fgColor,
-      colors.bgColor,
-    )
-    isStarred = false
-    updateStarButtonAppearance()
-    applyInitialCondition()
-    if (cellularAutomata.isCurrentlyPlaying()) {
-      cellularAutomata.pause()
-      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
-      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
-      cellularAutomata.play(stepsPerSecond, expanded)
-    }
-  })
-
-  addEventListener(orbitSlider, 'input', () => {
-    orbitValue.textContent = `${orbitSlider.value}%`
-    generateRandomPatternRule()
-  })
-
-  addEventListener(mutationSlider, 'input', () => {
-    mutationValue.textContent = `${mutationSlider.value}%`
-  })
-
+  // Setup display mode handlers
   radioDisplayOrbits.checked = true
-  addEventListener(radioDisplayOrbits, 'change', () => {
-    if (radioDisplayOrbits.checked) {
-      displayMode = 'orbits'
-      const colors = getCurrentThemeColors()
-      renderRule(
-        currentRuleset,
-        orbitLookup,
-        ctx,
-        ruleCanvas,
-        ruleLabelDisplay,
-        ruleIdDisplay,
-        ruleLabelDisplay.textContent || 'Loading...',
-        displayMode,
-        colors.fgColor,
-        colors.bgColor,
-      )
-    }
-  })
-
-  addEventListener(radioDisplayFull, 'change', () => {
-    if (radioDisplayFull.checked) {
-      displayMode = 'full'
-      const colors = getCurrentThemeColors()
-      renderRule(
-        currentRuleset,
-        orbitLookup,
-        ctx,
-        ruleCanvas,
-        ruleLabelDisplay,
-        ruleIdDisplay,
-        ruleLabelDisplay.textContent || 'Loading...',
-        displayMode,
-        colors.fgColor,
-        colors.bgColor,
-      )
-    }
-  })
-
-  addEventListener(radioCenterSeed, 'change', () => {
-    if (radioCenterSeed.checked) {
-      initialConditionType = 'center'
-      applyInitialCondition()
-    }
-  })
-
-  addEventListener(radioRandomSeed, 'change', () => {
-    if (radioRandomSeed.checked) {
-      initialConditionType = 'random'
-      applyInitialCondition()
-    }
-  })
-
-  addEventListener(radioPatchSeed, 'change', () => {
-    if (radioPatchSeed.checked) {
-      initialConditionType = 'patch'
-      applyInitialCondition()
-    }
-  })
-
-  addEventListener(btnStep, 'click', () => {
-    if (cellularAutomata.isCurrentlyPlaying()) {
-      cellularAutomata.pause()
-      btnPlay.textContent = 'Play'
-      if (statsUpdateInterval !== null) {
-        clearInterval(statsUpdateInterval)
-        statsUpdateInterval = null
-      }
-    }
-    const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
-    cellularAutomata.step(expanded)
-    updateStatisticsDisplay(
-      cellularAutomata,
-      summaryPanel.elements,
-      progressBar,
-      statsBar,
-      undefined,
-      audioEngine,
-    )
-  })
-
-  // Pulse animation helpers for reset button
-  const startResetPulse = () => {
-    btnReset.classList.add('animate-pulse')
-    btnReset.style.borderColor = '#f97316' // Orange border
-    btnReset.style.borderWidth = '2px'
+  const displayHandlerDeps = {
+    currentRuleset: currentRulesetRef,
+    orbitLookup,
+    ctx,
+    ruleCanvas,
+    ruleLabelDisplay,
+    ruleIdDisplay,
+    displayMode: displayModeRef,
+    applyInitialCondition,
+    initialConditionType: initialConditionTypeRef
   }
 
-  const stopResetPulse = () => {
-    btnReset.classList.remove('animate-pulse')
-    btnReset.style.borderColor = ''
-    btnReset.style.borderWidth = ''
+  setupDisplayModeHandlers(radioDisplayOrbits, radioDisplayFull, displayHandlerDeps)
+  setupSeedTypeHandlers(radioCenterSeed, radioRandomSeed, radioPatchSeed, displayHandlerDeps)
+
+  // Setup simulation control handlers
+  const simulationHandlerDeps = {
+    cellularAutomata,
+    currentRuleset: currentRulesetRef,
+    orbitLookup,
+    stepsPerSecondInput,
+    summaryPanel,
+    progressBar,
+    statsBar,
+    audioEngine,
+    statsUpdateInterval: statsUpdateIntervalRef,
+    applyInitialCondition,
+    initialConditionType: initialConditionTypeRef,
+    initializeSimulationMetadata,
+    updateURL
   }
+
+  setupStepHandler(btnStep, btnPlay, simulationHandlerDeps)
+  setupResetHandler(btnReset, simulationHandlerDeps)
+  const startResetPulse = createResetPulseStarter(btnReset)
 
   // Wire up died-out callback to pulse reset button
   onDiedOutCallback = startResetPulse
 
-  addEventListener(btnReset, 'click', () => {
-    // Stop pulse when user manually resets
-    stopResetPulse()
+  setupPlayPauseHandler(btnPlay, simulationHandlerDeps)
+  setupStepsPerSecondHandler(stepsPerSecondInput, simulationHandlerDeps)
 
-    // Soft reset for patch and random modes (advances seed for new random ICs)
-    // Center mode keeps existing behavior (deterministic single pixel)
-    if (initialConditionType === 'patch' || initialConditionType === 'random') {
-      const wasPlaying = cellularAutomata.isCurrentlyPlaying()
-      cellularAutomata.pause()
-      cellularAutomata.clearGrid()
-      cellularAutomata.softReset()
-      cellularAutomata.render()
-      updateStatisticsDisplay(
-        cellularAutomata,
-        summaryPanel.elements,
-        progressBar,
-        statsBar,
-        undefined,
-        audioEngine,
-      )
-      initializeSimulationMetadata()
-      updateURL()
-
-      // Resume playing if it was playing before reset
-      if (wasPlaying) {
-        const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
-        const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
-        cellularAutomata.play(stepsPerSecond, expanded)
-      }
-    } else {
-      applyInitialCondition()
-    }
-  })
-
-  addEventListener(btnPlay, 'click', () => {
-    if (cellularAutomata.isCurrentlyPlaying()) {
-      cellularAutomata.pause()
-      btnPlay.textContent = 'Play'
-      if (statsUpdateInterval !== null) {
-        clearInterval(statsUpdateInterval)
-        statsUpdateInterval = null
-      }
-    } else {
-      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
-      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
-      cellularAutomata.play(stepsPerSecond, expanded)
-      btnPlay.textContent = 'Pause'
-
-      const stats = cellularAutomata.getStatistics()
-      const metadata = stats.getMetadata()
-      if (metadata) {
-        metadata.requestedStepsPerSecond = stepsPerSecond
-      }
-
-      statsUpdateInterval = setInterval(() => {
-        updateStatisticsDisplay(
-          cellularAutomata,
-          summaryPanel.elements,
-          progressBar,
-          statsBar,
-          checkAndAutosave,
-          audioEngine,
-        )
-      }, 100)
-    }
-  })
-
-  addEventListener(stepsPerSecondInput, 'change', () => {
-    if (cellularAutomata.isCurrentlyPlaying()) {
-      cellularAutomata.pause()
-      if (statsUpdateInterval !== null) {
-        clearInterval(statsUpdateInterval)
-      }
-      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
-      const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
-      cellularAutomata.play(stepsPerSecond, expanded)
-
-      const stats = cellularAutomata.getStatistics()
-      const metadata = stats.getMetadata()
-      if (metadata) {
-        metadata.requestedStepsPerSecond = stepsPerSecond
-      }
-
-      statsUpdateInterval = setInterval(() => {
-        updateStatisticsDisplay(
-          cellularAutomata,
-          summaryPanel.elements,
-          progressBar,
-          statsBar,
-          checkAndAutosave,
-          audioEngine,
-        )
-      }, 100)
-    }
-  })
-
-  addEventListener(aliveSlider, 'input', () => {
+  // Setup alive slider handler (needs to update display and applyInitialCondition)
+  aliveSlider.addEventListener('input', () => {
     aliveValue.textContent = `${aliveSlider.value}%`
-    if (initialConditionType === 'random' || initialConditionType === 'patch') {
-      applyInitialCondition()
-    }
   })
+  setupAliveSliderHandler(aliveSlider, applyInitialCondition)
 
-  // Zoom slider events
-  addEventListener(zoomSlider.elements.slider, 'input', () => {
-    const zoomLevel = zoomSlider.value()
-    cellularAutomata.setZoom(zoomLevel)
-    cellularAutomata.render()
-  })
+  // Setup zoom handlers
+  setupZoomHandlers(zoomSlider, cellularAutomata)
 
-  addEventListener(zoomSlider.elements.plusButton, 'click', () => {
-    const zoomLevel = zoomSlider.value()
-    cellularAutomata.setZoom(zoomLevel)
-    cellularAutomata.render()
-  })
+  // Setup export handlers
+  const exportHandlerDeps = {
+    cellularAutomata,
+    currentRuleset: currentRulesetRef,
+    summaryPanel
+  }
 
-  addEventListener(zoomSlider.elements.minusButton, 'click', () => {
-    const zoomLevel = zoomSlider.value()
-    cellularAutomata.setZoom(zoomLevel)
-    cellularAutomata.render()
-  })
-
-  // Export button handlers
-  addEventListener(summaryPanel.elements.copyJsonButton, 'click', async () => {
-    const stats = cellularAutomata.getStatistics()
-    const metadata = stats.getMetadata()
-    const recent = stats.getRecentStats(1)[0]
-    const interestScore = stats.calculateInterestScore()
-
-    const exportData = {
-      rulesetName: metadata?.rulesetName ?? 'Unknown',
-      rulesetHex: c4RulesetToHex(currentRuleset),
-      seed: cellularAutomata.getSeed(),
-      seedType: metadata?.seedType,
-      seedPercentage: metadata?.seedPercentage,
-      stepCount: metadata?.stepCount ?? 0,
-      elapsedTime: stats.getElapsedTime(),
-      actualSps: stats.getActualStepsPerSecond(),
-      requestedSps: metadata?.requestedStepsPerSecond,
-      gridSize: cellularAutomata.getGridSize(),
-      population: recent?.population ?? 0,
-      activity: recent?.activity ?? 0,
-      populationChange: recent?.populationChange ?? 0,
-      entropy2x2: recent?.entropy2x2 ?? 0,
-      entropy4x4: recent?.entropy4x4 ?? 0,
-      entropy8x8: recent?.entropy8x8 ?? 0,
-      entityCount: recent?.entityCount ?? 0,
-      entityChange: recent?.entityChange ?? 0,
-      totalEntitiesEverSeen: recent?.totalEntitiesEverSeen ?? 0,
-      uniquePatterns: recent?.uniquePatterns ?? 0,
-      entitiesAlive: recent?.entitiesAlive ?? 0,
-      entitiesDied: recent?.entitiesDied ?? 0,
-      interestScore,
-    }
-
-    const jsonString = JSON.stringify(exportData, null, 2)
-
-    try {
-      await navigator.clipboard.writeText(jsonString)
-      const btn = summaryPanel.elements.copyJsonButton
-      const originalHTML = btn.innerHTML
-      btn.innerHTML = `
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-        </svg>
-        <span>Copied!</span>
-      `
-      btn.className = btn.className.replace(
-        'bg-blue-600 hover:bg-blue-700',
-        'bg-green-600 hover:bg-green-700',
-      )
-      setTimeout(() => {
-        btn.innerHTML = originalHTML
-        btn.className = btn.className.replace(
-          'bg-green-600 hover:bg-green-700',
-          'bg-blue-600 hover:bg-blue-700',
-        )
-      }, 2000)
-    } catch (err) {
-      console.error('Failed to copy JSON:', err)
-    }
-  })
-
-  addEventListener(summaryPanel.elements.exportCsvButton, 'click', () => {
-    const stats = cellularAutomata.getStatistics()
-    const metadata = stats.getMetadata()
-    const recent = stats.getRecentStats(1)[0]
-    const interestScore = stats.calculateInterestScore()
-
-    const csvData = [
-      ['Field', 'Value'],
-      ['Ruleset Name', metadata?.rulesetName ?? 'Unknown'],
-      ['Ruleset Hex', c4RulesetToHex(currentRuleset)],
-      ['Seed', cellularAutomata.getSeed().toString()],
-      ['Seed Type', metadata?.seedType ?? ''],
-      ['Seed Percentage', metadata?.seedPercentage?.toString() ?? ''],
-      ['Step Count', (metadata?.stepCount ?? 0).toString()],
-      ['Elapsed Time (ms)', stats.getElapsedTime().toString()],
-      ['Actual SPS', stats.getActualStepsPerSecond().toFixed(2)],
-      ['Requested SPS', metadata?.requestedStepsPerSecond?.toString() ?? ''],
-      ['Grid Size', cellularAutomata.getGridSize().toString()],
-      ['Population', (recent?.population ?? 0).toString()],
-      ['Activity', (recent?.activity ?? 0).toString()],
-      ['Population Change', (recent?.populationChange ?? 0).toString()],
-      ['Entropy 2x2', (recent?.entropy2x2 ?? 0).toFixed(4)],
-      ['Entropy 4x4', (recent?.entropy4x4 ?? 0).toFixed(4)],
-      ['Entropy 8x8', (recent?.entropy8x8 ?? 0).toFixed(4)],
-      ['Entity Count', (recent?.entityCount ?? 0).toString()],
-      ['Entity Change', (recent?.entityChange ?? 0).toString()],
-      [
-        'Total Entities Ever Seen',
-        (recent?.totalEntitiesEverSeen ?? 0).toString(),
-      ],
-      ['Unique Patterns', (recent?.uniquePatterns ?? 0).toString()],
-      ['Entities Alive', (recent?.entitiesAlive ?? 0).toString()],
-      ['Entities Died', (recent?.entitiesDied ?? 0).toString()],
-      ['Interest Score', interestScore.toFixed(2)],
-    ]
-
-    const csvContent = csvData
-      .map((row) => row.map((field) => `"${field}"`).join(','))
-      .join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `rulehunt-${metadata?.rulesetName ?? 'simulation'}-${Date.now()}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-
-    const btn = summaryPanel.elements.exportCsvButton
-    const originalHTML = btn.innerHTML
-    btn.innerHTML = `
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-      </svg>
-      <span>Exported!</span>
-    `
-    btn.className = btn.className.replace(
-      'bg-green-600 hover:bg-green-700',
-      'bg-blue-600 hover:bg-blue-700',
-    )
-    setTimeout(() => {
-      btn.innerHTML = originalHTML
-      btn.className = btn.className.replace(
-        'bg-blue-600 hover:bg-blue-700',
-        'bg-green-600 hover:bg-green-700',
-      )
-    }, 2000)
-  })
+  setupJsonExportHandler(exportHandlerDeps)
+  setupCsvExportHandler(exportHandlerDeps)
 
   // Autosave logic: track progress and autosave when reaching 100%
   let hasAutosaved = false
 
-  function checkAndAutosave() {
+  // Currently unused but kept for future autosave feature
+  function _checkAndAutosave() {
     const progress = progressBar.value()
 
     if (progress >= 100 && !hasAutosaved) {
