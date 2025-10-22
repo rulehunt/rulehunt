@@ -3,13 +3,33 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { BenchmarkResult } from '../src/components/desktop/benchmark'
+
+// Mock Chart.js to avoid canvas dependency in test environment
+vi.mock('chart.js', () => ({
+  Chart: vi.fn().mockImplementation((canvas, config) => ({
+    canvas,
+    config,
+    data: config.data || {
+      labels: [],
+      datasets: [
+        { label: 'CPU (SPS)', data: [] },
+        { label: 'GPU (SPS)', data: [] },
+      ],
+    },
+    options: config.options,
+    update: vi.fn(),
+    destroy: vi.fn(),
+  })),
+  registerables: [],
+}))
+
 import {
   calculateStdDev,
   createBenchmarkChart,
   resetChart,
   updateChart,
 } from '../src/components/desktop/benchmarkChart'
-import type { BenchmarkResult } from '../src/components/desktop/benchmark'
 
 describe('benchmarkChart', () => {
   let canvas: HTMLCanvasElement

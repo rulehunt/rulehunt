@@ -3,6 +3,16 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+// Mock cellular-automata-gpu to avoid WebGL native bindings in test environment
+vi.mock('../src/cellular-automata-gpu', () => ({
+  CellularAutomataGPU: vi.fn().mockImplementation(() => ({
+    step: vi.fn(),
+    getState: vi.fn(() => new Uint8Array(100)),
+    destroy: vi.fn(),
+  })),
+}))
+
 import {
   BenchmarkRunner,
   accumulateResults,
