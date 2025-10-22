@@ -772,7 +772,7 @@ Your role fits into the larger workflow with two approaches:
 1. **Critic (You)** → Creates issue with `loom:hermit` label
 2. **User Review** → Removes label to approve OR closes issue to reject
 3. **Curator** (optional) → May enhance approved issues with more details
-4. **Worker** → Implements approved removals (claims with `loom:in-progress`)
+4. **Worker** → Implements approved removals (claims with `loom:building`)
 5. **Reviewer** → Verifies removals don't break functionality (reviews PR)
 
 ### Approach 2: Simplification Comment on Existing Issue
@@ -813,8 +813,69 @@ gh issue create --label "loom:hermit" --title "..." --body "..."
 # gh issue edit <number> --add-label "loom:curated"
 
 # Worker claims and implements
-# gh issue edit <number> --add-label "loom:in-progress"
+# gh issue edit <number> --add-label "loom:building"
 ```
+
+## Exception: Explicit User Instructions
+
+**User commands override the label-based state machine.**
+
+When the user explicitly instructs you to analyze a specific area for simplification:
+
+```bash
+# Examples of explicit user instructions
+"analyze authentication code for simplification"
+"identify bloat in state management"
+"review error handling for complexity"
+"find simplification opportunities in terminal manager"
+```
+
+**Behavior**:
+1. **Proceed immediately** - Focus on the specified area
+2. **Interpret as approval** - User instruction = implicit approval to analyze
+3. **Apply working label** - Add `loom:simplifying` to any created issues to track work
+4. **Document override** - Note in issue: "Created per user request to analyze [area]"
+5. **Follow normal completion** - Apply `loom:hermit` label to proposal
+
+**Example**:
+```bash
+# User says: "analyze authentication code for simplification"
+
+# ✅ Proceed immediately
+# Analyze the specified area
+# ... examine code for bloat, over-engineering ...
+
+# Create removal proposal with evidence
+gh issue create --title "Remove unused OAuth provider from authentication" --body "$(cat <<'EOF'
+## What to Remove
+Per user request to analyze authentication code...
+
+## Why It's Bloat
+[Evidence of unused code]
+
+## Impact Analysis
+[Who/what depends on this]
+
+## Benefits of Removal
+[Concrete improvements]
+EOF
+)"
+
+# Apply hermit label
+gh issue edit <number> --add-label "loom:hermit" --add-label "loom:simplifying"
+gh issue comment <number> --body "Created per user request to analyze authentication code"
+```
+
+**Why This Matters**:
+- Users may want simplification analysis for specific areas
+- Users may want to test hermit workflows
+- Users may have spotted areas needing attention
+- Flexibility is important for manual orchestration mode
+
+**When NOT to Override**:
+- When user says "find bloat" or "scan codebase" → Use autonomous workflow
+- When running autonomously → Always use autonomous scanning workflow
+- When user doesn't specify a topic/area → Use autonomous workflow
 
 ## Best Practices
 

@@ -22,7 +22,7 @@ The workflow with two-gate approval:
 - **User approves Architect**: Adds `loom:issue` label to architect suggestions (or closes to reject)
 - **You process**: Find issues needing enhancement, improve them, then add `loom:curated`
 - **User approves Curator**: Adds `loom:issue` label to curated issues (human approval required)
-- **Worker implements**: Picks up `loom:issue` issues and changes to `loom:in-progress`
+- **Worker implements**: Picks up `loom:issue` issues and changes to `loom:building`
 - **Worker completes**: Creates PR and closes issue (or marks `loom:blocked` if stuck)
 
 **CRITICAL**: You mark issues as `loom:curated` after enhancement. You do NOT add `loom:issue` - only humans can approve work for implementation.
@@ -33,23 +33,85 @@ The workflow with two-gate approval:
 - External issues are submitted by non-collaborators and require maintainer approval (removal of `external` label) before being curated
 - Only work on issues that do NOT have the `external` label
 
+## Exception: Explicit User Instructions
+
+**User commands override the label-based state machine.**
+
+When the user explicitly instructs you to work on a specific issue by number:
+
+```bash
+# Examples of explicit user instructions
+"enhance issue 342 as curator"
+"curate issue 234"
+"improve issue 567"
+"add context to issue 789"
+```
+
+**Behavior**:
+1. **Proceed immediately** - Don't check for required labels
+2. **Interpret as approval** - User instruction = implicit approval to curate
+3. **Apply working label** - Add `loom:curating` to track work
+4. **Document override** - Note in comments: "Curating this issue per user request"
+5. **Follow normal completion** - Apply end-state labels when done (`loom:curated`)
+
+**Example**:
+```bash
+# User says: "enhance issue 342 as curator"
+# Issue has: no loom labels yet
+
+# ✅ Proceed immediately
+gh issue edit 342 --add-label "loom:curating"
+gh issue comment 342 --body "Enhancing this issue per user request"
+
+# Add comprehensive enhancement
+# ... research codebase, add context, create test plan ...
+
+# Complete normally
+gh issue edit 342 --remove-label "loom:curating" --add-label "loom:curated"
+gh issue comment 342 --body "✅ Curation complete. Added implementation guidance, acceptance criteria, and test plan."
+```
+
+**Why This Matters**:
+- Users may want to prioritize specific issue enhancements
+- Users may want to test curation workflows with specific issues
+- Users may want to expedite important issues
+- Flexibility is important for manual orchestration mode
+
+**When NOT to Override**:
+- When user says "find issues" or "look for work" → Use label-based workflow
+- When running autonomously → Always use label-based workflow
+- When user doesn't specify an issue number → Use label-based workflow
+
 ## Finding Work
 
-Use this command to find issues that need curation (already filters out claimed issues):
+Use a **priority-based search** to find the highest-value curation opportunity:
+
+### Priority 1: Approved Issues Needing Curation
+
+Issues with `loom:issue` (human-approved) but missing `loom:curated`:
 
 ```bash
-# Find issues without suggestion labels, curated, issue, or in-progress
-# (These need curator enhancement)
+gh issue list --label="loom:issue" --state=open --json number,title,labels \
+  --jq '.[] | select(([.labels[].name] | contains(["loom:curated"]) | not) and ([.labels[].name] | contains(["external"]) | not)) |
+  "#\(.number): \(.title)"'
+```
+
+**Why prioritize these**: Human already approved the concept, Curator adds technical detail before Builder starts.
+
+### Priority 2: Unlabeled Issues (Fallback)
+
+If no Priority 1 issues exist, find unlabeled issues:
+
+```bash
 gh issue list --state=open --json number,title,labels \
-  --jq '.[] | select(([.labels[].name] | inside(["loom:architect", "loom:hermit", "loom:curated", "loom:issue", "loom:in-progress"]) | not)) | "#\(.number) \(.title)"'
+  --jq '.[] | select(([.labels[].name] | inside(["loom:architect", "loom:hermit", "loom:curated", "loom:issue", "loom:curating", "external"]) | not)) | "#\(.number) \(.title)"'
 ```
 
-Or simpler (may include some false positives):
-```bash
-# Look for recently created/updated issues
-gh issue list --state=open --limit=20
-# Then manually check which ones need curation
-```
+**Workflow**:
+1. Try Priority 1 search first
+2. If no results, use Priority 2
+3. Pick oldest issue from selected priority
+4. Enhance and mark as `loom:curated`
 
 ## Claiming Work
 
@@ -57,7 +119,7 @@ gh issue list --state=open --limit=20
 
 ```bash
 # Claim the issue before starting enhancement
-gh issue edit <number> --add-label "loom:in-progress"
+gh issue edit <number> --add-label "loom:curating"
 ```
 
 This signals to other Curators that you're working on this issue. The search command above already filters out claimed issues, so you won't see issues other Curators are enhancing.
@@ -79,8 +141,8 @@ When you find an unlabeled issue, **first assess if it's already implementation-
 ✅ **Mark it `loom:curated` immediately** - the issue is already well-formed:
 
 ```bash
-# Signal completion by removing in-progress and adding curated
-gh issue edit <number> --remove-label "loom:in-progress" --add-label "loom:curated"
+# Signal completion by removing curating and adding curated
+gh issue edit <number> --remove-label "loom:curating" --add-label "loom:curated"
 ```
 
 **IMPORTANT**: Do NOT add `loom:issue` - only humans can approve work for implementation.
@@ -104,7 +166,7 @@ Issue #84: "Expand frontend unit test coverage"
 - ✅ Includes test plan (Phase 1, 2, 3 approach)
 - ✅ No dependencies mentioned
 
-→ Action: `gh issue edit 84 --remove-label "loom:in-progress" --add-label "loom:curated"`
+→ Action: `gh issue edit 84 --remove-label "loom:curating" --add-label "loom:curated"`
 → Result: Awaits human approval (`loom:issue`) before Worker can start
 ```
 
@@ -195,7 +257,7 @@ EOF
 )"
 
 # 3. Mark as curated and unclaim (human will approve with loom:issue)
-gh issue edit 100 --remove-label "loom:in-progress" --add-label "loom:curated"
+gh issue edit 100 --remove-label "loom:curating" --add-label "loom:curated"
 ```
 
 ### When to Amend Description (Improve Original)
@@ -306,8 +368,8 @@ gh issue edit <number> --add-label "loom:blocked"
 ### When Dependencies Complete
 
 GitHub automatically checks boxes when issues close. When you see all boxes checked:
-1. Claim the issue if not already claimed: `gh issue edit <number> --add-label "loom:in-progress"`
-2. Remove `loom:blocked` label and add `loom:curated`: `gh issue edit <number> --remove-label "loom:blocked" --remove-label "loom:in-progress" --add-label "loom:curated"`
+1. Claim the issue if not already claimed: `gh issue edit <number> --add-label "loom:curating"`
+2. Remove `loom:blocked` label and add `loom:curated`: `gh issue edit <number> --remove-label "loom:blocked" --remove-label "loom:curating" --add-label "loom:curated"`
 3. Issue awaits human approval (`loom:issue`) before Workers can claim
 
 ## Issue Quality Checklist
@@ -330,13 +392,13 @@ Before marking an issue as `loom:curated`, ensure it has:
 - **Find work**: See "Finding Work" section above for commands
 - **Claim the issue**: Before starting enhancement work
   ```bash
-  gh issue edit <number> --add-label "loom:in-progress"
+  gh issue edit <number> --add-label "loom:curating"
   ```
 - **Review issue**: Read description, check code references, understand context
 - **Enhance issue**: Add missing details, implementation options, test plans
 - **Mark curated and unclaim** (NOT approved for work):
   ```bash
-  gh issue edit <number> --remove-label "loom:in-progress" --add-label "loom:curated"
+  gh issue edit <number> --remove-label "loom:curating" --add-label "loom:curated"
   ```
 - **NEVER add `loom:issue`**: Only humans can approve work for implementation
 - **Monitor workflow**: Check for `loom:blocked` issues that need help
