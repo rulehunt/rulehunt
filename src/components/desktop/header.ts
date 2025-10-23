@@ -1,8 +1,8 @@
 // src/components/header.ts
 
 import {
-  type SoundControlsElements,
   createSoundControls,
+  type SoundControlsElements,
 } from './soundControls'
 import type { ThemeToggleElements } from './theme'
 

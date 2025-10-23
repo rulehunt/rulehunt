@@ -1,7 +1,10 @@
 // src/components/mobile.ts
 import { formatRulesetName, saveRun } from '../../api/save'
+import { fetchStarredPattern } from '../../api/starred.ts'
+import { getRunStatsSnapshot } from '../../api/statistics-utils.ts'
 import { createCellularAutomata } from '../../cellular-automata-factory.ts'
 import type { ICellularAutomata } from '../../cellular-automata-interface.ts'
+import { getAutoMutateEnabled } from '../../dataStorage.ts'
 import { getUserIdentity } from '../../identity.ts'
 import type {
   C4OrbitsData,
@@ -10,24 +13,20 @@ import type {
   RunSubmission,
 } from '../../schema.ts'
 import {
-  buildOrbitLookup,
-  c4RulesetToHex,
-  conwayRule,
-  expandC4Ruleset,
-  makeC4Ruleset,
-  mutateC4Ruleset,
-  randomC4RulesetByDensity,
-} from '../../utils.ts'
-import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
-
-import { fetchStarredPattern } from '../../api/starred.ts'
-import { getRunStatsSnapshot } from '../../api/statistics-utils.ts'
-import {
   parseURLRuleset,
   parseURLState,
   updateURLWithoutReload,
 } from '../../urlState.ts'
-import { hexToC4Ruleset } from '../../utils.ts'
+import {
+  buildOrbitLookup,
+  c4RulesetToHex,
+  conwayRule,
+  expandC4Ruleset,
+  hexToC4Ruleset,
+  makeC4Ruleset,
+  mutateC4Ruleset,
+  randomC4RulesetByDensity,
+} from '../../utils.ts'
 import type { AudioEngine } from '../audioEngine.ts'
 import { getVisualizationPalette } from '../shared/theme.ts'
 import { createAutoFadeContainer } from './buttonContainer.ts'
@@ -39,6 +38,8 @@ import {
 import { createMobileHeader, setupMobileHeader } from './header.ts'
 import { createRoundButton } from './roundButton.ts'
 import { createStarButton } from './starButton.ts'
+import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
+import { createAutoMutateCheckbox } from './ui/autoMutateCheckbox.ts'
 import { createShareButton } from './ui/shareButton.ts'
 import { createSoftResetButton } from './ui/softResetButton.ts'
 import { createStatsButton } from './ui/statsButton.ts'
@@ -47,6 +48,7 @@ import { createStatsButton } from './ui/statsButton.ts'
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
 const STEPS_PER_SECOND = 60
 const TARGET_GRID_SIZE = 600_000
+
 // Exploration/Exploitation/Mutation Strategy:
 // 20% random - Generate completely new random rule (exploration)
 // 10% exact starred - Load exact starred pattern from database (exploitation)
@@ -232,11 +234,19 @@ function generateRandomRule(): RuleData {
 
 /**
  * Exploration/Exploitation/Mutation Strategy:
+ *
+ * When auto-mutate is **enabled** (default):
  * - 0.0–0.2: return a brand new random rule
  * - 0.2–0.9: fetch a starred rule, then mutate it with increasing magnitude
  * - 0.9–1.0: fetch and return starred rule unmodified
+ *
+ * When auto-mutate is **disabled**:
+ * - 0.0–0.2: return a brand new random rule
+ * - 0.2–1.0: fetch and return starred rule unmodified
+ *
+ * @param autoMutateEnabled Whether to apply mutation to starred rules (default: true)
  */
-async function generateNextRule(): Promise<RuleData> {
+async function generateNextRule(autoMutateEnabled = true): Promise<RuleData> {
   const r = Math.random()
 
   // 20% random (0.0 - 0.2)
@@ -257,6 +267,23 @@ async function generateNextRule(): Promise<RuleData> {
 
     const ruleset = hexToC4Ruleset(starred.ruleset_hex)
 
+    // If auto-mutate is disabled, always return exact starred (80% of the time after random)
+    if (!autoMutateEnabled) {
+      console.log(
+        '[generateNextRule] Strategy: Exact starred (auto-mutate disabled) -',
+        starred.ruleset_name,
+        'seed:',
+        starred.seed,
+      )
+      return {
+        name: starred.ruleset_name,
+        hex: starred.ruleset_hex,
+        ruleset,
+        seed: starred.seed, // Include saved seed for exact reproduction
+      }
+    }
+
+    // Auto-mutate is enabled - use original mutation strategy
     // 10% exact starred (0.9 - 1.0)
     if (r > 0.9) {
       console.log(
@@ -603,7 +630,7 @@ export async function setupMobileLayout(
   }
 
   // Use exploration/exploitation strategy for initial offscreen rule
-  let offScreenRule = await generateNextRule()
+  let offScreenRule = await generateNextRule(getAutoMutateEnabled())
 
   // Apply URL seed if provided (only on initial load)
   if (urlState.seed !== undefined) {
@@ -738,7 +765,7 @@ export async function setupMobileLayout(
   // Closure variable to store hash for the currently visible rule
   // Using a closure variable instead of per-object storage because rule objects
   // are discarded after being swapped out (not reused in the dual-canvas architecture)
-  let currentlyVisibleRuleHash: string | undefined = undefined
+  let currentlyVisibleRuleHash: string | undefined
 
   let shareBtn = createShareButton(
     resetControlFade,
@@ -797,6 +824,27 @@ export async function setupMobileLayout(
   wrapper.appendChild(controlContainer)
   resetControlFade()
 
+  // Create auto-mutate checkbox
+  const autoMutateCheckbox = createAutoMutateCheckbox({
+    onToggle: (enabled) => {
+      console.log(
+        `[autoMutateCheckbox] Auto-mutate ${enabled ? 'enabled' : 'disabled'}`,
+      )
+    },
+    isTransitioning: () => isTransitioning,
+  })
+
+  // Position checkbox in bottom-left corner
+  const checkboxContainer = document.createElement('div')
+  checkboxContainer.style.cssText = `
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    z-index: 20;
+  `
+  checkboxContainer.appendChild(autoMutateCheckbox.element)
+  wrapper.appendChild(checkboxContainer)
+
   let hasSwipedOnce = false
 
   // Create state accessors for swipe handler
@@ -848,7 +896,7 @@ export async function setupMobileLayout(
           )
         } else {
           // At end of history → generate new rule
-          nextRule = await generateNextRule()
+          nextRule = await generateNextRule(getAutoMutateEnabled())
           nextSeed = onScreenCA.getSeed()
           currentIsStarred = false
           console.log(`[history] Generate new rule at end: ${nextRule.name}`)
@@ -868,7 +916,7 @@ export async function setupMobileLayout(
           )
         } else {
           // At start of history → generate new rule (symmetric behavior)
-          nextRule = await generateNextRule()
+          nextRule = await generateNextRule(getAutoMutateEnabled())
           nextSeed = onScreenCA.getSeed()
           currentIsStarred = false
           console.log(`[history] Generate new rule at start: ${nextRule.name}`)
@@ -949,7 +997,7 @@ export async function setupMobileLayout(
 
         // Prepare offscreen CA for the next swipe
         // Always generate a new pattern for offscreen (will be used if navigating forward)
-        offScreenRule = await generateNextRule()
+        offScreenRule = await generateNextRule(getAutoMutateEnabled())
         prepareAutomata(offScreenCA, offScreenRule, lookup, 50)
         offscreenReady = true
 

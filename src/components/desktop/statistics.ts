@@ -15,8 +15,8 @@ import {
 } from 'chart.js'
 import type { StatisticsData } from '../../schema'
 import {
-  type StatsChartElements,
   createStatsChartModal,
+  type StatsChartElements,
   showStatsChart,
 } from '../shared/statsChart'
 import { getCurrentThemeColors } from '../shared/theme'

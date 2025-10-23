@@ -67,7 +67,9 @@ export function createProgressBar(options: ProgressBarOptions = {}): {
     root,
     label: root.querySelector('#progress-label') as HTMLSpanElement,
     bar: root.querySelector('#progress-bar') as HTMLDivElement,
-    checkbox: root.querySelector('#checkbox-auto-mutate-on-complete') as HTMLInputElement,
+    checkbox: root.querySelector(
+      '#checkbox-auto-mutate-on-complete',
+    ) as HTMLInputElement,
   }
 
   if (buttonLabel) {
