@@ -42,7 +42,7 @@ export function createSimulationPanel(): {
           <span>Center Seed</span>
         </label>
         <hr class="border-gray-300 dark:border-gray-600 my-1" />
-        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="When enabled, each reset generates a new random pattern. When disabled, resets reuse the same initial conditions for reproducible testing.">
+        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Controls manual reset behavior. When enabled, each reset generates a new random pattern. When disabled, resets reuse the same seed for reproducible testing. Does NOT affect automatic mutation.">
           <input type="checkbox" id="checkbox-new-pattern-on-reset" checked class="cursor-pointer" />
           <span>Generate new pattern on reset</span>
         </label>
