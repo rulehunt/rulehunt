@@ -22,14 +22,16 @@ export const onRequestGet = async (
     const csvHeader = headers.join(',')
 
     // Generate CSV rows with proper escaping
-    const csvRows = rows.map(row =>
-      headers.map(header => {
-        const value = row[header]
-        const str = String(value ?? '')
-        return str.includes(',') || str.includes('"') || str.includes('\n')
-          ? `"${str.replace(/"/g, '""')}"`
-          : str
-      }).join(',')
+    const csvRows = rows.map((row) =>
+      headers
+        .map((header) => {
+          const value = row[header]
+          const str = String(value ?? '')
+          return str.includes(',') || str.includes('"') || str.includes('\n')
+            ? `"${str.replace(/"/g, '""')}"`
+            : str
+        })
+        .join(','),
     )
 
     const csv = [csvHeader, ...csvRows].join('\n')
@@ -39,8 +41,8 @@ export const onRequestGet = async (
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="rulehunt-export-${new Date().toISOString().split('T')[0]}.csv"`,
-        'Cache-Control': 'public, max-age=86400'
-      }
+        'Cache-Control': 'public, max-age=86400',
+      },
     })
   } catch (err) {
     console.error('[export-database] Error:', err)

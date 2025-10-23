@@ -3,14 +3,14 @@
   "files": {
     "includes": [
       "**",
-      "!**/node_modules/**",
-      "!**/dist/**",
-      "!**/build/**",
-      "!**/coverage/**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/build",
+      "!**/coverage",
       "!**/*.test.ts",
       "!**/*.spec.ts",
-      "!**/tests/**",
-      "!**/__tests__/**"
+      "!**/tests",
+      "!**/__tests__"
     ]
   },
   "formatter": {
