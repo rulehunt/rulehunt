@@ -50,6 +50,7 @@ import {
 } from './events/simulationHandlers.ts'
 import { createHeader } from './header.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
+import { GridEditor } from './gridEditor.ts'
 import { createPatternInspector } from './patternInspector.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
@@ -194,7 +195,9 @@ export async function setupDesktopLayout(
 
   const summaryPanel = createSummaryPanel()
   const statsBar = createStatsBar()
+
   leftColumn.appendChild(simulationContainer)
+  // Grid editor will be added after cellularAutomata is created
   leftColumn.appendChild(summaryPanel.root)
   leftColumn.appendChild(statsBar.root)
 
@@ -354,6 +357,16 @@ export async function setupDesktopLayout(
     bgColor: colors.bgColor,
     onDiedOut: () => onDiedOutCallback?.(),
   })
+
+  // Create grid editor (Issue #9 - Phase 1: Grid Editing Tools)
+  const gridEditor = new GridEditor(
+    cellularAutomata,
+    simCanvas,
+    GRID_ROWS,
+    GRID_COLS,
+  )
+  // Insert grid editor after simulation container
+  leftColumn.insertBefore(gridEditor.getContainer(), summaryPanel.root)
 
   // Create tab container (must be after cellularAutomata is initialized)
   const tabContainer = createTabContainer({

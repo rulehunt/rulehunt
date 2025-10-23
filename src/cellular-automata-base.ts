@@ -545,6 +545,35 @@ export abstract class CellularAutomataBase {
     return this.isPlaying
   }
 
+  // --- Cell-level grid access ----------------------------------------------
+  /**
+   * Get the value of a single cell.
+   * @param row - Row index (0-based)
+   * @param col - Column index (0-based)
+   * @returns 0 (dead) or 1 (alive), or undefined if out of bounds
+   */
+  getCell(row: number, col: number): number | undefined {
+    if (row < 0 || row >= this.gridRows || col < 0 || col >= this.gridCols) {
+      return undefined
+    }
+    return this.grid[row * this.gridCols + col]
+  }
+
+  /**
+   * Set the value of a single cell.
+   * Used for grid editing tools (pencil, line, rect, etc.)
+   * @param row - Row index (0-based)
+   * @param col - Column index (0-based)
+   * @param value - 0 (dead) or 1 (alive)
+   */
+  setCell(row: number, col: number, value: number): void {
+    if (row < 0 || row >= this.gridRows || col < 0 || col >= this.gridCols) {
+      return // Silently ignore out-of-bounds writes
+    }
+    this.grid[row * this.gridCols + col] = value & 1 // Ensure 0 or 1
+    this.onGridChanged()
+  }
+
   // --- Grid access for testing ----------------------------------------------
   /**
    * Get a copy of the current grid state.
