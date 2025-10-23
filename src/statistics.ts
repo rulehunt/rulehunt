@@ -26,10 +26,10 @@ export interface SimulationMetadata {
 }
 
 import {
-  EntityTracker,
   buildActiveRegions,
   detectEntities,
   detectEntitiesSparse,
+  EntityTracker,
 } from './entityDetection'
 import type { Grid } from './schema'
 

@@ -117,3 +117,15 @@ export function formatDuration(ms: number): string {
   const seconds = totalSeconds % 60
   return `${hours}h ${minutes}m ${seconds}s`
 }
+
+// Auto-mutate preference storage
+const AUTO_MUTATE_KEY = 'rulehunt-auto-mutate-enabled'
+
+export function getAutoMutateEnabled(): boolean {
+  const stored = localStorage.getItem(AUTO_MUTATE_KEY)
+  return stored === null ? true : stored === 'true' // Default: enabled
+}
+
+export function setAutoMutateEnabled(enabled: boolean): void {
+  localStorage.setItem(AUTO_MUTATE_KEY, String(enabled))
+}

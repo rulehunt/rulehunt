@@ -33,17 +33,25 @@ export function generateRandomRule(): RuleData {
 /**
  * Generates the next rule using an exploration/exploitation/mutation strategy:
  *
+ * When auto-mutate is **enabled** (default):
  * - **20% Random** (r ∈ [0.0, 0.2]): Brand new random rule
  * - **70% Mutated Starred** (r ∈ [0.2, 0.9]): Fetch starred rule, mutate with decreasing magnitude
  *   - At r = 0.2: maximum mutation (magnitude = 1.0)
  *   - At r = 0.9: minimum mutation (magnitude → 0.0)
  * - **10% Exact Starred** (r ∈ [0.9, 1.0]): Fetch and return starred rule unmodified (with saved seed)
  *
+ * When auto-mutate is **disabled**:
+ * - **20% Random** (r ∈ [0.0, 0.2]): Brand new random rule
+ * - **80% Exact Starred** (r ∈ [0.2, 1.0]): Fetch and return starred rule unmodified (with saved seed)
+ *
  * This balances exploration (random) with exploitation (starred) and learning (mutation).
  *
+ * @param autoMutateEnabled Whether to apply mutation to starred rules (default: true)
  * @returns Promise resolving to the next rule
  */
-export async function generateNextRule(): Promise<RuleData> {
+export async function generateNextRule(
+  autoMutateEnabled = true,
+): Promise<RuleData> {
   const r = Math.random()
 
   // 20% random (0.0 - 0.2)
@@ -64,6 +72,23 @@ export async function generateNextRule(): Promise<RuleData> {
 
     const ruleset = hexToC4Ruleset(starred.ruleset_hex)
 
+    // If auto-mutate is disabled, always return exact starred (80% of the time after random)
+    if (!autoMutateEnabled) {
+      console.log(
+        '[generateNextRule] Strategy: Exact starred (auto-mutate disabled) -',
+        starred.ruleset_name,
+        'seed:',
+        starred.seed,
+      )
+      return {
+        name: starred.ruleset_name,
+        hex: starred.ruleset_hex,
+        ruleset,
+        seed: starred.seed, // Include saved seed for exact reproduction
+      }
+    }
+
+    // Auto-mutate is enabled - use original mutation strategy
     // 10% exact starred (0.9 - 1.0)
     if (r > 0.9) {
       console.log(
