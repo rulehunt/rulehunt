@@ -29,6 +29,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.2.7",
     "@cloudflare/workers-types": "^4.20251014.0",
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^24.9.1",
     "@vitest/coverage-v8": "^4.0.1",
     "gpu.js": "^2.16.0",
@@ -42,7 +43,10 @@
     "zod": "^4.1.12"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.2",
     "chart.js": "^4.5.1",
-    "chartjs-chart-error-bars": "^4.4.5"
+    "chartjs-chart-error-bars": "^4.4.5",
+    "jose": "^6.1.0",
+    "nanoid": "^5.1.6"
   }
 }

@@ -58,3 +58,79 @@ export function setUserLabel(label?: string): void {
 export function getUserIdentity(): { userId: string; userLabel?: string } {
   return { userId: getUserId(), userLabel: getUserLabel() }
 }
+
+// ========================================================================
+// Authentication State Management
+// Added for Issue #7: User authentication and device linking
+// ========================================================================
+
+const STORAGE_KEY_AUTH_TOKEN = 'rulehunt:authToken'
+const STORAGE_KEY_USER_EMAIL = 'rulehunt:userEmail'
+
+/**
+ * Get the current JWT authentication token
+ * @returns JWT token string or null if not authenticated
+ */
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY_AUTH_TOKEN)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Store JWT authentication token
+ * @param token - JWT token to store
+ */
+export function setAuthToken(token: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_AUTH_TOKEN, token)
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Clear authentication token and user email (logout)
+ */
+export function clearAuthToken(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY_AUTH_TOKEN)
+    localStorage.removeItem(STORAGE_KEY_USER_EMAIL)
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Check if user is currently authenticated
+ * @returns true if auth token exists, false otherwise
+ */
+export function isAuthenticated(): boolean {
+  return !!getAuthToken()
+}
+
+/**
+ * Get the authenticated user's email
+ * @returns Email address or null if not authenticated
+ */
+export function getUserEmail(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY_USER_EMAIL)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Store the authenticated user's email
+ * @param email - Email address to store
+ */
+export function setUserEmail(email: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_USER_EMAIL, email)
+  } catch {
+    /* ignore */
+  }
+}
