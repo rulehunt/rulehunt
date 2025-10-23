@@ -5,6 +5,7 @@ export interface ProgressBarElements {
   label: HTMLSpanElement
   bar: HTMLDivElement
   saveButton?: HTMLButtonElement
+  checkbox?: HTMLInputElement
 }
 
 export interface ProgressBarOptions {
@@ -56,12 +57,17 @@ export function createProgressBar(options: ProgressBarOptions = {}): {
           : ''
       }
     </div>
+    <label class="flex items-center gap-2 text-sm cursor-pointer mt-2" title="When enabled, automatically mutates ruleset and restarts after reaching 100%">
+      <input type="checkbox" id="checkbox-auto-mutate-on-complete" class="cursor-pointer" />
+      <span>Auto-mutate ruleset on completion</span>
+    </label>
   `
 
   const elements: ProgressBarElements = {
     root,
     label: root.querySelector('#progress-label') as HTMLSpanElement,
     bar: root.querySelector('#progress-bar') as HTMLDivElement,
+    checkbox: root.querySelector('#checkbox-auto-mutate-on-complete') as HTMLInputElement,
   }
 
   if (buttonLabel) {
