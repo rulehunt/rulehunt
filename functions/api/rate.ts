@@ -94,7 +94,7 @@ export const onRequestPost = async (
 
     if (err instanceof z.ZodError) {
       return jsonResponse(
-        { ok: false, error: 'Invalid rating data', details: err.errors },
+        { ok: false, error: 'Invalid rating data', details: err.issues },
         400,
       )
     }
