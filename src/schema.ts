@@ -265,6 +265,13 @@ export const StarredResponse = z.object({
   pattern: StarredPattern.nullable(),
 })
 
+export const FavoritesResponse = z.object({
+  ok: z.boolean(),
+  favorites: z.array(StarredPattern),
+  count: z.number().int().nonnegative(),
+  hasMore: z.boolean(),
+})
+
 // ============================================================================
 // Statistics types
 // ============================================================================
@@ -356,6 +363,7 @@ export type LeaderboardEntry = z.infer<typeof LeaderboardEntry>
 export type LeaderboardResponse = z.infer<typeof LeaderboardResponse>
 export type StarredPattern = z.infer<typeof StarredPattern>
 export type StarredResponse = z.infer<typeof StarredResponse>
+export type FavoritesResponse = z.infer<typeof FavoritesResponse>
 export type OutcomeDistribution = z.infer<typeof OutcomeDistribution>
 export type WolframClassification = z.infer<typeof WolframClassification>
 export type StatisticsData = z.infer<typeof StatisticsData>

@@ -43,6 +43,11 @@ import { createAutoMutateCheckbox } from './ui/autoMutateCheckbox.ts'
 import { createShareButton } from './ui/shareButton.ts'
 import { createSoftResetButton } from './ui/softResetButton.ts'
 import { createStatsButton } from './ui/statsButton.ts'
+import { createFavoritesButton } from './ui/favoritesButton.ts'
+import {
+  createFavoritesModal,
+  setupFavoritesModal,
+} from './ui/favoritesModal.ts'
 
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing
@@ -675,6 +680,38 @@ export async function setupMobileLayout(
     () => updateStats(getCurrentRunData()), // refresh every second
   )
 
+  // Create favorites modal - append to container for proper positioning
+  const {
+    elements: favoritesElements,
+    show: showFavorites,
+    hide: hideFavorites,
+  } = createFavoritesModal({
+    onLoadFavorite: (favorite) => {
+      // Load the favorite into offscreen automata (user will swipe down to see it)
+      const ruleset = hexToC4Ruleset(favorite.ruleset_hex)
+      offScreenRule = {
+        name: favorite.ruleset_name,
+        hex: favorite.ruleset_hex,
+        ruleset: ruleset,
+        seed: favorite.seed,
+      }
+
+      // Prepare offscreen automata with the favorite pattern
+      prepareAutomata(offScreenCA, offScreenRule, lookup, 50)
+      offscreenReady = true
+
+      // Close the modal
+      hideFavorites()
+
+      console.log('[favorites] Loaded favorite pattern:', favorite.ruleset_name)
+    },
+  })
+
+  const cleanupFavoritesModal = setupFavoritesModal(
+    favoritesElements,
+    hideFavorites,
+  )
+
   // Audio update loop (10 Hz / every 100ms)
   let audioUpdateInterval: number | null = null
   const startAudioUpdates = () => {
@@ -821,6 +858,17 @@ export async function setupMobileLayout(
     () => isTransitioning,
   )
 
+  // Create favorites button
+  let favoritesBtn = createFavoritesButton({
+    onOpenFavorites: () => {
+      if (!isTransitioning) {
+        showFavorites()
+        resetControlFade()
+      }
+    },
+    isTransitioning: () => isTransitioning,
+  })
+
   // Wire up died-out callback to pulse reset button
   onDiedOutCallback = () => {
     softResetButton.startPulse()
@@ -828,6 +876,7 @@ export async function setupMobileLayout(
 
   controlContainer.appendChild(softResetButton.button)
   controlContainer.appendChild(starBtn.button)
+  controlContainer.appendChild(favoritesBtn.button)
   controlContainer.appendChild(statsBtn.button)
   controlContainer.appendChild(shareBtn.button)
   wrapper.appendChild(controlContainer)
@@ -1023,6 +1072,7 @@ export async function setupMobileLayout(
       shareBtn.cleanup()
       softResetButton.cleanup()
       starBtn.cleanup()
+      favoritesBtn.cleanup()
       statsBtn.cleanup()
 
       shareBtn = createShareButton(
@@ -1078,9 +1128,20 @@ export async function setupMobileLayout(
         () => isTransitioning,
       )
 
+      favoritesBtn = createFavoritesButton({
+        onOpenFavorites: () => {
+          if (!isTransitioning) {
+            showFavorites()
+            resetControlFade()
+          }
+        },
+        isTransitioning: () => isTransitioning,
+      })
+
       controlContainer.innerHTML = ''
       controlContainer.appendChild(softResetButton.button)
       controlContainer.appendChild(starBtn.button)
+      controlContainer.appendChild(favoritesBtn.button)
       controlContainer.appendChild(statsBtn.button)
       controlContainer.appendChild(shareBtn.button)
       resetControlFade()
@@ -1149,6 +1210,7 @@ export async function setupMobileLayout(
     cleanupControlContainer()
     cleanupHeader()
     cleanupStatsOverlay()
+    cleanupFavoritesModal()
     stopAudioUpdates()
     if (audioEngine) {
       ;(audioEngine as AudioEngine).stop()
