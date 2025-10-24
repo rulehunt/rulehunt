@@ -9,6 +9,7 @@ export type URLState = {
   seed?: number
   seedType?: 'center' | 'random' | 'patch'
   seedPercentage?: number
+  generation?: number
 }
 
 /**
@@ -50,6 +51,15 @@ export function parseURLState(): URLState {
       seedPercentage <= 100
     ) {
       state.seedPercentage = seedPercentage
+    }
+  }
+
+  // Parse generation (non-negative integer)
+  const generationStr = params.get('generation')
+  if (generationStr) {
+    const generation = Number.parseInt(generationStr, 10)
+    if (!Number.isNaN(generation) && generation >= 0) {
+      state.generation = generation
     }
   }
 
@@ -99,6 +109,11 @@ export function buildShareURL(state: URLState): string {
   if (state.seedPercentage !== undefined && state.seedPercentage !== 50) {
     // Only include if non-default
     params.set('seedPercentage', state.seedPercentage.toString())
+  }
+
+  if (state.generation !== undefined && state.generation > 0) {
+    // Only include if non-zero (0 is initial state)
+    params.set('generation', state.generation.toString())
   }
 
   const url = new URL(window.location.href)

@@ -604,6 +604,18 @@ export async function setupDesktopLayout(
   // Now apply initial condition which will also initialize simulation metadata
   applyInitialCondition()
 
+  // Fast-forward to URL generation if specified
+  if (urlState.generation !== undefined && urlState.generation > 0) {
+    const expandedRuleset = expandC4Ruleset(currentRuleset, orbitLookup)
+    for (let i = 0; i < urlState.generation; i++) {
+      cellularAutomata.step(expandedRuleset)
+    }
+    console.log(
+      '[desktop] Fast-forwarded to generation:',
+      urlState.generation,
+    )
+  }
+
   // Auto-select first cell (index 0) on page load
   if (displayMode === 'orbits') {
     const orbit = orbitsData.orbits[0]

@@ -644,6 +644,15 @@ export async function setupMobileLayout(
   prepareAutomata(onScreenCA, onScreenRule, lookup, initialSeedPercentage)
   startAutomata(onScreenCA, onScreenRule)
 
+  // Fast-forward to URL generation if specified
+  if (urlState.generation !== undefined && urlState.generation > 0) {
+    const expandedRuleset = expandC4Ruleset(onScreenRule.ruleset, lookup)
+    for (let i = 0; i < urlState.generation; i++) {
+      onScreenCA.step(expandedRuleset)
+    }
+    console.log('[mobile] Fast-forwarded to generation:', urlState.generation)
+  }
+
   prepareAutomata(offScreenCA, offScreenRule, lookup)
   offscreenReady = true
 
