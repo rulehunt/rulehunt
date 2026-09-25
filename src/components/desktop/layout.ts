@@ -30,6 +30,7 @@ import {
 } from './events/exportHandlers.ts'
 import {
   setupBenchmarkHandler,
+  setupCanvasWheelZoom,
   setupHeadlessHandler,
   setupZoomHandlers,
 } from './events/miscHandlers.ts'
@@ -91,6 +92,7 @@ export async function setupDesktopLayout(
     element: EventTarget
     event: string
     handler: EventListenerOrEventListenerObject
+    options?: AddEventListenerOptions
   }> = []
   const intervals: number[] = []
 
@@ -100,15 +102,18 @@ export async function setupDesktopLayout(
     handler:
       | EventListenerOrEventListenerObject
       | ((evt: HTMLElementEventMap[K]) => void),
+    options?: AddEventListenerOptions,
   ) => {
     element.addEventListener(
       event as string,
       handler as EventListenerOrEventListenerObject,
+      options,
     )
     eventListeners.push({
       element,
       event: event as string,
       handler: handler as EventListenerOrEventListenerObject,
+      options,
     })
   }
 
@@ -856,6 +861,12 @@ export async function setupDesktopLayout(
 
   // Setup zoom handlers
   setupZoomHandlers(zoomSlider, cellularAutomata)
+  setupCanvasWheelZoom(
+    simCanvas,
+    zoomSlider,
+    cellularAutomata,
+    addEventListener,
+  )
 
   // Setup export handlers
   const exportHandlerDeps = {
@@ -1009,8 +1020,8 @@ export async function setupDesktopLayout(
     for (const id of intervals) {
       window.clearInterval(id)
     }
-    for (const { element, event, handler } of eventListeners) {
-      element.removeEventListener(event, handler)
+    for (const { element, event, handler, options } of eventListeners) {
+      element.removeEventListener(event, handler, options)
     }
     cleanupTheme()
     benchmarkModal.cleanup()
