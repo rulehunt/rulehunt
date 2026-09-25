@@ -24,6 +24,7 @@ export interface SimulationHandlerDeps {
   initializeSimulationMetadata: () => void
   updateURL: () => void
   checkboxNewPatternOnReset: HTMLInputElement
+  autoMutateCallback?: () => void
 }
 
 /**
@@ -53,6 +54,7 @@ export function setupStepHandler(
       deps.summaryPanel.elements,
       deps.progressBar,
       deps.statsBar,
+      undefined,
       undefined,
       deps.audioEngine,
     )
@@ -104,6 +106,7 @@ export function setupResetHandler(
         deps.summaryPanel.elements,
         deps.progressBar,
         deps.statsBar,
+        undefined,
         undefined,
         deps.audioEngine,
       )
@@ -178,6 +181,7 @@ export function setupPlayPauseHandler(
           deps.progressBar,
           deps.statsBar,
           undefined,
+          deps.autoMutateCallback,
           deps.audioEngine,
         )
       }, 200) as unknown as number
