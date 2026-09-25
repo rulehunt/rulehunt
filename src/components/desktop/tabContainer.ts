@@ -1,6 +1,11 @@
 // src/components/desktop/tabContainer.ts
 
-export type TabId = 'explore' | 'analyze' | 'leaderboard' | 'statistics'
+export type TabId =
+  | 'explore'
+  | 'analyze'
+  | 'leaderboard'
+  | 'statistics'
+  | 'research'
 
 export interface TabConfig {
   id: TabId
@@ -24,6 +29,7 @@ const TABS: TabConfig[] = [
   { id: 'analyze', label: 'Analyze', icon: '📊', shortcut: 'Ctrl+2' },
   { id: 'leaderboard', label: 'Leaderboard', icon: '🏆', shortcut: 'Ctrl+3' },
   { id: 'statistics', label: 'Statistics', icon: '📈', shortcut: 'Ctrl+4' },
+  { id: 'research', label: 'Research', icon: '🔬', shortcut: 'Ctrl+5' },
 ]
 
 export function createTabContainer(config: TabContainerConfig): {
@@ -134,7 +140,8 @@ export function createTabContainer(config: TabContainerConfig): {
       hash === 'explore' ||
       hash === 'analyze' ||
       hash === 'leaderboard' ||
-      hash === 'statistics'
+      hash === 'statistics' ||
+      hash === 'research'
     ) {
       return hash
     }
@@ -149,7 +156,7 @@ export function createTabContainer(config: TabContainerConfig): {
     tabButtons.get(tab.id)?.addEventListener('click', handler)
   }
 
-  // Keyboard shortcuts (Ctrl+1, Ctrl+2, Ctrl+3, Ctrl+4)
+  // Keyboard shortcuts (Ctrl+1, Ctrl+2, Ctrl+3, Ctrl+4, Ctrl+5)
   const keyboardHandler = (e: KeyboardEvent) => {
     if (e.ctrlKey || e.metaKey) {
       if (e.key === '1') {
@@ -164,6 +171,9 @@ export function createTabContainer(config: TabContainerConfig): {
       } else if (e.key === '4') {
         e.preventDefault()
         setActiveTab('statistics')
+      } else if (e.key === '5') {
+        e.preventDefault()
+        setActiveTab('research')
       }
     }
   }

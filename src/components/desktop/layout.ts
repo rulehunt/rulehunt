@@ -59,6 +59,7 @@ import { createHeader } from './header.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
 import { createPatternInspector } from './patternInspector.ts'
 import { createProgressBar } from './progressBar.ts'
+import { createResearchPanel } from './research.ts'
 import { createRulesetPanel } from './ruleset.ts'
 import { createSimulationPanel } from './simulation.ts'
 import { createStatisticsPanel, renderStatistics } from './statistics.ts'
@@ -233,11 +234,18 @@ export async function setupDesktopLayout(
   const statisticsPanel = createStatisticsPanel()
   statisticsColumn.appendChild(statisticsPanel.root)
 
+  // Research column (full-width for research tab)
+  const researchColumn = document.createElement('div')
+  researchColumn.className = 'flex flex-col items-center gap-3 w-full'
+  const researchPanel = createResearchPanel()
+  researchColumn.appendChild(researchPanel.root)
+
   mainContainer.appendChild(leftColumn)
   mainContainer.appendChild(rightColumn)
   mainContent.appendChild(mainContainer)
   mainContent.appendChild(leaderboardColumn)
   mainContent.appendChild(statisticsColumn)
+  mainContent.appendChild(researchColumn)
   appRoot.appendChild(mainContent)
 
   // Create footer with build info
@@ -317,6 +325,7 @@ export async function setupDesktopLayout(
     const analyzeVisible = tabId === 'analyze'
     const leaderboardVisible = tabId === 'leaderboard'
     const statisticsVisible = tabId === 'statistics'
+    const researchVisible = tabId === 'research'
 
     // Show/hide main containers based on tab
     mainContainer.style.display =
@@ -326,6 +335,7 @@ export async function setupDesktopLayout(
     rightColumn.style.display = exploreVisible ? 'flex' : 'none'
     leaderboardColumn.style.display = leaderboardVisible ? 'flex' : 'none'
     statisticsColumn.style.display = statisticsVisible ? 'flex' : 'none'
+    researchColumn.style.display = researchVisible ? 'flex' : 'none'
 
     if (exploreVisible) {
       // Explore: full simulation + full ruleset + pattern inspector + stats bar
