@@ -1,5 +1,8 @@
 // src/api/favorites.ts
-import { type FavoritesResponse, FavoritesResponse as FavoritesResponseSchema } from '../schema'
+import {
+  type FavoritesResponse,
+  FavoritesResponse as FavoritesResponseSchema,
+} from '../schema'
 
 /**
  * Fetch all starred patterns from the database with pagination.
@@ -16,7 +19,11 @@ export async function fetchFavorites(
   limit: number = 50,
   offset: number = 0,
 ): Promise<FavoritesResponse | null> {
-  console.log('[fetchFavorites] 📤 Fetching favorites...', { userId, limit, offset })
+  console.log('[fetchFavorites] 📤 Fetching favorites...', {
+    userId,
+    limit,
+    offset,
+  })
 
   try {
     const params = new URLSearchParams({

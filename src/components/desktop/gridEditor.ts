@@ -66,12 +66,14 @@ export class GridEditor {
 
   private createElements(): GridEditorElements {
     const container = document.createElement('div')
-    container.className = 'flex flex-col gap-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800'
+    container.className =
+      'flex flex-col gap-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800'
 
     // Edit mode toggle button
     const btnEditMode = document.createElement('button')
     btnEditMode.textContent = 'Enter Edit Mode'
-    btnEditMode.className = 'px-4 py-2 rounded-md border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900 text-sm hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500'
+    btnEditMode.className =
+      'px-4 py-2 rounded-md border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900 text-sm hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500'
 
     // Tools container (hidden by default)
     const toolsContainer = document.createElement('div')
@@ -88,16 +90,19 @@ export class GridEditor {
     // Action buttons
     const btnClear = document.createElement('button')
     btnClear.textContent = '🗑️ Clear All'
-    btnClear.className = 'px-4 py-2 rounded-md border border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900 text-sm hover:bg-red-100 dark:hover:bg-red-800 transition-colors'
+    btnClear.className =
+      'px-4 py-2 rounded-md border border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900 text-sm hover:bg-red-100 dark:hover:bg-red-800 transition-colors'
 
     const btnUndo = document.createElement('button')
     btnUndo.textContent = '↶ Undo'
-    btnUndo.className = 'px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'
+    btnUndo.className =
+      'px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'
     btnUndo.disabled = true
 
     const btnRedo = document.createElement('button')
     btnRedo.textContent = '↷ Redo'
-    btnRedo.className = 'px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'
+    btnRedo.className =
+      'px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'
     btnRedo.disabled = true
 
     // Assemble tools
@@ -139,7 +144,8 @@ export class GridEditor {
     const btn = document.createElement('button')
     btn.textContent = label
     btn.dataset.tool = tool
-    btn.className = 'px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'
+    btn.className =
+      'px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'
     return btn
   }
 
@@ -184,14 +190,16 @@ export class GridEditor {
       // Enter edit mode
       this.ca.pause()
       this.elements.btnEditMode.textContent = 'Exit Edit Mode'
-      this.elements.btnEditMode.className = 'px-4 py-2 rounded-md border border-green-300 dark:border-green-600 bg-green-50 dark:bg-green-900 text-sm hover:bg-green-100 dark:hover:bg-green-800 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500'
+      this.elements.btnEditMode.className =
+        'px-4 py-2 rounded-md border border-green-300 dark:border-green-600 bg-green-50 dark:bg-green-900 text-sm hover:bg-green-100 dark:hover:bg-green-800 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500'
       this.elements.toolsContainer.style.display = 'flex'
       this.canvas.style.cursor = 'crosshair'
       this.saveHistory() // Save initial state
     } else {
       // Exit edit mode
       this.elements.btnEditMode.textContent = 'Enter Edit Mode'
-      this.elements.btnEditMode.className = 'px-4 py-2 rounded-md border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900 text-sm hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500'
+      this.elements.btnEditMode.className =
+        'px-4 py-2 rounded-md border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900 text-sm hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500'
       this.elements.toolsContainer.style.display = 'none'
       this.canvas.style.cursor = 'default'
     }
@@ -211,14 +219,18 @@ export class GridEditor {
 
     for (const btn of toolButtons) {
       if (btn.dataset.tool === tool) {
-        btn.className = 'px-4 py-2 rounded-md border-2 border-blue-500 bg-blue-100 dark:bg-blue-900 text-sm font-semibold'
+        btn.className =
+          'px-4 py-2 rounded-md border-2 border-blue-500 bg-blue-100 dark:bg-blue-900 text-sm font-semibold'
       } else {
-        btn.className = 'px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'
+        btn.className =
+          'px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'
       }
     }
   }
 
-  private getGridCoordinates(e: MouseEvent): { row: number; col: number } | null {
+  private getGridCoordinates(
+    e: MouseEvent,
+  ): { row: number; col: number } | null {
     const rect = this.canvas.getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
@@ -347,7 +359,10 @@ export class GridEditor {
 
   private saveHistory(): void {
     // Remove any redo history
-    this.state.history = this.state.history.slice(0, this.state.historyIndex + 1)
+    this.state.history = this.state.history.slice(
+      0,
+      this.state.historyIndex + 1,
+    )
 
     // Save current state
     const gridCopy = this.ca.getGrid()
