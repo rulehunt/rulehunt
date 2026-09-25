@@ -1,14 +1,18 @@
 packages:
   - .
 
+# gl is an optionalDependency of gpu.js: Node headless-GL bindings. This is a
+# browser app, so gpu.js uses WebGL and gl is never loaded — but it drags in
+# node-gyp, cacache, make-fetch-happen and socks, which together accounted for
+# all 11 Dependabot advisories on this repo (tar, ip-address, brace-expansion).
+ignoredOptionalDependencies:
+  - gl
+
 # Which dependencies may run install scripts (pnpm 11 build approval).
-#   esbuild  — vite/vitest bundler; needs its platform binary
-#   workerd  — wrangler's local runtime, used by `wrangler dev` and local D1
-#   gl       — headless GL, pulled in transitively by gpu.js; a heavy native
-#              build the browser code path never uses
-#   puppeteer— downloads a full Chromium; nothing in the test suite uses it
+#   esbuild   — vite/vitest bundler; needs its platform binary
+#   workerd   — wrangler's local runtime, used by `wrangler dev` and local D1
+#   puppeteer — downloads a full Chromium; nothing in the test suite uses it
 allowBuilds:
   esbuild: true
   workerd: true
-  gl: false
   puppeteer: false
