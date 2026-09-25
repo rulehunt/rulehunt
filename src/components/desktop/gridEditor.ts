@@ -322,7 +322,9 @@ export class GridEditor {
     const maxIterations = 100000 // Prevent infinite loops
 
     while (queue.length > 0 && iterations++ < maxIterations) {
-      const [row, col] = queue.shift()!
+      const next = queue.shift()
+      if (!next) break // unreachable: guarded by queue.length above
+      const [row, col] = next
       const key = `${row},${col}`
 
       if (visited.has(key)) continue
