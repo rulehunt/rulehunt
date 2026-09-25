@@ -14,26 +14,6 @@ export interface ButtonContainerPosition {
   left?: string
 }
 
-/**
- * Create a positioned container for buttons.
- * Parent controls positioning - buttons remain simple and reusable.
- *
- * @param position - CSS position values
- * @param className - Optional additional Tailwind classes
- * @returns Container element
- */
-export function createButtonContainer(
-  position: ButtonContainerPosition,
-  className?: string,
-): HTMLElement {
-  const container = document.createElement('div')
-  container.className = className
-    ? `absolute z-10 ${className}`
-    : 'absolute z-10'
-  Object.assign(container.style, position)
-  return container
-}
-
 export interface AutoFadeContainerConfig {
   /** CSS position values */
   position: ButtonContainerPosition
