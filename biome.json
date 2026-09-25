@@ -11,10 +11,10 @@
       "!**/*.spec.ts",
       "!**/tests",
       "!**/__tests__",
-      "!**/.loom",
-      "!**/.agents",
-      "!**/.claude",
-      "!**/public"
+      "!.loom",
+      "!.agents",
+      "!.claude",
+      "!public"
     ]
   },
   "formatter": {
