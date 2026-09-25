@@ -25,12 +25,7 @@ export interface SimulationMetadata {
   lastStepTime: number
 }
 
-import {
-  buildActiveRegions,
-  detectEntities,
-  detectEntitiesSparse,
-  EntityTracker,
-} from './entityDetection'
+import { detectEntities, EntityTracker } from './entityDetection'
 import type { Grid } from './schema'
 
 export class StatisticsTracker {
@@ -39,7 +34,6 @@ export class StatisticsTracker {
   private previousGrid: Uint8Array | null = null
   private gridRows: number
   private gridCols: number
-  private gridArea: number
   private metadata: SimulationMetadata | null = null
   private stepTimes: number[] = [] // Track last 20 step times for SPS calculation
   private maxStepTimes = 20
@@ -51,12 +45,10 @@ export class StatisticsTracker {
   private entityDetectionInterval = 10 // Run entity detection every N steps
   private entropyCalculationInterval = 10 // Run entropy calculation every N steps
 
-  // Sparse entity detection optimization
-  // Note: Testing showed sparse detection doesn't improve performance for typical CA patterns
-  // with very low activity (<0.5%). The overhead of building active regions outweighs benefits.
-  // Keeping implementation for potential future use with higher-activity scenarios.
-  private useSparseEntityDetection = false // Disabled: no perf benefit for low-activity grids
-  private sparseDetectionActivityThreshold = 0.3 // Use sparse if <30% of grid changed
+  // Sparse entity detection was removed in #222: it was permanently disabled,
+  // and testing showed it doesn't improve performance for typical CA patterns
+  // with very low activity (<0.5%) — building the active regions costs more
+  // than a full detection pass. Recorded here so it isn't re-attempted blindly.
 
   // Sparse entropy calculation optimization
   // Instead of checking every overlapping block, sample systematically with larger stride
@@ -81,7 +73,6 @@ export class StatisticsTracker {
   constructor(gridRows: number, gridCols: number) {
     this.gridRows = gridRows
     this.gridCols = gridCols
-    this.gridArea = gridRows * gridCols
     // Initialize entity tracker for all grid sizes
     this.entityTracker = new EntityTracker()
   }
@@ -179,34 +170,8 @@ export class StatisticsTracker {
     let entitiesDied: number
 
     if (shouldRunEntityDetection) {
-      // Decide whether to use sparse or full entity detection
       const grid2D = this.convertTo2DGrid(grid)
-      const activityRatio = activity / this.gridArea
-      const useSparse =
-        this.useSparseEntityDetection &&
-        this.previousGrid !== null &&
-        activityRatio < this.sparseDetectionActivityThreshold
-
-      let entities: ReturnType<typeof detectEntities>
-
-      if (useSparse) {
-        // Sparse detection: only check active regions
-        if (!this.previousGrid) {
-          throw new Error(
-            'previousGrid is required for sparse entity detection',
-          )
-        }
-        const previousGrid2D = this.convertTo2DGrid(this.previousGrid)
-        const activeRegions = buildActiveRegions(grid2D, previousGrid2D)
-        entities = detectEntitiesSparse(
-          grid2D,
-          activeRegions,
-          this.entityTracker || undefined,
-        )
-      } else {
-        // Full detection: check entire grid
-        entities = detectEntities(grid2D, this.entityTracker || undefined)
-      }
+      const entities = detectEntities(grid2D, this.entityTracker || undefined)
 
       entityCount = entities.length
       entityChange = entityCount - this.previousEntityCount
