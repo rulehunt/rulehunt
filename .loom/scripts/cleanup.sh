@@ -1,176 +1,56 @@
 #!/bin/bash
-# Loom Cleanup Script - Remove build artifacts and orphaned worktrees
+# cleanup.sh - Log archival for Loom
 #
-# AGENT USAGE INSTRUCTIONS:
-#   This script cleans up Loom build artifacts and orphaned worktrees.
+# Delegates to the native `loom-daemon cleanup logs` subcommand (issue
+# #4272, epic #4081 Phase 3 family 2 — a byte-compatible Rust port of the
+# historical Python `loom-cleanup` CLI). A capability probe still detects a
+# daemon binary that predates the `cleanup` subcommand (a host mid-roll), but
+# there is NO fallback to fall back to: PR #4301 (commit dba33666) deleted
+# `loom_tools/cleanup.py` and its `loom-cleanup` console-script entry in the
+# very same commit that added the probe, so the old `run_loom_tool` branch
+# could only ever produce `No module named loom_tools.cleanup`. A stale binary
+# now fails loudly with a rebuild remedy instead (#4384).
 #
-#   Non-interactive mode (for Claude Code):
-#     ./scripts/cleanup.sh --yes
-#     ./scripts/cleanup.sh -y
+# History: this script was previously named daemon-cleanup.sh and dispatched
+# event-driven cleanup for the Loom daemon (shepherd-complete, daemon-startup,
+# daemon-shutdown, periodic, prune-sessions).  Those events were removed in
+# #3396 (Phase 3.1.7 of #3372) -- session rotation goes away with the daemon
+# brain in Phase 3.2.  Only log archival survives.
 #
-#   Interactive mode (prompts for confirmation):
-#     ./scripts/cleanup.sh
-#
-#   What this script does:
-#     1. Removes target/ directory (Rust build artifacts)
-#     2. Removes node_modules/ directory (Node dependencies)
-#     3. Detects worktrees for closed issues and offers to remove them
-#     4. Prunes orphaned git worktrees (with confirmation unless --yes)
-#
-#   After running, restore dependencies with: pnpm install
+# Usage:
+#   cleanup.sh logs                          # archive task outputs + prune
+#   cleanup.sh logs --dry-run                # preview
+#   cleanup.sh logs --prune-only             # skip archival, only prune
+#   cleanup.sh logs --retention-days N       # override retention window
+#   cleanup.sh --help                        # show help
 
-set -e  # Exit on error
+set -euo pipefail
 
-# Parse command line arguments
-NON_INTERACTIVE=false
-for arg in "$@"; do
-  case $arg in
-    -y|--yes)
-      NON_INTERACTIVE=true
-      shift
-      ;;
-  esac
-done
-
-echo "🧹 Loom Cleanup"
-echo ""
-
-# Track if we're in main workspace
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Clean Rust build artifacts
-if [ -d "$PROJECT_ROOT/target" ]; then
-  SIZE=$(du -sh "$PROJECT_ROOT/target" 2>/dev/null | cut -f1 || echo "unknown")
-  echo "Removing target/ ($SIZE)"
-  rm -rf "$PROJECT_ROOT/target"
-  echo "✓ Removed target/"
-else
-  echo "ℹ No target/ directory found"
+# shellcheck source=lib/locate-daemon-bin.sh
+source "$SCRIPT_DIR/lib/locate-daemon-bin.sh"
+
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+DAEMON_BIN="$(loom_locate_daemon_bin "$REPO_ROOT")"
+
+if [[ -n "$DAEMON_BIN" ]] && "$DAEMON_BIN" cleanup logs --help >/dev/null 2>&1; then
+    exec "$DAEMON_BIN" cleanup "$@"
 fi
 
-echo ""
-
-# Clean node_modules
-if [ -d "$PROJECT_ROOT/node_modules" ]; then
-  SIZE=$(du -sh "$PROJECT_ROOT/node_modules" 2>/dev/null | cut -f1 || echo "unknown")
-  echo "Removing node_modules/ ($SIZE)"
-  rm -rf "$PROJECT_ROOT/node_modules"
-  echo "✓ Removed node_modules/"
+# No usable path remains. Fail loudly and actionably rather than degrading
+# into a `No module named loom_tools.cleanup` traceback (#4384).
+if [[ -n "$DAEMON_BIN" ]]; then
+    DAEMON_VERSION="$("$DAEMON_BIN" --version 2>/dev/null || true)"
+    echo "ERROR cleanup.sh: $DAEMON_BIN does not support the 'cleanup logs' subcommand (stale build)." >&2
+    echo "  Reported version: ${DAEMON_VERSION:-unknown}" >&2
 else
-  echo "ℹ No node_modules/ directory found"
+    echo "ERROR cleanup.sh: no loom-daemon binary could be resolved." >&2
+    echo "  Searched: \$LOOM_DAEMON_BIN, PATH, then $REPO_ROOT/{loom-daemon/,}target/{release,debug}/loom-daemon" >&2
 fi
-
-echo ""
-
-# Check for worktrees associated with closed issues
-echo "Checking for worktrees associated with closed issues..."
-cd "$PROJECT_ROOT"
-
-CLOSED_ISSUE_WORKTREES=()
-
-# List all worktrees and check if their issues are closed
-while IFS= read -r worktree_line; do
-  # Extract worktree path (format: /path/to/worktree COMMIT [branch-name])
-  worktree_path=$(echo "$worktree_line" | awk '{print $1}')
-
-  # Skip the main worktree
-  if [[ "$worktree_path" == "$PROJECT_ROOT" ]]; then
-    continue
-  fi
-
-  # Extract issue number from path (e.g., .loom/worktrees/issue-123)
-  if [[ "$worktree_path" =~ issue-([0-9]+) ]]; then
-    issue_num="${BASH_REMATCH[1]}"
-
-    # Check if issue is closed using gh
-    if command -v gh &> /dev/null; then
-      issue_state=$(gh issue view "$issue_num" --json state --jq .state 2>/dev/null || echo "")
-
-      if [[ "$issue_state" == "CLOSED" ]]; then
-        CLOSED_ISSUE_WORKTREES+=("$worktree_path:$issue_num")
-        echo "⚠ Worktree for closed issue #$issue_num is still active"
-        echo "ℹ Path: $worktree_path"
-      fi
-    fi
-  fi
-done < <(git worktree list --porcelain | grep "worktree " | sed 's/worktree //')
-
-if [[ ${#CLOSED_ISSUE_WORKTREES[@]} -gt 0 ]]; then
-  echo ""
-
-  # Auto-remove in non-interactive mode
-  if [ "$NON_INTERACTIVE" = true ]; then
-    echo "Non-interactive mode: automatically removing closed issue worktrees"
-    for entry in "${CLOSED_ISSUE_WORKTREES[@]}"; do
-      worktree_path="${entry%%:*}"
-      issue_num="${entry##*:}"
-      echo "Removing worktree for closed issue #$issue_num..."
-      git worktree remove "$worktree_path" --force
-      echo "✓ Removed: $worktree_path"
-    done
-    echo "✓ Removed ${#CLOSED_ISSUE_WORKTREES[@]} closed issue worktree(s)"
-  else
-    echo "Found ${#CLOSED_ISSUE_WORKTREES[@]} worktree(s) for closed issues."
-    read -p "Force remove all closed issue worktrees? (y/N) " -n 1 -r
-    echo
-
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-      for entry in "${CLOSED_ISSUE_WORKTREES[@]}"; do
-        worktree_path="${entry%%:*}"
-        issue_num="${entry##*:}"
-        echo "Removing worktree for closed issue #$issue_num..."
-        git worktree remove "$worktree_path" --force
-        echo "✓ Removed: $worktree_path"
-      done
-      echo "✓ Removed ${#CLOSED_ISSUE_WORKTREES[@]} closed issue worktree(s)"
-    else
-      echo "ℹ Skipped closed issue worktree cleanup"
-      echo "ℹ To remove individually:"
-      for entry in "${CLOSED_ISSUE_WORKTREES[@]}"; do
-        worktree_path="${entry%%:*}"
-        issue_num="${entry##*:}"
-        echo "  git worktree remove $worktree_path --force  # issue #$issue_num"
-      done
-    fi
-  fi
-else
-  echo "✓ No worktrees found for closed issues"
-fi
-
-echo ""
-
-# Clean orphaned worktrees
-echo "Checking for orphaned worktrees..."
-
-# Show what would be pruned
-PRUNE_OUTPUT=$(git worktree prune --dry-run --verbose 2>&1 || true)
-
-if [ -n "$PRUNE_OUTPUT" ]; then
-  echo "$PRUNE_OUTPUT"
-  echo ""
-
-  # Auto-confirm in non-interactive mode
-  if [ "$NON_INTERACTIVE" = true ]; then
-    echo "Non-interactive mode: automatically removing orphaned worktrees"
-    git worktree prune --verbose
-    echo "✓ Orphaned worktrees removed"
-  else
-    read -p "Remove orphaned worktrees? (y/N) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-      git worktree prune --verbose
-      echo "✓ Orphaned worktrees removed"
-    else
-      echo "ℹ Skipped worktree cleanup"
-    fi
-  fi
-else
-  echo "✓ No orphaned worktrees found"
-fi
-
-echo ""
-echo "✅ Cleanup complete!"
-echo ""
-echo "To restore dependencies, run:"
-echo "  pnpm install"
+echo "  'loom-daemon cleanup' requires a binary built at or after commit dba33666 (PR #4301)." >&2
+echo "  There is no Python fallback — loom_tools/cleanup.py was deleted in that same commit." >&2
+echo "  Remedy: rebuild or update loom-daemon, then retry:" >&2
+echo "    cargo build --release -p loom-daemon        # source checkout" >&2
+echo "    ./.loom/scripts/cli/loom-daemon-update.sh   # installed host (self-update)" >&2
+exit 1

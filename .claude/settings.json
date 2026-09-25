@@ -60,7 +60,15 @@
       "Bash(shuf:*)",
       "WebSearch",
       "Read(/tmp/**)",
-      "Edit(/tmp/**)"
+      "Read(/private/tmp/**)",
+      "Edit(/tmp/**)",
+      "Edit(/private/tmp/**)"
+    ],
+    "deny": [
+      "Bash(osascript:*)",
+      "Bash(*osascript *)",
+      "Bash(*\"System Events\"*)",
+      "Bash(*tell application*)"
     ]
   },
   "hooks": {
@@ -70,7 +78,46 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/skills/repo/hooks/guard-destructive.sh"
+            "command": "\"${CLAUDE_PROJECT_DIR}/.loom/hooks/guard-destructive.sh\""
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}/.loom/hooks/guard-loom-workflow.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}/.loom/hooks/guard-worktree-paths.sh\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}/.loom/hooks/skill-router.sh\""
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}/.loom/hooks/methodology-inject.sh\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}/.loom/hooks/guard-background-subagents.sh\""
           }
         ]
       }
