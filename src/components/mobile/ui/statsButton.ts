@@ -1,8 +1,11 @@
 // src/components/mobile/ui/statsButton.ts
 import { trackStatsView } from '../../../api/stats-view'
-import type { ICellularAutomata } from '../../../cellular-automata-interface'
-import type { RuleData } from '../layout'
 import { createRoundButton } from '../roundButton'
+import {
+  ensureRunHash,
+  type RunData,
+  type SaveRunStatisticsFn,
+} from './runHash'
 
 /**
  * Creates the stats button that displays simulation statistics.
@@ -19,19 +22,10 @@ import { createRoundButton } from '../roundButton'
 export function createStatsButton(
   onShowStats: () => void,
   onResetFade?: () => void,
-  getRunData?: () => {
-    ca: ICellularAutomata
-    rule: RuleData
-    isStarred: boolean
-  },
+  getRunData?: () => RunData,
   getLastRunHash?: () => string | undefined,
   setLastRunHash?: (hash: string | undefined) => void,
-  saveRunStatistics?: (
-    ca: ICellularAutomata,
-    ruleName: string,
-    ruleHex: string,
-    isStarred?: boolean,
-  ) => Promise<string | undefined>,
+  saveRunStatistics?: SaveRunStatisticsFn,
   isTransitioningFn?: () => boolean,
 ): { button: HTMLButtonElement; cleanup: () => void } {
   const { button, cleanup } = createRoundButton(
@@ -47,20 +41,12 @@ export function createStatsButton(
         onResetFade?.()
 
         // Get or create run hash
-        let runHash = getLastRunHash?.()
-
-        if (!runHash && getRunData && setLastRunHash && saveRunStatistics) {
-          // First stats view of this rule - save it now
-          const { ca, rule, isStarred } = getRunData()
-          runHash = await saveRunStatistics(ca, rule.name, rule.hex, isStarred)
-
-          if (runHash) {
-            setLastRunHash(runHash)
-            console.log(
-              `[tracking] Saved and stored hash for ${rule.name}: ${runHash}`,
-            )
-          }
-        }
+        const runHash = await ensureRunHash(
+          getRunData,
+          getLastRunHash,
+          setLastRunHash,
+          saveRunStatistics,
+        )
 
         // Track the stats view
         if (runHash) {

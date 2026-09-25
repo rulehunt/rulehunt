@@ -1,8 +1,11 @@
 // src/components/mobile/ui/shareButton.ts
 import { trackShare } from '../../../api/share'
-import type { ICellularAutomata } from '../../../cellular-automata-interface'
-import type { RuleData } from '../layout'
 import { createRoundButton } from '../roundButton'
+import {
+  ensureRunHash,
+  type RunData,
+  type SaveRunStatisticsFn,
+} from './runHash'
 
 /**
  * Creates the share button that copies a shareable link to the clipboard.
@@ -17,19 +20,10 @@ import { createRoundButton } from '../roundButton'
  */
 export function createShareButton(
   onResetFade?: () => void,
-  getRunData?: () => {
-    ca: ICellularAutomata
-    rule: RuleData
-    isStarred: boolean
-  },
+  getRunData?: () => RunData,
   getLastRunHash?: () => string | undefined,
   setLastRunHash?: (hash: string | undefined) => void,
-  saveRunStatistics?: (
-    ca: ICellularAutomata,
-    ruleName: string,
-    ruleHex: string,
-    isStarred?: boolean,
-  ) => Promise<string | undefined>,
+  saveRunStatistics?: SaveRunStatisticsFn,
   isTransitioningFn?: () => boolean,
 ): {
   button: HTMLButtonElement
@@ -64,25 +58,12 @@ export function createShareButton(
           console.log('[share] Copied link to clipboard:', shareURL)
 
           // Get or create run hash
-          let runHash = getLastRunHash?.()
-
-          if (!runHash && getRunData && setLastRunHash && saveRunStatistics) {
-            // First share of this rule - save it now
-            const { ca, rule, isStarred } = getRunData()
-            runHash = await saveRunStatistics(
-              ca,
-              rule.name,
-              rule.hex,
-              isStarred,
-            )
-
-            if (runHash) {
-              setLastRunHash(runHash)
-              console.log(
-                `[tracking] Saved and stored hash for ${rule.name}: ${runHash}`,
-              )
-            }
-          }
+          const runHash = await ensureRunHash(
+            getRunData,
+            getLastRunHash,
+            setLastRunHash,
+            saveRunStatistics,
+          )
 
           // Track the share
           if (runHash) {
