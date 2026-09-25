@@ -24,7 +24,7 @@ export interface SimulationHandlerDeps {
   initializeSimulationMetadata: () => void
   updateURL: () => void
   checkboxNewPatternOnReset: HTMLInputElement
-  autoMutateCallback?: () => void
+  autoMutateCallback?: () => void | Promise<void>
 }
 
 /**

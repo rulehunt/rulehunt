@@ -118,6 +118,44 @@ export function setupRandomRulesetHandler(
 }
 
 /**
+ * Mutate the current ruleset in place and re-render it.
+ *
+ * Shared by the manual Mutate button and the auto-mutate-on-completion cycle
+ * (`createAutoMutateHandler`) so the "(mutated)" label convention, the
+ * `renderRule` call and the star reset cannot drift apart between them.
+ *
+ * Caller-owned: the magnitude (each surface reads the slider with its own
+ * fallback policy) and whatever reset/resume strategy follows.
+ */
+export function applyMutation(
+  deps: RulesetHandlerDeps,
+  magnitude: number,
+): C4Ruleset {
+  const mutated = mutateC4Ruleset(deps.currentRuleset.value, magnitude, true)
+  deps.currentRuleset.value = mutated
+  const colors = getCurrentThemeColors()
+  // Remove existing "(mutated)" suffix before adding a new one
+  const baseName =
+    deps.ruleLabelDisplay.textContent?.replace(/\s*\(mutated\)$/, '') ||
+    'Unknown'
+  renderRule(
+    mutated,
+    deps.orbitLookup,
+    deps.ctx,
+    deps.ruleCanvas,
+    deps.ruleLabelDisplay,
+    deps.ruleIdDisplay,
+    `${baseName} (mutated)`,
+    deps.displayMode.value,
+    colors.fgColor,
+    colors.bgColor,
+  )
+  deps.isStarred.value = false
+  deps.updateStarButtonAppearance()
+  return mutated
+}
+
+/**
  * Setup handler for ruleset mutation
  */
 export function setupMutateHandler(
@@ -126,28 +164,7 @@ export function setupMutateHandler(
 ) {
   btnMutate.addEventListener('click', () => {
     const mutationPercentage = Number.parseInt(deps.mutationSlider.value, 10)
-    const magnitude = mutationPercentage / 100
-    const mutated = mutateC4Ruleset(deps.currentRuleset.value, magnitude, true)
-    deps.currentRuleset.value = mutated
-    const colors = getCurrentThemeColors()
-    // Remove existing "(mutated)" suffix before adding a new one
-    const baseName =
-      deps.ruleLabelDisplay.textContent?.replace(/\s*\(mutated\)$/, '') ||
-      'Unknown'
-    renderRule(
-      mutated,
-      deps.orbitLookup,
-      deps.ctx,
-      deps.ruleCanvas,
-      deps.ruleLabelDisplay,
-      deps.ruleIdDisplay,
-      `${baseName} (mutated)`,
-      deps.displayMode.value,
-      colors.fgColor,
-      colors.bgColor,
-    )
-    deps.isStarred.value = false
-    deps.updateStarButtonAppearance()
+    applyMutation(deps, mutationPercentage / 100)
     deps.applyInitialCondition()
     if (deps.cellularAutomata.isCurrentlyPlaying()) {
       deps.cellularAutomata.pause()

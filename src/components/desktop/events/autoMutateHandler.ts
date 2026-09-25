@@ -1,9 +1,8 @@
 // src/components/desktop/events/autoMutateHandler.ts
 
-import { expandC4Ruleset, mutateC4Ruleset } from '../../../utils.ts'
-import { getCurrentThemeColors } from '../../shared/theme.ts'
-import { renderRule } from '../utils/ruleRenderer.ts'
+import { expandC4Ruleset } from '../../../utils.ts'
 import type { RulesetHandlerDeps } from './rulesetHandlers.ts'
+import { applyMutation } from './rulesetHandlers.ts'
 
 /** How long to keep showing the completed simulation before mutating. */
 export const AUTO_MUTATE_DELAY_MS = 10_000
@@ -49,21 +48,25 @@ export function createAutoMutateHandler(
   return async () => {
     if (isWaiting) return
 
-    const metadata = deps.cellularAutomata.getStatistics().getMetadata()
-    if (!metadata) return
-
-    const currentStep = metadata.stepCount
-
-    // Already handled this completion (step count has not advanced since).
-    if (currentStep <= lastCompletionStep) return
-
-    // Only cycle a running simulation.
-    if (!deps.cellularAutomata.isCurrentlyPlaying()) return
-
-    isWaiting = true
-    lastCompletionStep = currentStep
-
+    // Everything below runs inside the try: the entry guards touch the CA too,
+    // and this callback's return value is discarded by the caller
+    // (`updateStatisticsDisplay`), so a throw out here would surface as an
+    // unhandled rejection rather than a logged error.
     try {
+      const metadata = deps.cellularAutomata.getStatistics().getMetadata()
+      if (!metadata) return
+
+      const currentStep = metadata.stepCount
+
+      // Already handled this completion (step count has not advanced since).
+      if (currentStep <= lastCompletionStep) return
+
+      // Only cycle a running simulation.
+      if (!deps.cellularAutomata.isCurrentlyPlaying()) return
+
+      isWaiting = true
+      lastCompletionStep = currentStep
+
       console.log(
         `[auto-mutate] progress complete at step ${currentStep}, waiting ${delayMs}ms`,
       )
@@ -81,32 +84,8 @@ export function createAutoMutateHandler(
         ? DEFAULT_MUTATION_MAGNITUDE
         : mutationPercentage / 100
 
-      const mutated = mutateC4Ruleset(
-        deps.currentRuleset.value,
-        magnitude,
-        true,
-      )
-      deps.currentRuleset.value = mutated
-
-      const colors = getCurrentThemeColors()
-      // Remove an existing "(mutated)" suffix before adding a new one.
-      const baseName =
-        deps.ruleLabelDisplay.textContent?.replace(/\s*\(mutated\)$/, '') ||
-        'Unknown'
-      renderRule(
-        mutated,
-        deps.orbitLookup,
-        deps.ctx,
-        deps.ruleCanvas,
-        deps.ruleLabelDisplay,
-        deps.ruleIdDisplay,
-        `${baseName} (mutated)`,
-        deps.displayMode.value,
-        colors.fgColor,
-        colors.bgColor,
-      )
-      deps.isStarred.value = false
-      deps.updateStarButtonAppearance()
+      // Shared with the manual Mutate button (setupMutateHandler).
+      const mutated = applyMutation(deps, magnitude)
 
       // Soft reset onto a fresh seed — same path as the Reset button's
       // "new pattern" branch (simulationHandlers.setupResetHandler).

@@ -2,8 +2,8 @@ import { fetchStatistics } from '../../api/statistics.ts'
 import { CellularAutomata } from '../../cellular-automata-cpu.ts'
 import { AudioEngine } from '../../components/audioEngine.ts'
 import {
-  getAutoMutateEnabled,
-  setAutoMutateEnabled,
+  getAutoMutateOnCompleteEnabled,
+  setAutoMutateOnCompleteEnabled,
 } from '../../dataStorage.ts'
 import type { C4OrbitsData, C4Ruleset } from '../../schema.ts'
 import type { CleanupFunction } from '../../types'
@@ -785,9 +785,9 @@ export async function setupDesktopLayout(
   // Restore auto-mutate preference and persist changes
   const autoMutateCheckbox = progressBar.elements.checkbox
   if (autoMutateCheckbox) {
-    autoMutateCheckbox.checked = getAutoMutateEnabled()
+    autoMutateCheckbox.checked = getAutoMutateOnCompleteEnabled()
     autoMutateCheckbox.addEventListener('change', () => {
-      setAutoMutateEnabled(autoMutateCheckbox.checked)
+      setAutoMutateOnCompleteEnabled(autoMutateCheckbox.checked)
     })
   }
 

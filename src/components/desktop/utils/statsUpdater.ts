@@ -19,7 +19,7 @@ export function updateStatisticsDisplay(
   progressBar: ReturnType<typeof createProgressBar>,
   statsBarComponent?: ReturnType<typeof createStatsBar>,
   autosaveCallback?: () => void,
-  autoMutateCallback?: () => void,
+  autoMutateCallback?: () => void | Promise<void>,
   audioEngine?: AudioEngine | null,
 ) {
   const stats = cellularAutomata.getStatistics()
@@ -47,7 +47,12 @@ export function updateStatisticsDisplay(
     // Start the auto-mutation cycle once progress completes, if enabled
     if (progressPercent >= 100 && autoMutateCallback) {
       if (progressBar.elements.checkbox?.checked) {
-        autoMutateCallback()
+        // The callback is async and deliberately not awaited here (this runs on
+        // a 200ms interval). Attach a catch so a rejection escaping it can never
+        // become an unhandled rejection.
+        Promise.resolve(autoMutateCallback()).catch((error) => {
+          console.error('[auto-mutate] cycle rejected:', error)
+        })
       }
     }
   }

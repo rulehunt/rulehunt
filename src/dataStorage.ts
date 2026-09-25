@@ -129,3 +129,21 @@ export function getAutoMutateEnabled(): boolean {
 export function setAutoMutateEnabled(enabled: boolean): void {
   localStorage.setItem(AUTO_MUTATE_KEY, String(enabled))
 }
+
+// Desktop "auto-mutate ruleset on completion" preference storage.
+//
+// Deliberately a SEPARATE key from AUTO_MUTATE_KEY above: mobile's Auto-Mutate
+// controls a rule-*selection* strategy for the swipe feed (mutate a starred
+// rule vs. return it exactly), while this one controls an autonomous run loop
+// on desktop (wait at 100%, mutate the ruleset, soft-reset, resume). Sharing a
+// key would let one surface silently disable the other.
+const AUTO_MUTATE_ON_COMPLETE_KEY = 'rulehunt-auto-mutate-on-complete'
+
+export function getAutoMutateOnCompleteEnabled(): boolean {
+  const stored = localStorage.getItem(AUTO_MUTATE_ON_COMPLETE_KEY)
+  return stored === null ? true : stored === 'true' // Default: enabled
+}
+
+export function setAutoMutateOnCompleteEnabled(enabled: boolean): void {
+  localStorage.setItem(AUTO_MUTATE_ON_COMPLETE_KEY, String(enabled))
+}
