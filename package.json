@@ -48,5 +48,6 @@
     "chartjs-chart-error-bars": "^4.4.5",
     "jose": "^6.1.0",
     "nanoid": "^5.1.6"
-  }
+  },
+  "packageManager": "pnpm@11.20.0"
 }

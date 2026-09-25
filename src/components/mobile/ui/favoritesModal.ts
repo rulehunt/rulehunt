@@ -1,9 +1,9 @@
 // src/components/mobile/ui/favoritesModal.ts
 
-import type { StarredPattern } from '../../../schema'
-import type { CleanupFunction } from '../../../types'
 import { fetchFavorites } from '../../../api/favorites'
 import { getUserId } from '../../../identity'
+import type { StarredPattern } from '../../../schema'
+import type { CleanupFunction } from '../../../types'
 
 export interface FavoritesModalElements {
   overlay: HTMLDivElement
@@ -17,9 +17,7 @@ export interface FavoritesModalConfig {
   onLoadFavorite: (favorite: StarredPattern) => void
 }
 
-export function createFavoritesModal(
-  config: FavoritesModalConfig,
-): {
+export function createFavoritesModal(config: FavoritesModalConfig): {
   elements: FavoritesModalElements
   show: () => Promise<void>
   hide: () => void

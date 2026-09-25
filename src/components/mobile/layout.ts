@@ -40,14 +40,14 @@ import { createRoundButton } from './roundButton.ts'
 import { createStarButton } from './starButton.ts'
 import { createStatsOverlay, setupStatsOverlay } from './statsOverlay.ts'
 import { createAutoMutateCheckbox } from './ui/autoMutateCheckbox.ts'
-import { createShareButton } from './ui/shareButton.ts'
-import { createSoftResetButton } from './ui/softResetButton.ts'
-import { createStatsButton } from './ui/statsButton.ts'
 import { createFavoritesButton } from './ui/favoritesButton.ts'
 import {
   createFavoritesModal,
   setupFavoritesModal,
 } from './ui/favoritesModal.ts'
+import { createShareButton } from './ui/shareButton.ts'
+import { createSoftResetButton } from './ui/softResetButton.ts'
+import { createStatsButton } from './ui/statsButton.ts'
 
 // --- Constants --------------------------------------------------------------
 const FORCE_RULE_ZERO_OFF = true // avoid strobing

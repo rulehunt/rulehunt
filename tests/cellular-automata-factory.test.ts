@@ -9,7 +9,7 @@ import type { CAFactoryOptions } from '../src/cellular-automata-factory'
 // Mock the GPU.js module
 vi.mock('gpu.js', () => {
   return {
-    GPU: vi.fn().mockImplementation((options) => {
+    GPU: vi.fn().mockImplementation(function (options) {
       // Simulate GPU availability based on test context
       const shouldSucceed =
         !(global as any).__MOCK_GPU_UNAVAILABLE__ &&

@@ -7,7 +7,8 @@ import type { BenchmarkResult } from '../src/components/desktop/benchmark'
 
 // Mock Chart.js to avoid canvas dependency in test environment
 vi.mock('chart.js', () => ({
-  Chart: vi.fn().mockImplementation((canvas, config) => ({
+  Chart: vi.fn().mockImplementation(function (canvas, config) {
+    return {
     canvas,
     config,
     data: config.data || {
@@ -18,9 +19,10 @@ vi.mock('chart.js', () => ({
       ],
     },
     options: config.options,
-    update: vi.fn(),
-    destroy: vi.fn(),
-  })),
+      update: vi.fn(),
+      destroy: vi.fn(),
+    }
+  }),
   registerables: [],
 }))
 

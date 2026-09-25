@@ -48,9 +48,9 @@ import {
   setupStepHandler,
   setupStepsPerSecondHandler,
 } from './events/simulationHandlers.ts'
+import { GridEditor } from './gridEditor.ts'
 import { createHeader } from './header.ts'
 import { createLeaderboardPanel } from './leaderboard.ts'
-import { GridEditor } from './gridEditor.ts'
 import { createPatternInspector } from './patternInspector.ts'
 import { createProgressBar } from './progressBar.ts'
 import { createRulesetPanel } from './ruleset.ts'
@@ -610,10 +610,7 @@ export async function setupDesktopLayout(
     for (let i = 0; i < urlState.generation; i++) {
       cellularAutomata.step(expandedRuleset)
     }
-    console.log(
-      '[desktop] Fast-forwarded to generation:',
-      urlState.generation,
-    )
+    console.log('[desktop] Fast-forwarded to generation:', urlState.generation)
   }
 
   // Auto-select first cell (index 0) on page load
