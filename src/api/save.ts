@@ -1,5 +1,6 @@
 // src/api/save.ts
 import { z } from 'zod'
+import { showErrorNotice } from '../components/shared/errorNotice'
 import { getUserIdentity } from '../identity'
 import type { RunSubmission } from '../schema'
 
@@ -15,6 +16,52 @@ export const SaveResponse = z.object({
 
 export type SaveResponse = z.infer<typeof SaveResponse>
 
+export interface SaveRunOptions {
+  /**
+   * Show a user-facing notice when the save fails (default: true).
+   *
+   * Data mode passes `false`: it retries in a loop and reports failures
+   * through its own save-error counter, so a notice per attempt would be noise.
+   */
+  notifyOnError?: boolean
+}
+
+/** Key shared by all save notices, so repeated failures replace each other. */
+const SAVE_NOTICE_KEY = 'save-run'
+
+/**
+ * Tell the user the run was not stored, and offer a retry.
+ *
+ * The wording deliberately never implies the data was stored, and never
+ * echoes the raw error — the console keeps the diagnostic detail.
+ */
+function notifySaveFailure(
+  data: Omit<RunSubmission, 'userId' | 'userLabel'>,
+  options: SaveRunOptions,
+): void {
+  showErrorNotice({
+    key: SAVE_NOTICE_KEY,
+    message: "Couldn't save your run",
+    detail:
+      'Nothing was stored. Check your connection and retry — leaving this page loses the run.',
+    action: {
+      label: 'Retry',
+      onClick: async () => {
+        // A failed retry re-renders this same notice (same key).
+        const result = await saveRun(data, options)
+        if (result.ok) {
+          showErrorNotice({
+            key: SAVE_NOTICE_KEY,
+            tone: 'success',
+            message: 'Run saved',
+            autoDismissMs: 4000,
+          })
+        }
+      },
+    },
+  })
+}
+
 // ---------------------------------------------------------------------------
 // API: saveRun
 // ---------------------------------------------------------------------------
@@ -24,7 +71,9 @@ export type SaveResponse = z.infer<typeof SaveResponse>
  */
 export async function saveRun(
   data: Omit<RunSubmission, 'userId' | 'userLabel'>,
+  options: SaveRunOptions = {},
 ): Promise<SaveResponse> {
+  const { notifyOnError = true } = options
   const { userId, userLabel } = getUserIdentity()
   const body: RunSubmission = { ...data, userId, userLabel }
 
@@ -60,12 +109,15 @@ export async function saveRun(
     if (result.ok) {
       console.log('[saveRun] ✅ Success:', result.runHash)
     } else {
+      // Server accepted the request but rejected the run: still a failed save.
       console.warn('[saveRun] ⚠️  Server returned ok: false:', result)
+      if (notifyOnError) notifySaveFailure(data, options)
     }
 
     return result
   } catch (err) {
     console.error('[saveRun] ❌ Failed:', err)
+    if (notifyOnError) notifySaveFailure(data, options)
     return { ok: false }
   }
 }

@@ -83,7 +83,9 @@ async function saveRunWithRetry(
 ): Promise<boolean> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      await saveRun(payload)
+      // Data mode reports save failures through its own error counter
+      // (incrementSaveErrorCount below), so suppress the per-attempt notice.
+      await saveRun(payload, { notifyOnError: false })
       console.log(`[DataMode] Run saved successfully (attempt ${attempt})`)
       return true
     } catch (error) {
