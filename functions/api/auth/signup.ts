@@ -1,10 +1,10 @@
 /// <reference types="@cloudflare/workers-types" />
 import type { D1Database, EventContext } from '@cloudflare/workers-types'
 import bcrypt from 'bcryptjs'
-import { SignJWT } from 'jose'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { handleApiError, jsonResponse } from '../../utils/api-helpers'
+import { generateAuthToken } from '../../utils/jwt'
 
 // Validation schema for signup request
 const SignupRequestSchema = z.object({
@@ -19,28 +19,6 @@ type SignupRequest = z.infer<typeof SignupRequestSchema>
 interface Env {
   DB: D1Database
   JWT_SECRET: string
-}
-
-/**
- * Generate JWT token for authenticated user
- *
- * @param userId - User ID to encode in token
- * @param secret - JWT signing secret
- * @returns JWT token string
- */
-async function generateAuthToken(
-  userId: string,
-  secret: string,
-): Promise<string> {
-  const secretKey = new TextEncoder().encode(secret)
-
-  const token = await new SignJWT({ userId })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('30d') // Token expires in 30 days
-    .sign(secretKey)
-
-  return token
 }
 
 /**
