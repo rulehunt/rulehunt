@@ -1,6 +1,10 @@
 import { fetchStatistics } from '../../api/statistics.ts'
 import { CellularAutomata } from '../../cellular-automata-cpu.ts'
 import { AudioEngine } from '../../components/audioEngine.ts'
+import {
+  getAutoMutateOnCompleteEnabled,
+  setAutoMutateOnCompleteEnabled,
+} from '../../dataStorage.ts'
 import type { C4OrbitsData, C4Ruleset } from '../../schema.ts'
 import type { CleanupFunction } from '../../types'
 import {
@@ -19,6 +23,7 @@ import {
 import { getCurrentThemeColors } from '../shared/theme.ts'
 import { setupBenchmarkModal } from './benchmark.ts'
 import { setupDataModeLayout } from './dataMode.ts'
+import { createAutoMutateHandler } from './events/autoMutateHandler.ts'
 import {
   setupAliveSliderHandler,
   setupDisplayModeHandlers,
@@ -499,6 +504,7 @@ export async function setupDesktopLayout(
       progressBar,
       statsBar,
       undefined,
+      undefined,
       audioEngine,
     )
     initializeSimulationMetadata()
@@ -682,6 +688,7 @@ export async function setupDesktopLayout(
       progressBar,
       statsBar,
       undefined,
+      undefined,
       audioEngine,
     )
     renderRule(
@@ -772,6 +779,23 @@ export async function setupDesktopLayout(
     applyInitialCondition,
   }
 
+  // Auto-mutation cycle: fires when the progress bar reaches 100% with the
+  // "Auto-mutate ruleset on completion" checkbox enabled
+  const autoMutateCallback = createAutoMutateHandler({
+    ...rulesetHandlerDeps,
+    initializeSimulationMetadata,
+    updateURL,
+  })
+
+  // Restore auto-mutate preference and persist changes
+  const autoMutateCheckbox = progressBar.elements.checkbox
+  if (autoMutateCheckbox) {
+    autoMutateCheckbox.checked = getAutoMutateOnCompleteEnabled()
+    autoMutateCheckbox.addEventListener('change', () => {
+      setAutoMutateOnCompleteEnabled(autoMutateCheckbox.checked)
+    })
+  }
+
   setupStarHandler(btnStar, isStarredRef, updateStarButtonAppearance)
   setupConwayHandler(btnConway, rulesetHandlerDeps)
   setupOutlierHandler(btnOutlier, rulesetHandlerDeps)
@@ -827,6 +851,7 @@ export async function setupDesktopLayout(
     initializeSimulationMetadata,
     updateURL,
     checkboxNewPatternOnReset,
+    autoMutateCallback,
   }
 
   setupStepHandler(btnStep, btnPlay, simulationHandlerDeps)
