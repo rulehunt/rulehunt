@@ -21,7 +21,7 @@ const PROGRESS_BAR_STEPS = 500
 const GRID_ROWS = 400
 const GRID_COLS = 400
 const DELAY_BETWEEN_RUNS_MS = 100
-const SAVE_RETRY_ATTEMPTS = 3
+export const SAVE_RETRY_ATTEMPTS = 3
 
 export interface DataModeState {
   roundCount: number
@@ -77,32 +77,60 @@ function generateNextRuleset(
   }
 }
 
-async function saveRunWithRetry(
+/**
+ * Save a run, retrying with exponential backoff.
+ *
+ * `saveRun` reports failure by *returning* `{ ok: false }`, never by throwing,
+ * on both of its failure paths: a caught network/HTTP error, and a server that
+ * replies HTTP 200 with `{"ok": false}` (no exception involved at all). The
+ * retry therefore has to branch on the returned result — a `try`/`catch` alone
+ * would never fire, which is exactly how this loop used to report every failed
+ * save as a success (issue #255).
+ *
+ * Exported for testing.
+ *
+ * @returns `true` only when a save actually succeeded.
+ */
+export async function saveRunWithRetry(
   payload: Omit<RunSubmission, 'userId' | 'userLabel'>,
   maxRetries = SAVE_RETRY_ATTEMPTS,
 ): Promise<boolean> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    let saved = false
+
     try {
-      // Data mode reports save failures through its own error counter
-      // (incrementSaveErrorCount below), so suppress the per-attempt notice.
-      await saveRun(payload, { notifyOnError: false })
+      // Suppress the per-attempt user notice: data mode retries in a loop, so
+      // a notice per attempt would be noise. A run that fails every attempt is
+      // reported by incrementSaveErrorCount() below, and recorded as
+      // `success: false` in the accumulated stats by the caller.
+      const result = await saveRun(payload, { notifyOnError: false })
+      saved = result.ok
+      if (!saved) {
+        console.error(
+          `[DataMode] Save failed (attempt ${attempt}): save reported ok: false`,
+        )
+      }
+    } catch (error) {
+      // saveRun is not expected to throw; catch defensively so an unexpected
+      // throw retries and is counted rather than aborting the data loop.
+      console.error(`[DataMode] Save failed (attempt ${attempt}):`, error)
+    }
+
+    if (saved) {
       console.log(`[DataMode] Run saved successfully (attempt ${attempt})`)
       return true
-    } catch (error) {
-      console.error(`[DataMode] Save failed (attempt ${attempt}):`, error)
+    }
 
-      if (attempt < maxRetries) {
-        // Exponential backoff: 1s, 2s, 4s
-        const delayMs = 2 ** (attempt - 1) * 1000
-        await delay(delayMs)
-      } else {
-        // Final failure - log and update error counter
-        console.error('[DataMode] All retry attempts failed')
-        incrementSaveErrorCount()
-        return false
-      }
+    if (attempt < maxRetries) {
+      // Exponential backoff: 1s, 2s, 4s
+      const delayMs = 2 ** (attempt - 1) * 1000
+      await delay(delayMs)
     }
   }
+
+  // Every attempt failed - log and update error counter
+  console.error('[DataMode] All retry attempts failed')
+  incrementSaveErrorCount()
   return false
 }
 
