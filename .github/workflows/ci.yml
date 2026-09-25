@@ -35,6 +35,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      # src/buildInfo.ts is gitignored and generated at build time, but
+      # tsc needs it to resolve the import in desktop/layout.ts.
+      - name: Generate build info
+        run: node scripts/generate-build-info.cjs
+
       - name: Type check
         run: pnpm run check
 
