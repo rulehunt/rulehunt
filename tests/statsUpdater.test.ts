@@ -62,7 +62,6 @@ describe('updateStatisticsDisplay auto-mutate trigger', () => {
       summaryPanel.elements,
       progressBar,
       undefined,
-      undefined,
       autoMutateCallback,
     )
 
@@ -81,7 +80,6 @@ describe('updateStatisticsDisplay auto-mutate trigger', () => {
       summaryPanel.elements,
       progressBar,
       undefined,
-      undefined,
       autoMutateCallback,
     )
 
@@ -98,7 +96,6 @@ describe('updateStatisticsDisplay auto-mutate trigger', () => {
       cellularAutomata,
       summaryPanel.elements,
       progressBar,
-      undefined,
       undefined,
       autoMutateCallback,
     )

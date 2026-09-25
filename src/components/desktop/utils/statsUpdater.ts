@@ -18,7 +18,6 @@ export function updateStatisticsDisplay(
   elements: SummaryPanelElements,
   progressBar: ReturnType<typeof createProgressBar>,
   statsBarComponent?: ReturnType<typeof createStatsBar>,
-  autosaveCallback?: () => void,
   autoMutateCallback?: () => void | Promise<void>,
   audioEngine?: AudioEngine | null,
 ) {
@@ -38,11 +37,6 @@ export function updateStatisticsDisplay(
       100,
     )
     progressBar.set(Math.round(progressPercent))
-
-    // Check for autosave after updating progress
-    if (autosaveCallback) {
-      autosaveCallback()
-    }
 
     // Start the auto-mutation cycle once progress completes, if enabled
     if (progressPercent >= 100 && autoMutateCallback) {
