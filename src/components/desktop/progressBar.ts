@@ -27,7 +27,7 @@ export function createProgressBar(options: ProgressBarOptions = {}): {
 
   root.innerHTML = `
     <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-      <span>Simulation progress (autosaves at 100%)</span>
+      <span>Simulation progress</span>
       <span id="progress-label">${initialValue}%</span>
     </div>
     <div class="flex items-center gap-2 w-full">

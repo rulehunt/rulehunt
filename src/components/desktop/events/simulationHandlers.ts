@@ -55,7 +55,6 @@ export function setupStepHandler(
       deps.progressBar,
       deps.statsBar,
       undefined,
-      undefined,
       deps.audioEngine,
     )
   })
@@ -106,7 +105,6 @@ export function setupResetHandler(
         deps.summaryPanel.elements,
         deps.progressBar,
         deps.statsBar,
-        undefined,
         undefined,
         deps.audioEngine,
       )
@@ -180,7 +178,6 @@ export function setupPlayPauseHandler(
           deps.summaryPanel.elements,
           deps.progressBar,
           deps.statsBar,
-          undefined,
           deps.autoMutateCallback,
           deps.audioEngine,
         )

@@ -169,7 +169,7 @@ export async function setupDesktopLayout(
     audioEngine.start()
   }
 
-  // Create progress bar (no button - autosave enabled)
+  // Create progress bar (no save button)
   const progressBar = createProgressBar({
     initialValue: 0,
   })
@@ -504,7 +504,6 @@ export async function setupDesktopLayout(
       progressBar,
       statsBar,
       undefined,
-      undefined,
       audioEngine,
     )
     initializeSimulationMetadata()
@@ -687,7 +686,6 @@ export async function setupDesktopLayout(
       summaryPanel.elements,
       progressBar,
       statsBar,
-      undefined,
       undefined,
       audioEngine,
     )
