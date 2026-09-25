@@ -45,10 +45,10 @@ export class StatisticsTracker {
   private entityDetectionInterval = 10 // Run entity detection every N steps
   private entropyCalculationInterval = 10 // Run entropy calculation every N steps
 
-  // Sparse entity detection optimization
-  // Note: Testing showed sparse detection doesn't improve performance for typical CA patterns
-  // with very low activity (<0.5%). The overhead of building active regions outweighs benefits.
-  // Keeping implementation for potential future use with higher-activity scenarios.
+  // Sparse entity detection was removed in #222: it was permanently disabled,
+  // and testing showed it doesn't improve performance for typical CA patterns
+  // with very low activity (<0.5%) — building the active regions costs more
+  // than a full detection pass. Recorded here so it isn't re-attempted blindly.
 
   // Sparse entropy calculation optimization
   // Instead of checking every overlapping block, sample systematically with larger stride
