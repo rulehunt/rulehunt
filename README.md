@@ -1,6 +1,6 @@
 # RuleHunt 🔍
 
-[![codecov](https://codecov.io/gh/rjwalters/rulehunt/branch/main/graph/badge.svg)](https://codecov.io/gh/rjwalters/rulehunt)
+[![codecov](https://codecov.io/gh/rulehunt/rulehunt/branch/main/graph/badge.svg)](https://codecov.io/gh/rulehunt/rulehunt)
 
 **A distributed exploration of the vast universe of cellular automata rules**
 
