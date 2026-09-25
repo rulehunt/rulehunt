@@ -148,7 +148,7 @@ function createFavoriteCard(
 
   const hex = document.createElement('div')
   hex.className = 'text-xs text-gray-600 dark:text-gray-400 font-mono'
-  hex.textContent = favorite.ruleset_hex.slice(0, 12) + '...'
+  hex.textContent = `${favorite.ruleset_hex.slice(0, 12)}...`
 
   const seedInfo = document.createElement('div')
   seedInfo.className = 'text-xs text-gray-500 dark:text-gray-500 mt-2'

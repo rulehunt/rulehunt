@@ -27,26 +27,25 @@
     "cloc": "cloc . --exclude-dir=node_modules,dist,build,.next,out"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.2.7",
+    "@biomejs/biome": "^2.5.14",
     "@cloudflare/workers-types": "^4.20251014.0",
-    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^24.9.1",
     "@vitest/coverage-v8": "^4.0.1",
-    "gpu.js": "^2.16.0",
+    "gpu.js": "^2.24.1",
     "jsdom": "^27.0.1",
     "puppeteer": "^24.26.0",
-    "tsx": "^4.20.6",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vite": "^7.1.11",
     "vitest": "^4.0.1",
-    "wrangler": "^4.44.0",
-    "zod": "^4.1.12"
+    "wrangler": "^4.137.0",
+    "zod": "^4.6.5"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.2",
+    "bcryptjs": "^3.0.3",
     "chart.js": "^4.5.1",
     "chartjs-chart-error-bars": "^4.4.5",
-    "jose": "^6.1.0",
+    "jose": "^6.2.12",
     "nanoid": "^5.1.6"
   },
   "packageManager": "pnpm@11.20.0"

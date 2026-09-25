@@ -57,7 +57,7 @@ export function setupConwayHandler(
     deps.applyInitialCondition()
     if (deps.cellularAutomata.isCurrentlyPlaying()) {
       deps.cellularAutomata.pause()
-      const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value)
+      const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value, 10)
       const expanded = expandC4Ruleset(
         deps.currentRuleset.value,
         deps.orbitLookup,
@@ -95,7 +95,7 @@ export function setupOutlierHandler(
     deps.applyInitialCondition()
     if (deps.cellularAutomata.isCurrentlyPlaying()) {
       deps.cellularAutomata.pause()
-      const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value)
+      const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value, 10)
       const expanded = expandC4Ruleset(
         deps.currentRuleset.value,
         deps.orbitLookup,
@@ -125,7 +125,7 @@ export function setupMutateHandler(
   deps: RulesetHandlerDeps,
 ) {
   btnMutate.addEventListener('click', () => {
-    const mutationPercentage = Number.parseInt(deps.mutationSlider.value)
+    const mutationPercentage = Number.parseInt(deps.mutationSlider.value, 10)
     const magnitude = mutationPercentage / 100
     const mutated = mutateC4Ruleset(deps.currentRuleset.value, magnitude, true)
     deps.currentRuleset.value = mutated
@@ -151,7 +151,7 @@ export function setupMutateHandler(
     deps.applyInitialCondition()
     if (deps.cellularAutomata.isCurrentlyPlaying()) {
       deps.cellularAutomata.pause()
-      const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value)
+      const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value, 10)
       const expanded = expandC4Ruleset(
         deps.currentRuleset.value,
         deps.orbitLookup,

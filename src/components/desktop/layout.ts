@@ -126,6 +126,7 @@ export async function setupDesktopLayout(
       // Get volume from localStorage (0-100) and convert to 0-1
       const volumePercent = Number.parseInt(
         localStorage.getItem('sound-volume') || '15',
+        10,
       )
       const volume = volumePercent / 100
       audioEngine = new AudioEngine(volume)
@@ -151,6 +152,7 @@ export async function setupDesktopLayout(
   if (soundEnabled) {
     const volumePercent = Number.parseInt(
       localStorage.getItem('sound-volume') || '15',
+      10,
     )
     const volume = volumePercent / 100
     audioEngine = new AudioEngine(volume)
@@ -348,7 +350,6 @@ export async function setupDesktopLayout(
   // Initialize cellular automata with colors
   const colors = getCurrentThemeColors()
   // Callback placeholder for died-out detection (set after simulation panel creation)
-  // biome-ignore lint/style/useConst: reassigned later at line 1064
   let onDiedOutCallback: (() => void) | undefined
   const cellularAutomata = new CellularAutomata(simCanvas, {
     gridRows: GRID_ROWS,
@@ -482,7 +483,7 @@ export async function setupDesktopLayout(
     } else if (initialConditionType === 'patch') {
       cellularAutomata.patchSeed()
     } else {
-      const percentage = Number.parseInt(aliveSlider.value)
+      const percentage = Number.parseInt(aliveSlider.value, 10)
       cellularAutomata.randomSeed(percentage)
     }
     // Explicit render after seeding
@@ -501,11 +502,11 @@ export async function setupDesktopLayout(
 
   function initializeSimulationMetadata() {
     const stats = cellularAutomata.getStatistics()
-    const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
+    const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value, 10)
 
     let seedPercentage: number | undefined
     if (initialConditionType === 'random' || initialConditionType === 'patch') {
-      seedPercentage = Number.parseInt(aliveSlider.value)
+      seedPercentage = Number.parseInt(aliveSlider.value, 10)
     }
 
     stats.initializeSimulation({
@@ -527,7 +528,7 @@ export async function setupDesktopLayout(
 
     let seedPercentage: number | undefined
     if (initialConditionType === 'random' || initialConditionType === 'patch') {
-      seedPercentage = Number.parseInt(aliveSlider.value)
+      seedPercentage = Number.parseInt(aliveSlider.value, 10)
     }
 
     updateURLWithoutReload({
@@ -539,7 +540,7 @@ export async function setupDesktopLayout(
   }
 
   function generateRandomPatternRule() {
-    const percentage = Number.parseInt(orbitSlider.value)
+    const percentage = Number.parseInt(orbitSlider.value, 10)
     const density = percentage / 100
     const ruleset = randomC4RulesetByDensity(density)
     currentRuleset = ruleset
@@ -561,7 +562,7 @@ export async function setupDesktopLayout(
     applyInitialCondition()
     if (cellularAutomata.isCurrentlyPlaying()) {
       cellularAutomata.pause()
-      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
+      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value, 10)
       const expanded = expandC4Ruleset(currentRuleset, orbitLookup)
       cellularAutomata.play(stepsPerSecond, expanded)
     }
