@@ -30,6 +30,7 @@ tsconfig.tsbuildinfo
 !.claude/commands/
 !.claude/settings.json
 !.claude/skills/
+!.claude/agents/
 # machine-local: records the absolute path of the install source clone
 .claude/skills/**/.install-local.json
 
