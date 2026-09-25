@@ -4,98 +4,69 @@ This directory contains GitHub configuration templates that Loom installs into n
 
 ## Contents
 
-### Workflows
+Loom ships exactly these four files under `.github/` (installed by `scripts/install-loom.sh`'s
+defaults walk, which mirrors `defaults/.github/` into the workspace):
 
-**`workflows/label-external-issues.yml`**
-- Automatically detects external contributors (non-collaborators)
-- Adds `external` label to their issues
-- Posts welcome comment explaining the workflow
-- Ensures AI agents focus on internal issues only
+- **`CONFIGURATION.md`** — this file
+- **`ISSUE_TEMPLATE/task.yml`** — single unified template for all development tasks (Bug Fix,
+  Feature, Refactoring, Documentation, Testing, Infrastructure, Research, Improvement); explains
+  that issues control the development process; redirects discussions to GitHub Discussions
+- **`ISSUE_TEMPLATE/config.yml`** — disables blank issues (forces template use) and links to
+  GitHub Discussions for non-task items
+- **`labels.yml`** — the authoritative label set for the label-based workflow (see below)
 
-### Issue Templates
-
-**`ISSUE_TEMPLATE/task.yml`**
-- Single unified template for all development tasks
-- Supports: Bug Fix, Feature, Refactoring, Documentation, Testing, Infrastructure, Research, Improvement
-- Clearly explains that issues control the development process
-- Redirects discussions to GitHub Discussions
-
-**`ISSUE_TEMPLATE/config.yml`**
-- Disables blank issues (forces template use)
-- Links to GitHub Discussions for non-task items
+Everything else under a workspace's `.github/` (e.g. `workflows/`) is consumer-owned — Loom
+never installs, edits, or removes it. If you see a `.github/` file not in this list, it isn't
+from Loom.
 
 ## How It Works
 
-### External Issue Workflow
-
-1. Non-collaborator creates an issue
-2. Workflow automatically:
-   - Checks if user is a repo collaborator
-   - Adds `external` label if not
-   - Posts welcome comment explaining the triage process
-3. Maintainers review and either:
-   - Accept: Remove `external` label, add `loom:triage`
-   - Reject: Close with explanation
-
-### Internal Issue Workflow
+### Issue Workflow
 
 1. Collaborator creates an issue (no auto-labeling)
 2. Issue starts with `loom:triage` label (from template)
 3. Enters the label-based workflow:
-   - Curator enhances → adds `loom:ready`
-   - Worker implements → adds `loom:in-progress`
+   - Curator enhances → adds `loom:curated`
+   - `loom:curated` → `loom:issue` promotion (human, Champion, or the `/loom:sweep`
+     orchestrator's approval gate — see `.loom/roles/curator.md` § "Who promotes
+     `loom:curated` → `loom:issue`" for the authoritative rule)
+   - Builder implements → adds `loom:building`
    - Creates PR → adds `loom:review-requested`
-   - Reviewer approves → adds `loom:pr`
+   - Judge approves → adds `loom:pr`
    - Merge completes workflow
 
 ## Installation
 
-### Automatic Template Installation
+These files are copied from `defaults/.github/` into `<workspace>/.github/` by
+`scripts/install-loom.sh`'s defaults-directory walk, and are re-synced on a forced `loom update` /
+reinstall (they're on the Loom-shipped `.github/` allowlist, so a forced reinstall overwrites
+local edits to these four files — customize via `defaults/optional/` or a fork instead).
+`CONFIGURATION.md` specifically is also covered by `./.loom/scripts/resync-installed.sh`, so a
+fix to this file reaches an existing install without a full forced reinstall.
 
-These templates are automatically copied to `<workspace>/.github/` during:
-- Initial workspace setup
-- Factory reset
-- New project creation
+### Optional: External Issue Labeling Workflow
 
-### Required GitHub Label
+For repositories that expect external contributors, an optional workflow is available that automatically labels issues from non-collaborators. See `defaults/optional/github-workflows/label-external-issues.yml` in the Loom source repository.
 
-The workflow requires an `external` label to exist in the repository. Create it with:
-
-```bash
-gh label create external --description "External contribution requiring manual triage" --color "6B7280"
-```
-
-**Label Protection**: GitHub's default permission model prevents non-collaborators from adding or removing labels. Once the workflow adds the `external` label to an issue, the external contributor cannot remove it. Only users with "Triage" permission or higher (collaborators, maintainers) can manage labels.
+This workflow is not installed by default because it generates "No jobs were run" email notifications from GitHub on every issue event in single-contributor repos.
 
 ## Customization
 
-Workspaces can customize these templates after installation:
-- Modify issue template fields
-- Adjust workflow triggers or conditions
-- Add additional workflows
-
-Changes to workspace `.github/` files don't affect the defaults.
+Workspaces can customize non-Loom-shipped `.github/` content freely (it's never touched by
+Loom). Customizing one of the four Loom-shipped files above will be clobbered on the next
+`loom update` / reinstall — instead add workflows from `defaults/optional/`, or fork.
 
 ## Label-Based Workflow
 
-The issue template integrates with Loom's label-based workflow coordination:
+The issue template integrates with Loom's label-based workflow coordination. `.github/labels.yml`
+is the authoritative label set (each label's `Applied by:` field states who sets it) — see that
+file rather than a table here, which would drift.
 
-| Label | Meaning | Who Sets It |
-|-------|---------|-------------|
-| `external` | External contribution | Workflow (automatic) |
-| `loom:triage` | Needs review/enhancement | Template (default) |
-| `loom:ready` | Ready for implementation | Curator agent |
-| `loom:in-progress` | Being worked on | Worker agent |
-| `loom:review-requested` | PR needs review | Worker agent |
-| `loom:reviewing` | Under review | Reviewer agent |
-| `loom:pr` | Approved for merge | Reviewer agent |
-
-See [WORKFLOWS.md](../../WORKFLOWS.md) for complete workflow documentation.
+See [WORKFLOWS.md](https://github.com/rjwalters/loom/blob/main/docs/workflows.md) for complete workflow documentation.
 
 ## Benefits
 
-1. **Automatic Triage**: External issues clearly marked for manual review
-2. **Workflow Clarity**: Template explains how issues are used
-3. **Reduced Noise**: Discussions redirected away from issue tracker
-4. **AI Integration**: Labels coordinate autonomous agent behavior
-5. **Consistent Setup**: Every Loom workspace gets the same workflow
+1. **Workflow Clarity**: Template explains how issues are used
+2. **Reduced Noise**: Discussions redirected away from issue tracker
+3. **AI Integration**: Labels coordinate autonomous agent behavior
+4. **Consistent Setup**: Every Loom workspace gets the same configuration
