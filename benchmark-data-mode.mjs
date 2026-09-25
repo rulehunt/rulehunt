@@ -43,7 +43,7 @@ page.on('console', (msg) => {
     )
     if (match) {
       roundSummaries.push({
-        round: Number.parseInt(match[1]),
+        round: Number.parseInt(match[1], 10),
         avg: Number.parseFloat(match[2]),
         p50: Number.parseFloat(match[3]),
         p90: Number.parseFloat(match[4]),

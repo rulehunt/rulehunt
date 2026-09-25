@@ -15,7 +15,7 @@ try {
   const buildTime = new Date().toISOString()
 
   // Create build info object
-  const buildInfo = {
+  const _buildInfo = {
     commitHash,
     buildTime,
   }

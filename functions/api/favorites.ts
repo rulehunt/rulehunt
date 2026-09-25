@@ -20,8 +20,11 @@ export const onRequestGet = async (
   try {
     const url = new URL(ctx.request.url)
     const userId = url.searchParams.get('userId') || 'anonymous'
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100)
-    const offset = parseInt(url.searchParams.get('offset') || '0')
+    const limit = Math.min(
+      parseInt(url.searchParams.get('limit') || '50', 10),
+      100,
+    )
+    const offset = parseInt(url.searchParams.get('offset') || '0', 10)
 
     // --- Query for starred patterns with pagination ---
     const query = `

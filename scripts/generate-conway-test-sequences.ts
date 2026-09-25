@@ -385,7 +385,7 @@ const testSequences: Record<string, TestSequenceConfig> = {
 }
 
 // Generate sequences
-function generateSequence(name: string, initial: Grid, steps: number) {
+function generateSequence(_name: string, initial: Grid, steps: number) {
   const sequence: Grid[] = [initial]
   let current = initial
 

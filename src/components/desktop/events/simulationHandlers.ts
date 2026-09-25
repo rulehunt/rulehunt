@@ -112,7 +112,10 @@ export function setupResetHandler(
 
       // Resume playing if it was playing before reset
       if (wasPlaying) {
-        const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value)
+        const stepsPerSecond = Number.parseInt(
+          deps.stepsPerSecondInput.value,
+          10,
+        )
         const expanded = expandC4Ruleset(
           deps.currentRuleset.value,
           deps.orbitLookup,
@@ -154,7 +157,7 @@ export function setupPlayPauseHandler(
         deps.statsUpdateInterval.value = null
       }
     } else {
-      const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value)
+      const stepsPerSecond = Number.parseInt(deps.stepsPerSecondInput.value, 10)
       const expanded = expandC4Ruleset(
         deps.currentRuleset.value,
         deps.orbitLookup,
@@ -192,7 +195,7 @@ export function setupStepsPerSecondHandler(
   stepsPerSecondInput.addEventListener('change', () => {
     if (deps.cellularAutomata.isCurrentlyPlaying()) {
       deps.cellularAutomata.pause()
-      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value)
+      const stepsPerSecond = Number.parseInt(stepsPerSecondInput.value, 10)
       const expanded = expandC4Ruleset(
         deps.currentRuleset.value,
         deps.orbitLookup,

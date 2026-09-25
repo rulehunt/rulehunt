@@ -88,7 +88,7 @@ export function createSoundControls(
     elements.volumeSlider.title = `Volume: ${volume}%`
 
     // Notify callback (convert 0-100 to 0-1 range)
-    const volumeDecimal = Number.parseInt(volume) / 100
+    const volumeDecimal = Number.parseInt(volume, 10) / 100
     onVolumeChange(volumeDecimal)
   })
 

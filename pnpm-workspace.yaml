@@ -1,7 +1,14 @@
 packages:
   - .
 
-onlyBuiltDependencies:
-  - canvas
-  - puppeteer
-  - workerd
+# Which dependencies may run install scripts (pnpm 11 build approval).
+#   esbuild  — vite/vitest bundler; needs its platform binary
+#   workerd  — wrangler's local runtime, used by `wrangler dev` and local D1
+#   gl       — headless GL, pulled in transitively by gpu.js; a heavy native
+#              build the browser code path never uses
+#   puppeteer— downloads a full Chromium; nothing in the test suite uses it
+allowBuilds:
+  esbuild: true
+  workerd: true
+  gl: false
+  puppeteer: false
